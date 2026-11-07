@@ -316,6 +316,29 @@ impl SelectionMask {
         self.has_active_selection
     }
 
+    /// Pixel bounds of every non-zero coverage value, as (x0, y0, x1, y1) with exclusive
+    /// max: the region a Copy should capture. None when nothing is selected.
+    pub fn bounds(&self) -> Option<(u32, u32, u32, u32)> {
+        let mut min_x = self.width;
+        let mut min_y = self.height;
+        let mut max_x = 0u32;
+        let mut max_y = 0u32;
+        let mut any = false;
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let index = (y as usize) * (self.width as usize) + x as usize;
+                if self.mask.get(index).copied().unwrap_or(0) > 0 {
+                    any = true;
+                    min_x = min_x.min(x);
+                    min_y = min_y.min(y);
+                    max_x = max_x.max(x);
+                    max_y = max_y.max(y);
+                }
+            }
+        }
+        any.then(|| (min_x, min_y, max_x + 1, max_y + 1))
+    }
+
     pub fn invert(&mut self) {
         for v in &mut self.mask {
             *v = 255 - *v;

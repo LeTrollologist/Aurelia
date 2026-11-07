@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use aurelia_core::blend::BlendMode;
 use aurelia_core::brush::BrushSettings;
+use aurelia_core::clipboard::ClipboardImage;
 use aurelia_core::color::{Color, DEFAULT_PALETTE};
 use aurelia_core::document::{
     Document, EditorState, GuideLine, StraightRulerState,
@@ -21,6 +22,75 @@ use aurelia_core::transform::{
 pub struct SelectionEdit {
     pub before: Option<SelectionMask>,
     pub after: Option<SelectionMask>,
+}
+
+/// Human label for a storage format, used in copy/paste status messages.
+fn format_label(format: PixelFormat) -> &'static str {
+    match format {
+        PixelFormat::Srgb8 => "RGBA8",
+        PixelFormat::Srgb16 => "RGBA16",
+    }
+}
+
+/// Clears pixels through the selection (or the whole layer when there is none).
+///
+/// Coverage scales the remaining alpha, so a Cut through a feathered selection leaves a soft
+/// hole rather than a hard rectangle; the same rule Copy uses for the payload.
+fn clear_region<C: aurelia_core::pixel::Channel>(
+    pixels: &mut [C],
+    layer_w: u32,
+    layer_h: u32,
+    offset_x: i32,
+    offset_y: i32,
+    selection: Option<&SelectionMask>,
+) {
+    for ly in 0..layer_h {
+        for lx in 0..layer_w {
+            let canvas_x = lx as i32 + offset_x;
+            let canvas_y = ly as i32 + offset_y;
+            let coverage = selection
+                .map(|mask| {
+                    if canvas_x < 0 || canvas_y < 0 {
+                        0
+                    } else {
+                        mask.get_value(canvas_x as u32, canvas_y as u32) as u32
+                    }
+                })
+                .unwrap_or(255);
+            if coverage == 0 {
+                continue;
+            }
+            let index = ((ly as usize) * (layer_w as usize) + lx as usize) * 4;
+            if index + 3 >= pixels.len() {
+                continue;
+            }
+            let alpha = pixels[index + 3].to_scaled_f32();
+            let kept = alpha * (255 - coverage) as f32 / 255.0;
+            pixels[index + 3] = C::from_scaled_f32(kept);
+        }
+    }
+}
+
+fn clear_region_8(
+    pixels: &mut [u8],
+    layer_w: u32,
+    layer_h: u32,
+    offset_x: i32,
+    offset_y: i32,
+    selection: Option<&SelectionMask>,
+) {
+    clear_region(pixels, layer_w, layer_h, offset_x, offset_y, selection);
+}
+
+fn clear_region_16(
+    pixels: &mut [u16],
+    layer_w: u32,
+    layer_h: u32,
+    offset_x: i32,
+    offset_y: i32,
+    selection: Option<&SelectionMask>,
+) {
+    clear_region(pixels, layer_w, layer_h, offset_x, offset_y, selection);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,6 +218,16 @@ impl CanvasPreset {
         Self { category: "Pixel Art", name: "Scene (128 × 128)", width: 128, height: 128 },
         Self { category: "Pixel Art", name: "Retro (256 × 256)", width: 256, height: 256 },
     ];
+}
+
+/// Clipboard commands requested from the Edit menu. The host window performs them because
+/// only it owns the Win32 clipboard; the state methods handle the internal payload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PendingEditAction {
+    Copy,
+    Cut,
+    Paste,
+    CopyMerged,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -479,6 +559,8 @@ pub struct AppState {
     pub is_space_panning: bool,
     pub pan_drag_start: Option<Vec2>,
     pub pending_file_action: Option<PendingFileAction>,
+    /// Clipboard command requested by the Edit menu, processed by the host after the frame.
+    pub pending_edit_action: Option<PendingEditAction>,
 
     // ── Document lifecycle & save safety ──
     /// Path of the project on disk, once it has been saved or opened.
@@ -507,6 +589,11 @@ pub struct AppState {
     pub discord_presence_configured: bool,
     /// Separate opt-in: include the project display name in the activity.
     pub discord_show_project_name: bool,
+    // ── Clipboard (#v3.7.1) ──
+    /// Internal clipboard: keeps the source storage width, so RGBA16 copies stay lossless.
+    pub clipboard: Option<ClipboardImage>,
+    /// Set when the internal clipboard should be mirrored to the Win32 clipboard by the host.
+    pub clipboard_sync_pending: bool,
     pub show_discord_presence_dialog: bool,
     // ── Custom window chrome ──
     pub window_action: Option<WindowAction>,
@@ -751,6 +838,7 @@ impl AppState {
             is_space_panning: false,
             pan_drag_start: None,
             pending_file_action: None,
+            pending_edit_action: None,
             document_path: None,
             saved_generation: 0,
             recent_files: Vec::new(),
@@ -766,6 +854,8 @@ impl AppState {
             discord_presence: false,
             discord_presence_configured: false,
             discord_show_project_name: false,
+            clipboard: None,
+            clipboard_sync_pending: false,
             show_discord_presence_dialog: false,
             window_action: None,
             is_maximized: false,
@@ -2089,6 +2179,146 @@ impl AppState {
             return self.redo_selection_edit();
         }
         self.history.redo(&mut self.document)
+    }
+
+    // ── Clipboard (#v3.7.1) ──
+
+    /// Copies the active layer through the selection (or whole layer) into the internal
+    /// clipboard. Returns false when there is no raster/text layer to copy.
+    pub fn copy_active_layer(&mut self) -> bool {
+        let (width, height) = (self.document.width, self.document.height);
+        let Some(layer) = self.document.active_layer() else {
+            self.set_status("Nothing to copy: no active pixel layer");
+            return false;
+        };
+        if !layer.is_raster() && !layer.is_text() {
+            self.set_status("Nothing to copy: the active layer has no pixels");
+            return false;
+        }
+        let Some(image) = ClipboardImage::from_layer(layer, width, height, self.selection.as_ref())
+        else {
+            self.set_status("Nothing to copy: the selection is empty");
+            return false;
+        };
+        self.set_status(format!(
+            "Copied {} x {} px ({})",
+            image.width,
+            image.height,
+            format_label(image.format)
+        ));
+        self.clipboard = Some(image);
+        self.clipboard_sync_pending = true;
+        true
+    }
+
+    /// Cuts the active layer through the selection (or clears it), keeping the payload for
+    /// paste. The clear is a normal undoable pixel edit.
+    pub fn cut_active_layer(&mut self) -> bool {
+        if !self.copy_active_layer() {
+            return false;
+        }
+        let Some(layer) = self.document.active_layer_mut() else {
+            return false;
+        };
+        let before = layer.storage_bytes();
+        let selection = self.selection.clone();
+        let (layer_w, layer_h) = (layer.width, layer.height);
+        let (offset_x, offset_y) = (layer.offset_x, layer.offset_y);
+        match layer.buffer_mut() {
+            aurelia_core::layer::LayerBuffer::Srgb8(pixels) => {
+                clear_region_8(pixels, layer_w, layer_h, offset_x, offset_y, selection.as_ref());
+            }
+            aurelia_core::layer::LayerBuffer::Srgb16(pixels) => {
+                clear_region_16(pixels, layer_w, layer_h, offset_x, offset_y, selection.as_ref());
+            }
+        }
+        let after = layer.storage_bytes();
+        if before != after {
+            let id = layer.id;
+            self.history.push(Box::new(
+                aurelia_core::history::LayerPixelsDeltaCommand::new(id, "Cut", before, after),
+            ));
+            self.set_status("Cut selection");
+        }
+        true
+    }
+
+    /// Copies the flattened visible document, honouring the selection as a mask.
+    pub fn copy_merged(&mut self) {
+        let (width, height) = (self.document.width, self.document.height);
+        let mut rgba = self.document.composite_layers(true);
+        if let Some(selection) = &self.selection {
+            for y in 0..height {
+                for x in 0..width {
+                    let coverage = selection.get_value(x, y) as u32;
+                    let at = ((y * width + x) * 4) as usize;
+                    if at + 3 < rgba.len() {
+                        rgba[at + 3] = ((rgba[at + 3] as u32 * coverage + 127) / 255) as u8;
+                    }
+                }
+            }
+        }
+        let bounds = self
+            .selection
+            .as_ref()
+            .and_then(SelectionMask::bounds)
+            .unwrap_or((0, 0, width, height));
+        let (x0, y0, x1, y1) = bounds;
+        if x1 <= x0 || y1 <= y0 {
+            self.set_status("Nothing to copy: the selection is empty");
+            return;
+        }
+        let region_w = x1 - x0;
+        let region_h = y1 - y0;
+        let mut region = Vec::with_capacity((region_w * region_h * 4) as usize);
+        for y in y0..y1 {
+            let row = ((y * width + x0) * 4) as usize;
+            region.extend_from_slice(&rgba[row..row + (region_w * 4) as usize]);
+        }
+        self.clipboard = ClipboardImage::from_rgba8(region_w, region_h, x0 as i32, y0 as i32, &region);
+        self.clipboard_sync_pending = true;
+        self.set_status(format!("Copied merged {} x {} px", region_w, region_h));
+    }
+
+    /// Pastes the internal clipboard as a new layer at its original canvas position.
+    pub fn paste_clipboard(&mut self) -> bool {
+        let Some(image) = self.clipboard.clone() else {
+            return false;
+        };
+        self.paste_image(image)
+    }
+
+    /// Pastes an image read from another application's clipboard, centred on the canvas.
+    pub fn paste_external_image(&mut self, width: u32, height: u32, rgba: &[u8]) -> bool {
+        let origin_x = ((self.document.width as i32 - width as i32) / 2).max(0);
+        let origin_y = ((self.document.height as i32 - height as i32) / 2).max(0);
+        let Some(image) = ClipboardImage::from_rgba8(width, height, origin_x, origin_y, rgba) else {
+            self.set_status("Clipboard image is empty or malformed");
+            return false;
+        };
+        self.paste_image(image)
+    }
+
+    fn paste_image(&mut self, image: ClipboardImage) -> bool {
+        let (width, height) = (self.document.width, self.document.height);
+        let name = format!("Pasted Layer {}", self.document.layers.len() + 1);
+        let id = self.document.add_layer(Some(name.clone()));
+        let pasted = image.to_layer(id, name, width, height);
+        if let Some(layer) = self.document.get_layer_mut(id) {
+            *layer = pasted;
+        }
+        let insert_index = self.document.layers.len().saturating_sub(1);
+        if let Some(layer) = self.document.get_layer(id).cloned() {
+            self.history.push(Box::new(aurelia_core::history::AddLayerCommand {
+                layer,
+                insert_index,
+            }));
+        }
+        self.set_status(format!(
+            "Pasted {} x {} px as a new layer",
+            image.width, image.height
+        ));
+        true
     }
 
     pub fn fill_selection_active_layer(&mut self) {
@@ -3663,5 +3893,127 @@ mod dpi_transitions {
         state.apply_dpi_scale(1.5, 1.5);
         assert_eq!(state.zoom, 2.0);
         assert_eq!(state.pan, Vec2::new(3.0, 4.0));
+    }
+}
+
+#[cfg(test)]
+mod clipboard_actions {
+    use super::AppState;
+    use aurelia_core::layer::PixelFormat;
+    use glam::Vec2;
+
+    fn doc_with_pattern(format: PixelFormat) -> AppState {
+        let mut state = AppState::new(8, 8);
+        let id = state.document.active_layer_id;
+        if format == PixelFormat::Srgb16 {
+            if let Some(layer) = state.document.get_layer_mut(id) {
+                layer.convert_format(PixelFormat::Srgb16);
+            }
+        }
+        if let Some(layer) = state.document.get_layer_mut(id) {
+            match layer.buffer_mut() {
+                aurelia_core::layer::LayerBuffer::Srgb8(px) => {
+                    for (i, p) in px.chunks_exact_mut(4).enumerate() {
+                        p[0] = (i * 3) as u8;
+                        p[1] = (i * 5) as u8;
+                        p[2] = 7;
+                        p[3] = 255;
+                    }
+                }
+                aurelia_core::layer::LayerBuffer::Srgb16(px) => {
+                    for (i, p) in px.chunks_exact_mut(4).enumerate() {
+                        p[0] = (i as u16).wrapping_mul(4099);
+                        p[1] = 1234;
+                        p[2] = 65535;
+                        p[3] = 65535;
+                    }
+                }
+            }
+        }
+        state
+    }
+
+    #[test]
+    fn copy_and_paste_preserve_16_bit_bytes_and_are_undoable() {
+        let mut state = doc_with_pattern(PixelFormat::Srgb16);
+        state.selection = Some(aurelia_core::selection::SelectionMask::from_rect(
+            8,
+            8,
+            Vec2::new(2.0, 2.0),
+            Vec2::new(6.0, 6.0),
+        ));
+        assert!(state.copy_active_layer());
+        let clip = state.clipboard.clone().expect("clipboard");
+        assert_eq!(clip.format, PixelFormat::Srgb16);
+        assert_eq!((clip.width, clip.height), (4, 4));
+
+        let source = state.document.active_layer().expect("layer").as_srgb16().expect("16-bit").to_vec();
+        assert!(state.paste_clipboard());
+        assert_eq!(state.document.layers.len(), 2, "paste adds one layer");
+        let pasted = state.document.active_layer().expect("pasted").as_srgb16().expect("16-bit");
+        // The pasted region starts at the copied origin (2,2) in canvas space.
+        let at = ((2 * 8 + 2) * 4) as usize;
+        assert_eq!(&pasted[at..at + 4], &source[at..at + 4]);
+        assert_eq!(state.document.active_layer().expect("pasted").format(), PixelFormat::Srgb16);
+
+        state.undo_action();
+        assert_eq!(state.document.layers.len(), 1, "undo removes the pasted layer");
+        state.redo_action();
+        assert_eq!(state.document.layers.len(), 2, "redo restores the pasted layer");
+    }
+
+    #[test]
+    fn cut_clears_only_the_selection_and_undo_restores_it() {
+        let mut state = doc_with_pattern(PixelFormat::Srgb8);
+        state.selection = Some(aurelia_core::selection::SelectionMask::from_rect(
+            8,
+            8,
+            Vec2::new(0.0, 0.0),
+            Vec2::new(4.0, 4.0),
+        ));
+        let before = state.document.active_layer().expect("layer").storage_bytes();
+        assert!(state.cut_active_layer());
+        let after = state.document.active_layer().expect("layer").as_srgb8().expect("8-bit").to_vec();
+        assert_eq!(after[3], 0, "cut pixel becomes transparent");
+        let outside = (7 * 4) as usize;
+        assert_eq!(after[outside + 3], 255, "outside the selection is untouched");
+        assert_eq!(state.history.len(), 1, "cut is one undo step");
+
+        state.undo_action();
+        assert_eq!(state.document.active_layer().expect("layer").storage_bytes(), before);
+    }
+
+    #[test]
+    fn copy_merged_applies_the_selection_as_a_mask() {
+        let mut state = doc_with_pattern(PixelFormat::Srgb8);
+        state.selection = Some(aurelia_core::selection::SelectionMask::from_rect(
+            8,
+            8,
+            Vec2::new(2.0, 2.0),
+            Vec2::new(6.0, 6.0),
+        ));
+        state.copy_merged();
+        let clip = state.clipboard.clone().expect("clipboard");
+        assert_eq!((clip.width, clip.height), (4, 4));
+        // Fully selected interior stays opaque in the payload.
+        if let aurelia_core::layer::LayerBuffer::Srgb8(px) = &clip.pixels {
+            assert_eq!(px[3], 255);
+        } else {
+            panic!("merged copy is 8-bit");
+        }
+    }
+
+    #[test]
+    fn external_paste_centres_and_adds_a_layer() {
+        let mut state = AppState::new(16, 16);
+        let mut rgba = vec![200u8; 4 * 4 * 4];
+        for px in rgba.chunks_exact_mut(4) { px[3] = 255; }
+        assert!(state.paste_external_image(4, 4, &rgba));
+        assert_eq!(state.document.layers.len(), 2);
+        let layer = state.document.active_layer().expect("layer");
+        let centre = ((8 * 16 + 8) * 4) as usize;
+        let pixels = layer.as_srgb8().expect("8-bit");
+        assert_eq!(pixels[centre], 200);
+        assert_eq!(pixels[centre + 3], 255);
     }
 }

@@ -3,8 +3,8 @@ use crate::fonts;
 
 use crate::icons::draw_tool_icon;
 use crate::state::{
-    ActiveFilterModal, AppState, CanvasPreset, GuideOrientation, MoveMode, PendingFileAction,
-    WindowAction,
+    ActiveFilterModal, AppState, CanvasPreset, GuideOrientation, MoveMode, PendingEditAction,
+    PendingFileAction, WindowAction,
 };
 use egui::{Align, Color32, Layout, Rect, RichText, ScrollArea, Stroke, Vec2};
 use aurelia_core::brush::{EraserMode, GradientType, ShapeFillMode, ToolType};
@@ -509,6 +509,23 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         });
 
                         ui.menu_button("Edit", |ui| {
+                            if ui.button("✂ Cut (Ctrl+X)").clicked() {
+                                state.pending_edit_action = Some(PendingEditAction::Cut);
+                                ui.close_menu();
+                            }
+                            if ui.button("⧉ Copy (Ctrl+C)").clicked() {
+                                state.pending_edit_action = Some(PendingEditAction::Copy);
+                                ui.close_menu();
+                            }
+                            if ui.button("⧉ Copy Merged (Ctrl+Shift+C)").clicked() {
+                                state.pending_edit_action = Some(PendingEditAction::CopyMerged);
+                                ui.close_menu();
+                            }
+                            if ui.button("📋 Paste (Ctrl+V)").clicked() {
+                                state.pending_edit_action = Some(PendingEditAction::Paste);
+                                ui.close_menu();
+                            }
+                            ui.separator();
                             if ui.button("↶ Undo (Ctrl+Z)").clicked() {
                                 if let Some(desc) = state.undo_action() {
                                     state.set_status(format!("Undo: {}", desc));

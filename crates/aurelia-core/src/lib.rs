@@ -1,6 +1,7 @@
 pub mod animation;
 pub mod assets;
 pub mod blend;
+pub mod clipboard;
 pub mod brush;
 pub mod color;
 pub mod document;
@@ -16,6 +17,7 @@ pub mod transform;
 
 pub use animation::{AnimationFrame, AnimationTimeline};
 pub use blend::BlendMode;
+pub use clipboard::ClipboardImage;
 pub use brush::{BrushPoint, BrushPreset, BrushSettings, EraserMode, GradientType, ShapeFillMode, TextAlign, TextSettings, ToolType};
 pub use color::{Color, ThemeMode, DEFAULT_PALETTE};
 pub use document::{CompositeError, Document};

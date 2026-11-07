@@ -209,7 +209,10 @@ extern "system" {
     fn GlobalUnlock(hMem: *mut std::ffi::c_void) -> i32;
     fn SetClipboardData(uFormat: UINT, hMem: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
     fn EmptyClipboard() -> i32;
+    fn GetClipboardSequenceNumber() -> u32;
     fn GlobalAlloc(uFlags: UINT, dwBytes: usize) -> *mut std::ffi::c_void;
+    fn GlobalFree(hMem: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
+    fn GlobalSize(hMem: *mut std::ffi::c_void) -> usize;
     fn SetWindowTextW(hWnd: HWND, lpString: *const u16) -> i32;
     fn MessageBoxW(hWnd: HWND, lpText: *const u16, lpCaption: *const u16, uType: UINT) -> i32;
     fn GetDpiForSystem() -> u32;
@@ -336,6 +339,113 @@ unsafe fn set_clipboard_text(hwnd: HWND, text: &str) -> bool {
     true
 }
 
+/// Places an 8-bit RGBA image on the Windows clipboard as a 32-bit DIBV5.
+///
+/// The internal clipboard keeps 16-bit precision; this is the interoperability copy other
+/// applications can read. Returns false when the clipboard is locked by another process.
+unsafe fn set_clipboard_image(hwnd: HWND, width: u32, height: u32, rgba: &[u8]) -> bool {
+    let Some(dib) = aurelia_core::clipboard::encode_dibv5(width, height, rgba) else {
+        return false;
+    };
+    if OpenClipboard(hwnd) == 0 {
+        return false;
+    }
+    EmptyClipboard();
+    let h_mem = GlobalAlloc(0x0042 /* GMEM_MOVEABLE | GMEM_ZEROINIT */, dib.len());
+    if h_mem.is_null() {
+        CloseClipboard();
+        return false;
+    }
+    let ptr = GlobalLock(h_mem) as *mut u8;
+    if ptr.is_null() {
+        GlobalFree(h_mem);
+        CloseClipboard();
+        return false;
+    }
+    std::ptr::copy_nonoverlapping(dib.as_ptr(), ptr, dib.len());
+    GlobalUnlock(h_mem);
+    let stored = !SetClipboardData(17 /* CF_DIBV5 */, h_mem).is_null();
+    if !stored {
+        GlobalFree(h_mem);
+    }
+    CloseClipboard();
+    stored
+}
+
+/// Reads a DIB image (DIBV5 or DIB) from the Windows clipboard, if one is present.
+unsafe fn get_clipboard_image(hwnd: HWND) -> Option<(u32, u32, Vec<u8>)> {
+    if OpenClipboard(hwnd) == 0 {
+        return None;
+    }
+    let mut result = None;
+    for format in [17u32 /* CF_DIBV5 */, 8u32 /* CF_DIB */] {
+        let handle = GetClipboardData(format);
+        if handle.is_null() {
+            continue;
+        }
+        let ptr = GlobalLock(handle) as *const u8;
+        if ptr.is_null() {
+            continue;
+        }
+        let size = GlobalSize(handle);
+        if size > 0 {
+            let bytes = std::slice::from_raw_parts(ptr, size);
+            result = aurelia_core::clipboard::decode_dib(bytes);
+        }
+        GlobalUnlock(handle);
+        if result.is_some() {
+            break;
+        }
+    }
+    CloseClipboard();
+    result
+}
+
+/// Copies/cuts the active layer (or merged document) and mirrors it to the Win32 clipboard.
+fn copy_current_to_clipboard(app: &mut AureliaDesktopApp, hwnd: HWND, merged: bool, cut: bool) {
+    let copied = if merged {
+        app.state.copy_merged();
+        true
+    } else if cut {
+        app.state.cut_active_layer()
+    } else {
+        app.state.copy_active_layer()
+    };
+    if !copied {
+        return;
+    }
+    if let Some(clip) = &app.state.clipboard {
+        let rgba = clip.to_rgba8();
+        unsafe {
+            set_clipboard_image(hwnd, clip.width, clip.height, &rgba);
+        }
+    }
+    // Remember the sequence we produced, so a later Paste can tell whether another
+    // application has replaced the clipboard in the meantime.
+    app.last_clipboard_seq = unsafe { GetClipboardSequenceNumber() };
+    app.state.clipboard_sync_pending = false;
+}
+
+/// Pastes the internal payload when the clipboard has not changed, otherwise the system image.
+fn paste_from_clipboard(app: &mut AureliaDesktopApp, hwnd: HWND) {
+    let sequence = unsafe { GetClipboardSequenceNumber() };
+    if sequence != app.last_clipboard_seq {
+        if let Some((width, height, rgba)) = unsafe { get_clipboard_image(hwnd) } {
+            app.state.paste_external_image(width, height, &rgba);
+            app.last_clipboard_seq = sequence;
+            return;
+        }
+    }
+    if !app.state.paste_clipboard() {
+        if let Some((width, height, rgba)) = unsafe { get_clipboard_image(hwnd) } {
+            app.state.paste_external_image(width, height, &rgba);
+            app.last_clipboard_seq = sequence;
+        } else {
+            app.state.set_status("Clipboard does not contain an image");
+        }
+    }
+}
+
 static mut GLOBAL_APP_PTR: *mut AureliaDesktopApp = std::ptr::null_mut();
 
 /// What the pointer is currently dragging on the measurement layer.
@@ -400,6 +510,8 @@ struct AureliaDesktopApp {
     stroke_size_scale: f32,
     /// Last window title pushed to Win32, to avoid redundant SetWindowTextW calls.
     last_window_title: String,
+    /// Clipboard sequence number of the last image this app put on the system clipboard.
+    last_clipboard_seq: u32,
     /// Timestamp of the previous autosave check.
     last_autosave_tick: Instant,
 }
@@ -2440,16 +2552,34 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                 || app.egui_ctx.memory(|m| m.focused().is_some())
                 || (app.state.brush.tool == ToolType::Text && app.state.active_text_layer_id.is_some());
 
-            if is_ctrl {
-                if wparam == 0x56 { // Ctrl+V (Paste)
+            if is_ctrl && is_egui_text_active {
+                if wparam == 0x56 { // Ctrl+V (Paste text)
                     if let Some(text) = get_clipboard_text(hwnd) {
                         app.events.push(egui::Event::Paste(text));
                         InvalidateRect(hwnd, std::ptr::null(), 0);
                     }
-                } else if wparam == 0x43 { // Ctrl+C (Copy)
+                } else if wparam == 0x43 { // Ctrl+C (Copy text)
                     app.events.push(egui::Event::Copy);
-                } else if wparam == 0x58 && is_egui_text_active { // Ctrl+X (Cut)
+                } else if wparam == 0x58 { // Ctrl+X (Cut text)
                     app.events.push(egui::Event::Cut);
+                }
+            } else if is_ctrl {
+                // Canvas clipboard semantics (#v3.7.1): C/X/V operate on the active layer
+                // through the selection, and paste creates a new layer.
+                match wparam {
+                    0x43 => { // Ctrl+C / Ctrl+Shift+C (Copy Merged)
+                        copy_current_to_clipboard(app, hwnd, is_shift, false);
+                        InvalidateRect(hwnd, std::ptr::null(), 0);
+                    }
+                    0x58 => { // Ctrl+X
+                        copy_current_to_clipboard(app, hwnd, false, true);
+                        InvalidateRect(hwnd, std::ptr::null(), 0);
+                    }
+                    0x56 => { // Ctrl+V
+                        paste_from_clipboard(app, hwnd);
+                        InvalidateRect(hwnd, std::ptr::null(), 0);
+                    }
+                    _ => {}
                 }
             }
 
@@ -3058,6 +3188,23 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
 
             EndPaint(hwnd, &ps);
 
+            // 8b. Handle pending clipboard actions from the Edit menu. They run here because
+            // only the host window owns the Win32 clipboard.
+            if let Some(action) = app.state.pending_edit_action.take() {
+                match action {
+                    aurelia_ui::state::PendingEditAction::Copy => {
+                        copy_current_to_clipboard(app, hwnd, false, false)
+                    }
+                    aurelia_ui::state::PendingEditAction::Cut => {
+                        copy_current_to_clipboard(app, hwnd, false, true)
+                    }
+                    aurelia_ui::state::PendingEditAction::CopyMerged => {
+                        copy_current_to_clipboard(app, hwnd, true, false)
+                    }
+                    aurelia_ui::state::PendingEditAction::Paste => paste_from_clipboard(app, hwnd),
+                }
+            }
+
             // 9. Handle pending file actions SAFELY OUTSIDE OF EGUI FRAME
             if let Some(action) = app.state.pending_file_action.take() {
                 match action {
@@ -3533,6 +3680,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         last_point_time: Instant::now(),
         current_velocity: 0.0,
         last_anim_tick: Instant::now(),
+        last_clipboard_seq: 0,
         last_navigator_refresh: Instant::now(),
         stabilized_pos: None,
         stroke_dirty: false,
