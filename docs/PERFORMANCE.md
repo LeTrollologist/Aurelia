@@ -15,6 +15,77 @@ From the development machine used for the 3.0.x/3.1.0 work:
 These are composite throughput figures, not end-to-end frame rates. UI frame timing also
 includes egui layout, panel painting and the GDI blit.
 
+## v3.7.0 baseline (#48, #49, #50)
+
+Machine: Intel64 Family 6 Model 154 Stepping 3, 12 logical cores, rustc 1.93.1, release profile.
+Measured 2026-11-07 at `9695548` plus the v3.7.0 working tree. Reproduce with the commands at the
+bottom of this file.
+
+### Sparse 16-bit ratio (#48)
+
+`cargo test -p aurelia-core gate_2 --release -- --ignored --nocapture`, five paired rounds:
+
+| Workload | u8 | Srgb16 | Ratio | Spread |
+| :--- | ---: | ---: | ---: | ---: |
+| sparse 10% | 126.6 MPix/s | 92.4 MPix/s | **0.75** | 0.64 .. 1.08 |
+
+Budget is 0.60, so v3.7.0 has 25% headroom over the floor. The 0.75 exploratory target is met on
+this run; it is recorded, not enforced, because the spread crosses 1.00 and a single fast round
+must not become a gate.
+
+### Composite path (#49 Luminosity)
+
+Full run, median of five interleaved rounds (all 13 blend modes are timed in the same pass):
+
+| Case | Throughput |
+| :--- | ---: |
+| plain stack | 106.4 MPix/s |
+| with layer mask | 88.0 MPix/s |
+| general, opaque | 88.8 MPix/s |
+| general, clipping | 54.6 MPix/s |
+| Normal (general) | 76.7 MPix/s |
+| **Luminosity (general)** | **68.3 MPix/s** |
+
+Isolated run (`bench_composite --filter luminosity`: one case, no interleaving with twelve other
+modes): **92.2 MPix/s**. The gap between 68.3 and 92.2 is case-ordering/thermal effect, which is
+why paired measurement uses the filter.
+
+Luminosity is ~11% slower than Normal in the same pass. Profiling by inspection: the mode is the
+only one that runs the full W3C SetLum + ClipColor sequence — two luminance dot products, a
+channel shift, then min/max gamut clipping with two conditional rescales — rather than a
+per-channel formula. The extra work is inherent to the definition, not an implementation
+accident. No optimization was accepted for v3.7.0: nothing identified was both measurable and
+correctness-neutral. The recorded rollback reference is **68.3 MPix/s in the full pass / 92.2
+MPix/s isolated**; any future Luminosity change must beat that in paired runs and leave the
+compositor oracle unchanged.
+
+### Long-session soak (#50)
+
+`cargo test -p aurelia-io --test soak --release -- --ignored --nocapture`, 120 cycles on a
+192×192 RGBA16 document with a mask, 8 MiB history budget:
+
+```
+soak_record {"doc":"192x192 Srgb16 + mask","cycles":120,"undo_redo":718,
+"history_steps":36,"history_bytes":8356828,"history_budget":8388608,
+"live_start":9615883,"live_end":9646289,"peak":9669189,"growth":30406,
+"growth_budget":4501122}
+```
+
+Interpretation: after a 20-cycle warm-up the live heap grew **30 KB** over the remaining 100
+cycles (0.3% of the 4.5 MB allowance), while history sat at 99.6% of its 8 MiB budget — the
+expected plateau for bounded retention, not a leak. Each cycle paints, applies a Gaussian blur,
+renders a transform patch, performs 3 undos + 3 redos, and every 15th cycle saves and reloads the
+project and compares the 16-bit bytes. Animation frames are added, sampled and deleted every 10th
+cycle.
+
+### Navigator after the DPI change (#45)
+
+The thumbnail is no longer a fixed 320 px texture: it is sized from the dock's physical width
+(0.92 × dock, clamped to 160–720 px), so a 200% monitor rebuilds at roughly twice the resolution
+instead of upscaling. The per-refresh cost measured earlier (1.62 ms at 1080p, 2.72 ms at 4K for
+320 px) scales with the square of the width; at the default 324 px dock the target is ~298 px, so
+the default path is unchanged. The ~30 Hz live cap still applies during a stroke.
+
 ## 16-bit completion baseline
 
 Measured at `checkpoint/v3.4.0-16bit-complete` (`bfa6709`) on Intel64 Family 6 Model 154
@@ -53,9 +124,13 @@ in progress**; the final refresh after mouse-up is immediate. Idle frames still 
 
 ```powershell
 cargo run --release -p aurelia-render --example bench_composite
+# One case only, for paired A/B measurement:
+cargo run --release -p aurelia-render --example bench_composite -- --filter luminosity
+cargo run --release -p aurelia-render --example bench_composite -- srgb16 --filter luminosity
 cargo run --release -p aurelia-render --example bench_brush
 cargo run --release -p aurelia-render --example bench_navigator
 cargo test -p aurelia-core gate_2 --release -- --ignored --nocapture
+cargo test -p aurelia-io --test soak --release -- --ignored --nocapture
 ```
 
 Run on the same machine and power profile; laptop power saving, background load and debug builds

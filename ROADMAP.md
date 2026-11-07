@@ -1,10 +1,12 @@
 # Aurelia · Roadmap
 
-**Status:** v3.6.0 shipped 2026-11-07. Native 16-bit editing, compositing, filters, text,
+**Status:** v3.7.0 shipped 2026-11-07. Native 16-bit editing, compositing, filters, text,
 selection edits and free transform are complete. Measurement guides, the straight-edge ruler,
 Move modes, snapping and persisted editor state are shipped. v3.6.0 closed the editing-workflow
-gaps: mask painting, selection combine modes, a Preferences interface, a History panel, scoped
-tool/brush reset, and persistent ruler/guide/snap interaction.
+gaps; v3.7.0 closed the viewport-fidelity and stabilization items: DPI/multi-monitor framing,
+Navigator DPI sizing, premultiplied bilinear edges, paired performance records, soak coverage and
+history-eviction integrity. Native RGBA16 presentation was investigated and rejected with a
+written decision ([docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md)).
 
 The engine is ahead of the product surface. The next work is **viewport truth, project-file
 hardening, release repeatability, and essential editing workflows** — not another engine feature.
@@ -31,16 +33,18 @@ test work is not done.
 
 ## Release baseline
 
-- **v3.6.0** is the current release. Assets, SHA-256 manifests and Ed25519 signatures verify;
+- **v3.7.0** is the current release. Assets, SHA-256 manifests and Ed25519 signatures verify;
   the installer is unsigned by permanent policy.
-- **256 tests pass, 1 ignored**; clippy reports no new lints.
-- Sparse 16-bit composite ratio is **0.70** against the **0.60** budget.
-- The bilinear transparent-edge behavior is pinned as an accepted limitation; it is not silently
-  changing.
-- The viewport is still an **8-bit presentation** of 16-bit documents. This is a known display
-  limitation, not a storage limitation.
-- **Process debt closed:** v3.6.0 release notes were written before the tag, and preflight now
-  fails when `release-notes/<tag>.md` is absent.
+- **264 tests pass, 2 ignored** (the soak and the 60-second sparse gate); clippy reports no new
+  lints.
+- Sparse 16-bit composite ratio is **0.75** against the **0.60** budget on the v3.7.0 run.
+- Bilinear transparent edges are **fixed**: premultiplied coverage, with uniform-alpha output
+  byte-identical to before and the four 8-bit transform digests updated deliberately.
+- The viewport is still an **8-bit presentation** of 16-bit documents. That is now a recorded
+  decision rather than an open investigation — see
+  [docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md).
+- **Process debt closed:** release notes are written before the tag, and preflight rejects
+  missing notes, a BOM or mojibake.
 
 ---
 
@@ -119,7 +123,13 @@ rendering architecture.
 
 ---
 
-## Now — Phase 2: v3.7.0 viewport fidelity
+## Shipped — Phase 2: v3.7.0 viewport fidelity
+
+**Status: shipped 2026-11-07.** Decision: reject a native RGBA16 presentation path and document
+why ([docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md)); the viewport keeps the GDI
+8-bit framebuffer. Delivered alongside it: DPI-preserving zoom/pan, DPI/dock-sized Navigator
+textures, premultiplied bilinear edges, the sparse/luminosity performance records and the soak
+harness. Per-issue evidence is in `release-notes/v3.7.0.md`.
 
 **Goal:** decide and, only if justified, implement a higher-fidelity display path.
 
@@ -140,24 +150,27 @@ regressions from Phase 0.
 
 These are continuous, but only one correctness item is active at a time.
 
-1. **Bilinear transparent edges.** The behavior is pinned by
-   `bilinear_transparent_edge_is_pinned_as_known_limitation`. Keep that test; if fixing it, capture
-   the 8-bit baseline first and do not bundle the fix with throughput work.
-2. **Sparse 16-bit throughput.** Current 0.70 against 0.60. Preserve the budget, add regression
-   coverage, and target 0.75 only with paired measurements. Do not chase the target at the cost of
-   correctness.
-3. **General-path tail.** Luminosity is the slowest mode; optimize only with a benchmark and a
-   rollback number.
-4. **Memory and soak.** Long 16-bit sessions across paint, filters, transform, undo/redo,
-   save/load and animation frames; record machine, build and retained history.
-5. **Undo/redo integrity.** Verify bounded history, 16-bit snapshots and selection/mask operations
-   under eviction.
+1. **Bilinear transparent edges.** **Done in v3.7.0** (#47): premultiplied coverage in both
+   samplers, uniform-alpha output unchanged, corrected fixtures at 8 and 16 bits. Do not rebuild
+   the old behaviour.
+2. **Sparse 16-bit throughput.** v3.7.0 measured **0.75** against the 0.60 budget on the reference
+   machine (spread 0.64 .. 1.08). Keep the budget as the gate; the 0.75 target is exploratory and
+   must stay paired-measured.
+3. **General-path tail.** Luminosity is still the slowest mode (68.3 MPix/s in the full pass,
+   92.2 isolated). The cost is the W3C SetLum/ClipColor sequence; no optimization was accepted
+   without a paired win. Rollback reference is recorded in PERFORMANCE.md.
+4. **Memory and soak.** **Covered in v3.7.0** (#50): `--ignored` soak test over paint, filters,
+   transform, undo/redo, save/load and animation frames; 30 KB growth over 100 cycles at a full
+   history plateau. Re-run before each stability release.
+5. **Undo/redo integrity.** **Covered in v3.7.0** (#51): eviction tests for 16-bit deltas, mask
+   commands, redo invalidation and save/load after eviction.
 
 **Exit criteria**
 
-- Bilinear behavior is either fixed or explicitly accepted with the pinned test and user guidance.
-- Sparse ratio remains ≥0.60 with regression coverage.
-- Soak results are recorded; no unbounded memory growth is observed.
+- [x] Bilinear behavior fixed, with corrected fixtures and updated baseline digests.
+- [x] Sparse ratio recorded at ≥0.60 with regression coverage.
+- [x] Soak results recorded; bounded retention demonstrated.
+- [x] Eviction integrity covered by tests that compare restored bytes, not return values.
 
 ---
 
@@ -214,6 +227,7 @@ stable fixtures; timing tests need paired rounds and recorded machine/build cont
 | Release engineering | Journaled release tool, Ed25519 signatures, SHA-256, VirusTotal advisory scan, installer + portable zip |
 | Platform | Windows 10/11 x86-64, per-monitor V2 DPI, Win32 + GDI |
 | Editing workflows (v3.6.0) | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
+| Viewport & stabilization (v3.7.0) | DPI-preserving zoom/pan, DPI/dock-sized Navigator, premultiplied bilinear edges, RGBA16 presentation decision, paired perf records, soak + eviction tests |
 
 Detailed measurements are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md); the 16-bit record is in
 [docs/16bit-plan.md](docs/16bit-plan.md); release mechanics and the production gate are in

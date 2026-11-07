@@ -232,11 +232,19 @@ fn print_machine() {
 }
 
 fn main() {
-    let output = if std::env::args().any(|argument| argument == "srgb16") {
+    let args: Vec<String> = std::env::args().collect();
+    let output = if args.iter().any(|argument| argument == "srgb16") {
         Output::Srgb16
     } else {
         Output::Srgb8
     };
+    // `--filter <text>` runs only matching cases, which is what paired A/B measurement needs:
+    // measuring thirty cases to compare one mode invites thermal drift between the rounds.
+    let filter = args
+        .iter()
+        .position(|argument| argument == "--filter")
+        .and_then(|index| args.get(index + 1))
+        .map(|value| value.to_lowercase());
 
     print_machine();
     println!(
@@ -268,7 +276,21 @@ fn main() {
         });
     }
 
+    if let Some(needle) = &filter {
+        cases.retain(|case| case.label.to_lowercase().contains(needle));
+        if cases.is_empty() {
+            eprintln!("no case matches --filter {needle}");
+            std::process::exit(2);
+        }
+    }
     let rates = run(&cases, output);
+    if filter.is_some() {
+        println!();
+        for (case, rate) in cases.iter().zip(&rates) {
+            report(case.label, *rate);
+        }
+        return;
+    }
     let mode_count = BlendMode::ALL.len();
     let split = cases.len() - mode_count;
 

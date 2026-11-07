@@ -784,16 +784,21 @@ debug and release - with the 8-bit digest gate unchanged.
 | Transparent edges | `sixteen_bit_transparent_patch_edges_do_not_darken_the_destination` |
 | Every deformation / interpolation mode stays native | `every_transform_preview_mode_stays_native_at_sixteen_bits` |
 
-## Known limitation: bilinear transparent edges
+## Fixed (v3.7.0): bilinear transparent edges
 
 The transparent-edge test is nearest-sampled on purpose: it isolates the coverage check (a
 zero-alpha border carrying colour must paint nothing) from interpolation quality.
 
-**Accepted limitation:** bilinear source interpolation averages colour and alpha independently,
-the same as it does at 8 bits. A transparent black neighbour darkens the interpolated edge; a
-transparent coloured neighbour tints it. `bilinear_transparent_edge_is_pinned_as_known_limitation`
-pins both results. This is a pre-existing interpolation behaviour, not a 16-bit storage gap:
-fixing it would move 8-bit output and must be its own baseline-first change. Until then, use
-Nearest for hard transparent edges, or keep the RGB under zero-alpha border pixels black. It is
-recorded as an accepted stabilization limitation rather than part of the 16-bit completion
-claim; the follow-up belongs to P1, not v3.5.0.
+**Previously accepted limitation, now corrected (#47):** bilinear source interpolation averaged
+colour and alpha independently, so a transparent black neighbour darkened the interpolated edge
+and a transparent coloured neighbour tinted it. Coverage is now interpolated **premultiplied** in
+both samplers (`sample_bilinear` and `sample_bilinear_scaled`): colour is weighted by its own
+alpha, the alpha is interpolated, and the result is unpremultiplied by the exact coverage before
+quantising. A neighbourhood whose four samples share one alpha value takes the original
+arithmetic, so fully opaque and uniformly semi-transparent renders are byte-identical to before;
+only mixed-alpha edges move, which is the behaviour being corrected.
+
+`bilinear_transparent_edges_do_not_bleed_neighbour_colour` pins the corrected results at 8 and 16
+bits, including the uniform-alpha fast path. The 8-bit transform baseline digests for the four
+bilinear renderers were updated deliberately in the same change (bicubic is untouched and its
+digest did not move).
