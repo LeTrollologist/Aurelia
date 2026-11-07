@@ -9,3 +9,6 @@ aurelia-core = { path = "../aurelia-core", version = "3.6.0" }
 image = { workspace = true }
 flate2 = "1.0"
 thiserror = { workspace = true }
+
+[dev-dependencies]
+glam = { workspace = true }

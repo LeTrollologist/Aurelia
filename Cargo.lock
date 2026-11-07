@@ -306,6 +306,7 @@ version = "3.6.0"
 dependencies = [
  "aurelia-core",
  "flate2",
+ "glam",
  "image",
  "thiserror 1.0.69",
 ]

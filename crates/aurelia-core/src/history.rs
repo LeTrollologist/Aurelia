@@ -1061,3 +1061,162 @@ mod mask_history_tests {
     }
 }
 
+
+#[cfg(test)]
+mod eviction_integrity {
+    use super::{HistoryStack, LayerPixelsDeltaCommand, MaskPixelsCommand};
+    use crate::document::Document;
+    use crate::layer::LayerBuffer;
+
+    fn wide_doc(side: u32) -> (Document, u64) {
+        let mut doc = Document::new(side, side);
+        let id = doc.active_layer_id;
+        if let Some(layer) = doc.get_layer_mut(id) {
+            *layer.buffer_mut() = LayerBuffer::Srgb16(vec![1234u16; (side * side * 4) as usize]);
+        }
+        (doc, id)
+    }
+
+    /// Eviction must not change what undo/redo can restore: once the oldest steps are gone,
+    /// undoing everything that remains and redoing it must still land on the same bytes.
+    #[test]
+    fn repeated_eviction_keeps_undo_and_redo_byte_exact() {
+        let (mut doc, id) = wide_doc(32);
+        // Two small deltas fit; the budget forces the oldest out as edits accumulate.
+        let mut stack = HistoryStack::with_budget(64, 900);
+        let mut states = Vec::new();
+        let mut evictions = 0usize;
+
+        for step in 0..40u16 {
+            let before = doc.get_layer(id).expect("layer").storage_bytes();
+            if let Some(channels) = doc.get_layer_mut(id).and_then(|l| l.as_srgb16_mut()) {
+                for (index, channel) in channels.iter_mut().enumerate() {
+                    if index % 17 == step as usize % 17 {
+                        *channel = channel.wrapping_add(311 + step);
+                    }
+                }
+            }
+            let after = doc.get_layer(id).expect("layer").storage_bytes();
+            let before_len = stack.len();
+            stack.push(Box::new(LayerPixelsDeltaCommand::new(
+                id,
+                "16-bit stroke",
+                before,
+                after.clone(),
+            )));
+            if stack.len() == before_len && before_len > 0 {
+                evictions += 1;
+            }
+            states.push(after);
+        }
+        assert!(evictions > 0, "the fixture never exercised eviction");
+        assert!(stack.len() < states.len(), "the budget must have dropped steps");
+        let final_bytes = states.last().cloned().expect("states");
+
+        while stack.can_undo() {
+            stack.undo(&mut doc);
+        }
+        let after_full_undo = doc.get_layer(id).expect("layer").storage_bytes();
+        assert_ne!(after_full_undo, final_bytes, "undo must actually move away from the end");
+
+        while stack.can_redo() {
+            stack.redo(&mut doc);
+        }
+        assert_eq!(
+            doc.get_layer(id).expect("layer").storage_bytes(),
+            final_bytes,
+            "redo must restore the exact final 16-bit bytes after eviction"
+        );
+    }
+
+    /// Mask edits share the budget with pixel edits. Eviction may drop them, but whatever
+    /// remains must restore mask bytes and enabled state exactly.
+    #[test]
+    fn mask_and_pixel_steps_share_one_budget_without_corrupting_state() {
+        let (mut doc, id) = wide_doc(16);
+        doc.add_layer_mask(id, None);
+        let mut stack = HistoryStack::with_budget(64, 1200);
+        let mut last_mask = doc
+            .get_layer(id)
+            .and_then(|l| l.mask.as_ref())
+            .map(|m| m.pixels.clone())
+            .expect("mask");
+
+        for step in 0..30u8 {
+            let before_pixels = doc.get_layer(id).expect("layer").storage_bytes();
+            if let Some(channels) = doc.get_layer_mut(id).and_then(|l| l.as_srgb16_mut()) {
+                channels[step as usize % channels.len()] ^= 0x00FF;
+            }
+            let after_pixels = doc.get_layer(id).expect("layer").storage_bytes();
+            stack.push(Box::new(LayerPixelsDeltaCommand::new(
+                id,
+                "pixel",
+                before_pixels,
+                after_pixels,
+            )));
+
+            let before_mask = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.pixels.clone()).expect("mask");
+            let enabled_before = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.enabled).expect("mask");
+            let write_at = step as usize
+                % doc.get_layer(id)
+                    .and_then(|l| l.mask.as_ref())
+                    .map(|m| m.pixels.len())
+                    .unwrap_or(1);
+            if let Some(mask) = doc.get_layer_mut(id).and_then(|l| l.mask.as_mut()) {
+                if write_at < mask.pixels.len() {
+                    mask.pixels[write_at] = 255 - step;
+                }
+                mask.enabled = step % 3 != 0;
+            }
+            let after_mask = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.pixels.clone()).expect("mask");
+            let enabled_after = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.enabled).expect("mask");
+            stack.push(Box::new(MaskPixelsCommand {
+                layer_id: id,
+                description: "mask",
+                before_pixels: before_mask,
+                after_pixels: after_mask.clone(),
+                before_enabled: enabled_before,
+                after_enabled: enabled_after,
+            }));
+            last_mask = after_mask;
+        }
+
+        while stack.can_undo() {
+            stack.undo(&mut doc);
+        }
+        while stack.can_redo() {
+            stack.redo(&mut doc);
+        }
+        let mask = doc.get_layer(id).and_then(|l| l.mask.as_ref()).expect("mask");
+        assert_eq!(mask.pixels, last_mask, "redo must restore the final mask bytes");
+    }
+
+    /// A new edit after undo clears redo, and the cleared entries stop counting against the
+    /// budget.
+    #[test]
+    fn redo_is_invalidated_and_its_memory_released() {
+        let (mut doc, id) = wide_doc(8);
+        let mut stack = HistoryStack::with_budget(16, usize::MAX);
+        for step in 0..6u16 {
+            let before = doc.get_layer(id).expect("layer").storage_bytes();
+            if let Some(channels) = doc.get_layer_mut(id).and_then(|l| l.as_srgb16_mut()) {
+                channels[step as usize] = channels[step as usize].wrapping_add(700);
+            }
+            let after = doc.get_layer(id).expect("layer").storage_bytes();
+            stack.push(Box::new(LayerPixelsDeltaCommand::new(id, "step", before, after)));
+        }
+        stack.undo(&mut doc);
+        stack.undo(&mut doc);
+        assert!(stack.can_redo());
+        assert!(stack.redo_retained_bytes() > 0);
+
+        let before = doc.get_layer(id).expect("layer").storage_bytes();
+        if let Some(channels) = doc.get_layer_mut(id).and_then(|l| l.as_srgb16_mut()) {
+            channels[0] ^= 0xFFFF;
+        }
+        let after = doc.get_layer(id).expect("layer").storage_bytes();
+        stack.push(Box::new(LayerPixelsDeltaCommand::new(id, "branch", before, after)));
+        assert!(!stack.can_redo(), "a new edit must invalidate redo");
+        assert_eq!(stack.redo_retained_bytes(), 0);
+    }
+}
