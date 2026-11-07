@@ -4022,7 +4022,7 @@ mod transform_baseline {
         render_transformed_patch(
             &source, 8, 8, origin, &affine, InterpolationMode::Bilinear, &mut affine_out, SIDE as u32, SIDE as u32,
         );
-        assert_eq!(digest(&affine_out), 2403627809797626894u64, "transform_affine");
+        assert_eq!(digest(&affine_out), 14413423169143296575u64, "transform_affine");
 
         let mut bicubic_out = vec![0u8; (SIDE * SIDE * 4) as usize];
         render_transformed_patch(
@@ -4039,12 +4039,12 @@ mod transform_baseline {
         let quad = PerspectiveQuadTransform::new(quad_src, quad_src);
         let mut quad_out = vec![0u8; (SIDE * SIDE * 4) as usize];
         render_quad_transformed_patch(&source, 8, 8, &quad, InterpolationMode::Bilinear, &mut quad_out, SIDE as u32, SIDE as u32);
-        assert_eq!(digest(&quad_out), 2403627809797626894u64, "transform_quad");
+        assert_eq!(digest(&quad_out), 14413423169143296575u64, "transform_quad");
 
         let mesh = MeshWarpGrid::new(3, 3, origin, 8.0, 8.0);
         let mut mesh_out = vec![0u8; (SIDE * SIDE * 4) as usize];
         render_mesh_warped_patch(&source, 8, 8, &mesh, InterpolationMode::Bilinear, &mut mesh_out, SIDE as u32, SIDE as u32);
-        assert_eq!(digest(&mesh_out), 2403627809797626894u64, "transform_mesh");
+        assert_eq!(digest(&mesh_out), 14413423169143296575u64, "transform_mesh");
 
         let pins = vec![
             origin,
@@ -4056,7 +4056,7 @@ mod transform_baseline {
         let tps = ThinPlateSpline2D::solve(&pins, &pins);
         let mut tps_out = vec![0u8; (SIDE * SIDE * 4) as usize];
         crate::transform::render_tps_warped_patch(&source, 8, 8, origin, &tps, InterpolationMode::Bilinear, &mut tps_out, SIDE as u32, SIDE as u32);
-        assert_eq!(digest(&tps_out), 2403627809797626894u64, "transform_tps");
+        assert_eq!(digest(&tps_out), 14413423169143296575u64, "transform_tps");
 
     }
 }
@@ -4396,25 +4396,42 @@ mod transform_matrix {
         }
     }
 
-    /// Pins the accepted bilinear transparent-edge limitation. The sampler averages colour
-    /// and alpha independently: a transparent black neighbour darkens the edge, while a
-    /// transparent coloured neighbour tints it. Changing either result is a deliberate
-    /// rendering change, not an incidental refactor.
+    /// Bilinear transparent edges (#47).
+    ///
+    /// The sampler used to average colour and coverage independently, so a transparent
+    /// neighbour's colour bled into the edge: transparent black darkened it, transparent green
+    /// tinted it. Coverage is now interpolated premultiplied, which keeps the opaque pixel's
+    /// colour and lets alpha carry the transition. Neighbourhoods with uniform alpha (all
+    /// opaque, all 50%) still take the original arithmetic, so ordinary renders do not move.
     #[test]
-    fn bilinear_transparent_edge_is_pinned_as_known_limitation() {
+    fn bilinear_transparent_edges_do_not_bleed_neighbour_colour() {
         let dark_neighbour = [255u8, 0, 0, 255, 0, 0, 0, 0]; // opaque red | transparent black
         assert_eq!(
             crate::transform::sample_bilinear(&dark_neighbour, 2, 1, 0.5, 0.0),
-            (128, 0, 0, 128),
-            "transparent black must darken the bilinear edge"
+            (255, 0, 0, 128),
+            "transparent black must not darken the edge colour"
         );
 
         let coloured_neighbour = [255u8, 0, 0, 255, 0, 255, 0, 0]; // opaque red | transparent green
         assert_eq!(
             crate::transform::sample_bilinear(&coloured_neighbour, 2, 1, 0.5, 0.0),
-            (128, 128, 0, 128),
-            "transparent colour must tint the bilinear edge"
+            (255, 0, 0, 128),
+            "transparent colour must not tint the edge"
         );
+
+        // Uniform alpha is the old path exactly: two opaque pixels blend their colour only.
+        let opaque = [0u8, 0, 255, 255, 255, 0, 0, 255];
+        assert_eq!(
+            crate::transform::sample_bilinear(&opaque, 2, 1, 0.5, 0.0),
+            (128, 0, 128, 255)
+        );
+
+        // Same contract at 16 bits, in the source channel's own scale.
+        let wide = [65535u16, 0, 0, 65535, 0, 65535, 0, 0];
+        let half = crate::transform::sample_bilinear_scaled(&wide, 2, 1, 0.5, 0.0);
+        assert_eq!(half[0], 65535.0, "16-bit colour survives the transparent neighbour");
+        assert_eq!(half[1], 0.0, "no green bleed at 16 bits");
+        assert_eq!(half[3], 32768.0, "alpha carries the coverage");
     }
 
     /// Partial source alpha over a transparent destination keeps the colour and halves the

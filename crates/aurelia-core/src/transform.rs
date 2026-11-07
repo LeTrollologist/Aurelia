@@ -735,10 +735,39 @@ pub fn sample_bilinear(src: &[u8], w: u32, h: u32, x: f32, y: f32) -> (u8, u8, u
     let p01 = get_px(x0, y1);
     let p11 = get_px(x1, y1);
 
-    let r = (p00.0 * w00 + p10.0 * w10 + p01.0 * w01 + p11.0 * w11).round() as u8;
-    let g = (p00.1 * w00 + p10.1 * w10 + p01.1 * w01 + p11.1 * w11).round() as u8;
-    let b = (p00.2 * w00 + p10.2 * w10 + p01.2 * w01 + p11.2 * w11).round() as u8;
-    let a = (p00.3 * w00 + p10.3 * w10 + p01.3 * w01 + p11.3 * w11).round() as u8;
+    // Uniform alpha (including the fully opaque case) is exactly the old arithmetic, so
+    // opaque renders and digests do not move. Mixed alpha is interpolated premultiplied:
+    // averaging colour and coverage independently lets a transparent neighbour's colour
+    // bleed into the edge (the documented limitation this fixes, #47).
+    if p00.3 == p10.3 && p00.3 == p01.3 && p00.3 == p11.3 {
+        let r = (p00.0 * w00 + p10.0 * w10 + p01.0 * w01 + p11.0 * w11).round() as u8;
+        let g = (p00.1 * w00 + p10.1 * w10 + p01.1 * w01 + p11.1 * w11).round() as u8;
+        let b = (p00.2 * w00 + p10.2 * w10 + p01.2 * w01 + p11.2 * w11).round() as u8;
+        let a = p00.3.round() as u8;
+        return (r, g, b, a);
+    }
+
+    let premult = |p: (f32, f32, f32, f32)| -> (f32, f32, f32) {
+        let scale = p.3 / 255.0;
+        (p.0 * scale, p.1 * scale, p.2 * scale)
+    };
+    let q00 = premult(p00);
+    let q10 = premult(p10);
+    let q01 = premult(p01);
+    let q11 = premult(p11);
+    let pr = q00.0 * w00 + q10.0 * w10 + q01.0 * w01 + q11.0 * w11;
+    let pg = q00.1 * w00 + q10.1 * w10 + q01.1 * w01 + q11.1 * w11;
+    let pb = q00.2 * w00 + q10.2 * w10 + q01.2 * w01 + q11.2 * w11;
+    let alpha_exact = p00.3 * w00 + p10.3 * w10 + p01.3 * w01 + p11.3 * w11;
+    let a = alpha_exact.round() as u8;
+    if a == 0 {
+        return (0, 0, 0, 0);
+    }
+    // Unpremultiply by the exact coverage, not the rounded byte: rounding first loses a unit
+    // on half-covered edges (255 -> 254) even though the colour was fully opaque.
+    let r = (pr * 255.0 / alpha_exact).round().clamp(0.0, 255.0) as u8;
+    let g = (pg * 255.0 / alpha_exact).round().clamp(0.0, 255.0) as u8;
+    let b = (pb * 255.0 / alpha_exact).round().clamp(0.0, 255.0) as u8;
 
     (r, g, b, a)
 }
@@ -1255,10 +1284,36 @@ pub fn sample_bilinear_scaled<T: crate::pixel::Channel>(
     let p01 = get_px(x0, y1);
     let p11 = get_px(x1, y1);
 
-    let mut out = [0.0_f32; 4];
-    for ch in 0..4 {
-        out[ch] = (p00[ch] * w00 + p10[ch] * w10 + p01[ch] * w01 + p11[ch] * w11).round();
+    // Uniform alpha keeps the original arithmetic byte-for-byte; see `sample_bilinear`.
+    if p00[3] == p10[3] && p00[3] == p01[3] && p00[3] == p11[3] {
+        let mut out = [0.0_f32; 4];
+        for ch in 0..4 {
+            out[ch] = (p00[ch] * w00 + p10[ch] * w10 + p01[ch] * w01 + p11[ch] * w11).round();
+        }
+        return out;
     }
+
+    let max = T::MAX_SCALED as f32;
+    let premult = |p: [f32; 4]| -> [f32; 3] {
+        let scale = p[3] / max;
+        [p[0] * scale, p[1] * scale, p[2] * scale]
+    };
+    let q00 = premult(p00);
+    let q10 = premult(p10);
+    let q01 = premult(p01);
+    let q11 = premult(p11);
+    let alpha_exact = p00[3] * w00 + p10[3] * w10 + p01[3] * w01 + p11[3] * w11;
+    let a = alpha_exact.round();
+    if a <= 0.0 {
+        return [0.0; 4];
+    }
+    let mut out = [0.0_f32; 4];
+    for ch in 0..3 {
+        out[ch] = ((q00[ch] * w00 + q10[ch] * w10 + q01[ch] * w01 + q11[ch] * w11) * max
+            / alpha_exact)
+            .round();
+    }
+    out[3] = a;
     out
 }
 
