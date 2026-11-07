@@ -171,6 +171,7 @@ define_pixel_fns! {
     px_difference => Difference,
     px_exclusion => Exclusion,
     px_luminosity => Luminosity,
+    px_adaptive => Adaptive,
 }
 
 /// Composites every layer, in order, into the rows this band owns.
@@ -201,6 +202,7 @@ fn compose_band<C: Channel>(out: &mut [C], y0: usize, w: u32, h: u32, layers: &[
             BlendMode::Difference => run!(px_difference),
             BlendMode::Exclusion => run!(px_exclusion),
             BlendMode::Luminosity => run!(px_luminosity),
+            BlendMode::Adaptive => run!(px_adaptive),
         }
     }
 }

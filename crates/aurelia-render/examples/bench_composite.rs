@@ -356,5 +356,6 @@ fn mode_doc(mode: BlendMode) -> fn() -> Document {
         doc_difference => Difference,
         doc_exclusion => Exclusion,
         doc_luminosity => Luminosity,
+        doc_adaptive => Adaptive,
     }
 }

@@ -31,6 +31,7 @@ define_compositors! {
     compose_difference => Difference,
     compose_exclusion => Exclusion,
     compose_luminosity => Luminosity,
+    compose_adaptive => Adaptive,
 }
 
 
@@ -63,6 +64,13 @@ pub enum BlendMode {
     Exclusion,
     #[serde(rename = "luminosity")]
     Luminosity,
+    /// Per-pixel auto-contrast: keeps the source colour when it is already the more
+    /// contrasting of {colour, inverted colour} against the backdrop, and inverts it when
+    /// that reads better. Adobe's closest mode is Difference, which always inverts; this
+    /// chooses only when inversion helps, so neutral art on a neutral background is not
+    /// needlessly flipped.
+    #[serde(rename = "adaptive")]
+    Adaptive,
 }
 
 impl BlendMode {
@@ -80,6 +88,7 @@ impl BlendMode {
         BlendMode::Difference,
         BlendMode::Exclusion,
         BlendMode::Luminosity,
+        BlendMode::Adaptive,
     ];
 
     pub fn label(&self) -> &'static str {
@@ -97,6 +106,7 @@ impl BlendMode {
             Self::Difference => "Difference",
             Self::Exclusion => "Exclusion",
             Self::Luminosity => "Luminosity",
+            Self::Adaptive => "Adaptive",
         }
     }
 
@@ -114,6 +124,7 @@ impl BlendMode {
             "difference" => Self::Difference,
             "exclusion" => Self::Exclusion,
             "luminosity" => Self::Luminosity,
+            "adaptive" => Self::Adaptive,
             _ => Self::Normal,
         }
     }
@@ -173,7 +184,7 @@ impl BlendMode {
             }
             Self::Difference => (cb - cs).abs(),
             Self::Exclusion => cb + cs - 2.0 * cb * cs,
-            Self::Luminosity => cs, // Luminosity handled in full RGB conversion
+            Self::Luminosity | Self::Adaptive => cs, // handled in full RGB conversion
         }
     }
 
@@ -231,6 +242,20 @@ impl BlendMode {
                 }
                 (cr.clamp(0.0, 1.0), cg.clamp(0.0, 1.0), cb_val.clamp(0.0, 1.0))
             }
+            Self::Adaptive => {
+                // Auto-contrast: pick the reading of the source (as authored, or inverted)
+                // that is farther in luminance from the backdrop. Ties keep the source, so a
+                // mid-grey layer on a mid-grey backdrop is not arbitrarily flipped.
+                let lum_dst = 0.299 * dr + 0.587 * dg + 0.114 * db;
+                let lum_src = 0.299 * sr + 0.587 * sg + 0.114 * sb;
+                let as_is = (lum_src - lum_dst).abs();
+                let inverted = ((1.0 - lum_src) - lum_dst).abs();
+                if as_is >= inverted {
+                    (sr, sg, sb)
+                } else {
+                    (1.0 - sr, 1.0 - sg, 1.0 - sb)
+                }
+            }
             _ => (
                 self.blend_channel(dr, sr).clamp(0.0, 1.0),
                 self.blend_channel(dg, sg).clamp(0.0, 1.0),
@@ -280,5 +305,61 @@ impl BlendMode {
             crate::pixel::Channel::from_f32(out[2]),
             crate::pixel::Channel::from_f32(out[3]),
         ]
+    }
+}
+
+#[cfg(test)]
+mod adaptive_tests {
+    use super::BlendMode;
+
+    fn over(dst: [f32; 4], src: [f32; 4]) -> [f32; 4] {
+        BlendMode::Adaptive.composite_working(dst, src, 1.0)
+    }
+
+    fn approx(actual: [f32; 4], expected: [f32; 4]) {
+        for channel in 0..4 {
+            assert!(
+                (actual[channel] - expected[channel]).abs() < 0.002,
+                "channel {channel}: {actual:?} != {expected:?}"
+            );
+        }
+    }
+
+    /// The point of the mode: the same artwork stays legible on either backdrop.
+    #[test]
+    fn black_art_flips_on_black_and_stays_on_white() {
+        approx(over([0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]), [1.0, 1.0, 1.0, 1.0]);
+        approx(over([1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 1.0]), [0.0, 0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn white_art_flips_on_white_and_stays_on_black() {
+        approx(over([1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]), [0.0, 0.0, 0.0, 1.0]);
+        approx(over([0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]), [1.0, 1.0, 1.0, 1.0]);
+    }
+
+    /// Equal distance is a tie; the authored colour wins rather than being flipped at random.
+    #[test]
+    fn a_neutral_tie_keeps_the_source() {
+        approx(over([0.5, 0.5, 0.5, 1.0], [0.5, 0.5, 0.5, 1.0]), [0.5, 0.5, 0.5, 1.0]);
+    }
+
+    #[test]
+    fn colour_is_inverted_as_a_whole_not_per_channel() {
+        // Red against red has zero contrast as-is; cyan has 0.4 luminance distance.
+        approx(over([1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0]), [0.0, 1.0, 1.0, 1.0]);
+    }
+
+    #[test]
+    fn partial_alpha_composites_the_chosen_colour_normally() {
+        // Half-opaque black text on black chooses white, then blends: 0.5 grey.
+        approx(over([0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.5]), [0.5, 0.5, 0.5, 1.0]);
+        // Half-opaque black on white stays black and lightens to 0.5.
+        approx(over([1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.5]), [0.5, 0.5, 0.5, 1.0]);
+    }
+
+    #[test]
+    fn transparent_source_leaves_the_backdrop_untouched() {
+        approx(over([0.2, 0.4, 0.6, 1.0], [1.0, 0.0, 0.0, 0.0]), [0.2, 0.4, 0.6, 1.0]);
     }
 }

@@ -840,6 +840,7 @@ impl Document {
                 BlendMode::Difference => run!(crate::blend::compose_difference),
                 BlendMode::Exclusion => run!(crate::blend::compose_exclusion),
                 BlendMode::Luminosity => run!(crate::blend::compose_luminosity),
+                BlendMode::Adaptive => run!(crate::blend::compose_adaptive),
             }
         }
     }
@@ -1446,6 +1447,7 @@ pub(crate) fn compose_u16_prepared(
             BlendMode::Difference => run!(crate::blend::compose_difference),
             BlendMode::Exclusion => run!(crate::blend::compose_exclusion),
             BlendMode::Luminosity => run!(crate::blend::compose_luminosity),
+            BlendMode::Adaptive => run!(crate::blend::compose_adaptive),
         }
     }
 }

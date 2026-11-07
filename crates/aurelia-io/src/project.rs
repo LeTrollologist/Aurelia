@@ -257,6 +257,7 @@ pub(crate) fn write_project_version<W: Write>(
             BlendMode::Difference => 10u8,
             BlendMode::Exclusion => 11u8,
             BlendMode::Luminosity => 12u8,
+            BlendMode::Adaptive => 13u8,
         };
         writer.write_all(&[blend_byte])?;
         writer.write_all(&layer.offset_x.to_le_bytes())?;
@@ -816,6 +817,7 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             10 => BlendMode::Difference,
             11 => BlendMode::Exclusion,
             12 => BlendMode::Luminosity,
+            13 => BlendMode::Adaptive,
             _ => BlendMode::Normal,
         };
 
