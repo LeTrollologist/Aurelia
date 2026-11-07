@@ -2875,7 +2875,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                     && app.state.navigator_needs_refresh()
                 {
                     let thumb_width = app.state.navigator_target_width();
-                    if let Some(img) = app.renderer.navigator_thumbnail(&app.state.document, thumb_width) {
+                    if let Some(img) = app.renderer.navigator_thumbnail(&app.state.document, thumb_width as usize) {
                         match &mut app.state.navigator_texture {
                             Some(tex) if tex.size() == img.size => {
                                 tex.set(img, egui::TextureOptions::LINEAR);
