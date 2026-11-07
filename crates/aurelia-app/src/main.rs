@@ -1325,13 +1325,13 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
         0x02E0 => {
             // WM_DPICHANGED: move to the suggested rect and rescale the UI.
             let new_scale = (wparam & 0xFFFF) as f32 / 96.0;
-            let ratio = new_scale / app.dpi_scale.max(0.01);
+            let old_scale = app.dpi_scale;
             app.dpi_scale = new_scale;
             app.egui_ctx.set_pixels_per_point(new_scale);
-            app.state.left_panel_w *= ratio;
-            app.state.right_panel_w *= ratio;
-            app.state.header_h *= ratio;
-            app.state.footer_h *= ratio;
+            // Zoom and pan are physical pixels, so they follow the DPI ratio too; this is what
+            // keeps the framed canvas region identical when the window lands on another monitor
+            // (#46). Panel metrics and the navigator texture resolution scale with it (#45).
+            app.state.apply_dpi_scale(old_scale, new_scale);
             let suggested = &*(lparam as *const RECT);
             SetWindowPos(
                 hwnd,
@@ -2874,7 +2874,8 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                     && navigator_due
                     && app.state.navigator_needs_refresh()
                 {
-                    if let Some(img) = app.renderer.navigator_thumbnail(&app.state.document, 320) {
+                    let thumb_width = app.state.navigator_target_width();
+                    if let Some(img) = app.renderer.navigator_thumbnail(&app.state.document, thumb_width) {
                         match &mut app.state.navigator_texture {
                             Some(tex) if tex.size() == img.size => {
                                 tex.set(img, egui::TextureOptions::LINEAR);

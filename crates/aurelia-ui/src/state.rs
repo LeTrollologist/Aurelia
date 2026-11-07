@@ -633,6 +633,9 @@ pub struct AppState {
     pub navigator_history: u64,
     /// The paper state `navigator_texture` was built for: `(background_value, is_transparent)`.
     pub navigator_paper: (u8, bool),
+    /// Physical-pixel width the current `navigator_texture` was rendered at. A DPI change or a
+    /// panel resize can move this without moving the document revision (#45).
+    pub navigator_texture_w: u32,
 }
 
 impl AppState {
@@ -870,6 +873,7 @@ impl AppState {
             navigator_size: (0, 0),
             navigator_history: u64::MAX,
             navigator_paper: (0, false),
+            navigator_texture_w: 0,
         }
     }
 
@@ -1007,15 +1011,31 @@ impl AppState {
         self.document_revision = self.document_revision.wrapping_add(1);
     }
 
+    /// Physical-pixel width the navigator texture should be rendered at (#45).
+    ///
+    /// The dock width is stored in physical pixels, so this follows both the panel size and the
+    /// monitor DPI: at 200% the same panel must carry twice the pixels or the preview is a
+    /// stretched 320 px image. Clamped so a very wide dock cannot make the downsample dominate
+    /// the frame and a tiny dock does not produce a useless texture.
+    pub fn navigator_target_width(&self) -> u32 {
+        let dock = if self.right_panel_w > 0.0 {
+            self.right_panel_w
+        } else {
+            324.0 * self.ui_ppp.max(1.0)
+        };
+        (dock * 0.92).round().clamp(160.0, 720.0) as u32
+    }
+
     /// Whether the navigator thumbnail must be rebuilt this frame.
     ///
     /// `navigator_revision` starts at `u64::MAX`, so the first frame always refreshes; after
-    /// that only a content change or a size change does.
+    /// that only a content, size, paper or DPI/dock-size change does.
     pub fn navigator_needs_refresh(&self) -> bool {
         self.navigator_revision != self.document_revision
             || self.navigator_size != (self.document.width, self.document.height)
             || self.navigator_history != self.history.generation()
             || self.navigator_paper != (self.document.background_value, self.document.is_transparent)
+            || self.navigator_texture_w != self.navigator_target_width()
     }
 
     /// Records that the thumbnail now reflects the current document.
@@ -1024,6 +1044,32 @@ impl AppState {
         self.navigator_size = (self.document.width, self.document.height);
         self.navigator_history = self.history.generation();
         self.navigator_paper = (self.document.background_value, self.document.is_transparent);
+        self.navigator_texture_w = self.navigator_target_width();
+    }
+
+    /// Applies a per-monitor DPI transition, preserving what the viewport frames (#45, #46).
+    ///
+    /// `zoom` and `pan` are physical pixels, so leaving them alone across a DPI change makes the
+    /// document appear to shrink and the view jump. Scaling both by the same ratio as the window
+    /// keeps the visible canvas fraction identical. The navigator texture width is invalidated
+    /// so the next refresh happens at the new resolution instead of upscaling an old thumbnail.
+    pub fn apply_dpi_scale(&mut self, old_scale: f32, new_scale: f32) {
+        let old_scale = old_scale.max(0.01);
+        let new_scale = new_scale.max(0.01);
+        let ratio = new_scale / old_scale;
+        if (ratio - 1.0).abs() < 0.001 {
+            self.ui_ppp = new_scale;
+            return;
+        }
+        self.ui_ppp = new_scale;
+        self.left_panel_w *= ratio;
+        self.right_panel_w *= ratio;
+        self.header_h *= ratio;
+        self.footer_h *= ratio;
+        self.zoom = (self.zoom * ratio).clamp(0.05, 8.0);
+        self.pan *= ratio;
+        // Force a rebuild: the old texture was rasterised for the previous DPI.
+        self.navigator_texture_w = 0;
     }
 
     // ── Animation Timeline Management ──
@@ -3530,5 +3576,92 @@ mod ruler_snapping {
 
         state.apply_ruler_preset(90.0);
         assert!((state.straight_ruler.expect("ruler").angle_rad.to_degrees() - 90.0).abs() < 0.01);
+    }
+}
+
+#[cfg(test)]
+mod dpi_transitions {
+    use super::AppState;
+    use glam::Vec2;
+
+    fn close(a: f32, b: f32) -> bool {
+        (a - b).abs() <= 0.005
+    }
+
+    /// A monitor change rescales the window, so the same canvas region must stay framed. Zoom
+    /// and pan are physical pixels and have to follow the DPI ratio with the window.
+    #[test]
+    fn dpi_change_preserves_the_framed_canvas_region() {
+        let mut state = AppState::new(1600, 1200);
+        state.show_ui_panels = false;
+        state.zoom = 1.75;
+        state.pan = Vec2::new(84.0, -37.0);
+
+        let before = state.viewport_canvas_fraction(1000, 800);
+        state.apply_dpi_scale(1.0, 1.5);
+        let after = state.viewport_canvas_fraction(1500, 1200);
+
+        assert!(close(before.0, after.0), "{before:?} vs {after:?}");
+        assert!(close(before.1, after.1), "{before:?} vs {after:?}");
+        assert!(close(before.2, after.2), "{before:?} vs {after:?}");
+        assert!(close(before.3, after.3), "{before:?} vs {after:?}");
+        assert!(close(state.zoom, 1.75 * 1.5));
+        assert!(close(state.pan.x, 84.0 * 1.5));
+    }
+
+    /// Panels are measured in physical pixels too, and the navigator must stop presenting an
+    /// old-resolution texture after the transition.
+    #[test]
+    fn dpi_change_scales_panels_and_invalidates_the_navigator_texture() {
+        let mut state = AppState::new(800, 600);
+        state.left_panel_w = 268.0;
+        state.right_panel_w = 324.0;
+        state.header_h = 38.0;
+        state.footer_h = 30.0;
+        state.ui_ppp = 1.0;
+        state.note_navigator_refreshed();
+        assert!(!state.navigator_needs_refresh());
+
+        let before_width = state.navigator_target_width();
+        state.apply_dpi_scale(1.0, 2.0);
+        assert!(close(state.left_panel_w, 536.0));
+        assert!(close(state.right_panel_w, 648.0));
+        assert!(close(state.header_h, 76.0));
+        assert!(close(state.footer_h, 60.0));
+        assert_eq!(state.ui_ppp, 2.0);
+        assert!(
+            state.navigator_target_width() > before_width,
+            "a 200% monitor must rebuild the preview at a higher resolution"
+        );
+        assert!(state.navigator_needs_refresh(), "the old texture is invalid at the new DPI");
+
+        state.note_navigator_refreshed();
+        assert!(!state.navigator_needs_refresh());
+    }
+
+    /// Moving back and forth must not accumulate drift: two inverse transitions return the
+    /// original framing and panel metrics.
+    #[test]
+    fn dpi_round_trip_returns_to_the_original_view() {
+        let mut state = AppState::new(900, 700);
+        state.show_ui_panels = false;
+        state.zoom = 0.8;
+        state.pan = Vec2::new(-12.0, 40.0);
+
+        state.apply_dpi_scale(1.0, 1.25);
+        state.apply_dpi_scale(1.25, 1.0);
+        assert!(close(state.zoom, 0.8), "zoom drifted to {}", state.zoom);
+        assert!(close(state.pan.x, -12.0) && close(state.pan.y, 40.0));
+    }
+
+    /// A no-op transition (same scale) must not run the ratio maths at all.
+    #[test]
+    fn same_scale_is_a_no_op() {
+        let mut state = AppState::new(100, 100);
+        state.zoom = 2.0;
+        state.pan = Vec2::new(3.0, 4.0);
+        state.apply_dpi_scale(1.5, 1.5);
+        assert_eq!(state.zoom, 2.0);
+        assert_eq!(state.pan, Vec2::new(3.0, 4.0));
     }
 }
