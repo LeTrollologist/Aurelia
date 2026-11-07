@@ -33,10 +33,14 @@ test work is not done.
 
 ## Release baseline
 
-- **v3.7.0** is the current release. Assets, SHA-256 manifests and Ed25519 signatures verify;
+- **v3.7.1** is the current release. Assets, SHA-256 manifests and Ed25519 signatures verify;
   the installer is unsigned by permanent policy.
-- **264 tests pass, 2 ignored** (the soak and the 60-second sparse gate); clippy reports no new
+- **281 tests pass, 2 ignored** (the soak and the 60-second sparse gate); clippy reports no new
   lints.
+- Clipboard: Cut/Copy/Copy Merged/Paste with a lossless RGBA16 internal payload and an 8-bit
+  DIBV5 system copy; paste adds an undoable layer at the copied position.
+- Adaptive (auto-contrast) is a fourteenth blend mode: per pixel it keeps the layer colour or
+  its inverse, whichever contrasts more with the backdrop.
 - Sparse 16-bit composite ratio is **0.75** against the **0.60** budget on the v3.7.0 run.
 - Bilinear transparent edges are **fixed**: premultiplied coverage, with uniform-alpha output
   byte-identical to before and the four 8-bit transform digests updated deliberately.
@@ -227,6 +231,7 @@ stable fixtures; timing tests need paired rounds and recorded machine/build cont
 | Release engineering | Journaled release tool, Ed25519 signatures, SHA-256, VirusTotal advisory scan, installer + portable zip |
 | Platform | Windows 10/11 x86-64, per-monitor V2 DPI, Win32 + GDI |
 | Editing workflows (v3.6.0) | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
+| Clipboard & smart layers (v3.7.1) | Cut/Copy/Copy Merged/Paste with RGBA16 internal payload, DIBV5 interop, undoable paste; Adaptive auto-contrast blend mode |
 | Viewport & stabilization (v3.7.0) | DPI-preserving zoom/pan, DPI/dock-sized Navigator, premultiplied bilinear edges, RGBA16 presentation decision, paired perf records, soak + eviction tests |
 
 Detailed measurements are in [docs/PERFORMANCE.md](docs/PERFORMANCE.md); the 16-bit record is in

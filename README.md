@@ -133,6 +133,8 @@
 - ➕ **Selection Combine Modes**: Replace / Union / Subtract / Intersect as a sticky Select-menu mode, with <kbd>Shift</kbd>, <kbd>Alt</kbd> and <kbd>Shift</kbd>+<kbd>Alt</kbd> overriding one gesture. Combination keeps fractional coverage, clears honestly when nothing is left, and committed selection edits undo ahead of document steps.
 - 🕘 **History Panel & Preferences**: the right dock lists retained undo/redo steps with their memory cost against the configured budget, and *File → Preferences* exposes autosave interval, undo budget, default JPEG quality and theme, validated and persisted to the existing preferences file.
 - ↺ **Tool & Brush Reset**: one click restores the active tool's own parameters or the shared brush shape/dynamics, without touching colours, the other tools' settings or the document.
+- 📋 **Cut / Copy / Copy Merged / Paste**: <kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>C</kbd> / <kbd>Shift</kbd>+<kbd>C</kbd> / <kbd>V</kbd> through the selection (feathered coverage included). The internal clipboard keeps RGBA16 precision; the Windows clipboard copy is a standard 8-bit DIBV5 for interoperability, and Paste prefers another application's image if the clipboard changed. Pasting creates a new, undoable layer at the copied position.
+- 🔆 **Adaptive (Auto-Contrast) Layers**: a blend mode that picks, per pixel, between the layer's colour and its inverse — whichever contrasts more with the backdrop — so overlay art stays legible over light, dark or busy pixels. Ties keep the authored colour; Adobe's closest modes are Difference/Exclusion, which always invert. See [docs/CLIPBOARD_AND_SMART_LAYERS.md](docs/CLIPBOARD_AND_SMART_LAYERS.md).
 - 🎨 **Modern Studio Toolset**: Brush, Pencil, Watercolor (wet edge/falloff simulation), Chalk (grain dispersion), Spray (stochastic scatter), Smudge (directional velocity smear), Linear & Radial Gradients, Magic Wand fuzzy selection, Eraser modes (Soft, Hard 1-Bit, Color-Target), Dual-Color Vector Shapes, and Reference-layer Flood Fill.
 - 🔤 **Custom Typography & Text Engine**: Text layers rendered through `ab_glyph` with the full system font list plus direct `.ttf`/`.otf` file import, real-time font size, line spacing and letter tracking, Left/Center/Right alignment, subpixel-antialiased rasterization, and on-canvas placement/editing with per-edit undo snapshots.
 - 🧅 **Frame Animation Timeline**: Multi-frame timeline with play/pause preview, adjustable FPS and loop playback, frame add/duplicate/delete/reorder, ghost onion skinning (configurable previous/next frame counts and opacity), and <kbd>[</kbd> / <kbd>]</kbd> frame stepping.
@@ -329,6 +331,8 @@ If you prefer building from source with full compiler optimizations:
 | **Save Project As** | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> |
 | **Preferences** | <kbd>Ctrl</kbd> + <kbd>,</kbd> |
 | **Export Image (PNG / JPEG / WebP)** | <kbd>Ctrl</kbd> + <kbd>E</kbd> |
+| **Cut / Copy / Paste** | <kbd>Ctrl</kbd> + <kbd>X</kbd> / <kbd>C</kbd> / <kbd>V</kbd> |
+| **Copy Merged** | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> |
 | **Select All** | <kbd>Ctrl</kbd> + <kbd>A</kbd> |
 | **Deselect** | <kbd>Ctrl</kbd> + <kbd>D</kbd> or <kbd>Esc</kbd> |
 | **Fill Selection (active layer)** | <kbd>Shift</kbd> + <kbd>F5</kbd> or <kbd>Alt</kbd> + <kbd>Backspace</kbd> |
