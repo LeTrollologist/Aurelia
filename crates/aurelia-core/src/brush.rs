@@ -263,6 +263,9 @@ pub struct BrushSettings {
     pub watercolor_wetness: f32,
     pub chalk_grain: f32,
     pub smudge_strength: f32,
+    /// A sampled stamp from an imported `.abr`/`.gbr` brush. `None` uses the procedural tip.
+    #[serde(skip)]
+    pub stamp: Option<crate::brush_import::BrushStamp>,
     // ── Velocity Dynamics & Calligraphy ──
     pub velocity_dynamics: bool,
     pub velocity_taper_strength: f32, // 0.0 ..= 1.0 (how sharply fast strokes thin out)
@@ -302,6 +305,7 @@ impl Default for BrushSettings {
             watercolor_wetness: 0.65,
             chalk_grain: 0.75,
             smudge_strength: 0.6,
+            stamp: None,
             velocity_dynamics: true,
             velocity_taper_strength: 0.6,
             velocity_min_size: 0.15,

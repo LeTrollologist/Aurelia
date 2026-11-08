@@ -35,3 +35,10 @@ pub fn open_image_dialog() -> Option<PathBuf> {
         .add_filter("Image Files (*.png, *.jpg, *.jpeg, *.webp)", &["png", "jpg", "jpeg", "webp"])
         .pick_file()
 }
+
+pub fn open_brush_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Import Brush")
+        .add_filter("Brush Files (*.abr, *.gbr)", &["abr", "gbr"])
+        .pick_file()
+}

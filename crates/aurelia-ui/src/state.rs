@@ -244,6 +244,7 @@ pub enum PendingFileAction {
     OpenProject,
     ExportPng,
     OpenReferenceImage,
+    ImportBrush,
     NewCanvas(NewCanvasSpec),
 }
 
@@ -1282,6 +1283,39 @@ impl AppState {
             self.active_preset_idx = Some(idx);
             self.set_status(format!("Loaded brush preset: {}", p.name));
         }
+    }
+
+    /// Decodes `.abr`/`.gbr` bytes and appends one preset per sampled stamp.
+    ///
+    /// Imported stamps are session-only by design: the brush preferences format does not carry
+    /// embedded bitmaps, so `stamp` is skipped during serialization rather than silently turning
+    /// an imported shape into a procedural round brush on the next launch.
+    pub fn import_brush_file(&mut self, bytes: &[u8], path: &std::path::Path) -> Result<usize, String> {
+        let stamps = aurelia_core::decode_brush_file(bytes, Some(path))
+            .map_err(|error| error.to_string())?;
+        let imported = stamps.len();
+        for stamp in stamps {
+            let size = stamp.width.max(stamp.height).clamp(1, 512) as f32;
+            let settings = aurelia_core::brush::BrushSettings {
+                tool: aurelia_core::brush::ToolType::Brush,
+                size,
+                hardness: 1.0,
+                spacing: 0.12,
+                stamp: Some(stamp.clone()),
+                ..Default::default()
+            };
+            self.presets.push(aurelia_core::brush::BrushPreset {
+                name: stamp.name.clone(),
+                icon: "◉".to_string(),
+                category: "Imported".to_string(),
+                description: format!("Imported {} x {} stamp from {}", stamp.width, stamp.height, path.display()),
+                settings,
+            });
+        }
+        if imported > 0 {
+            self.select_preset(self.presets.len() - 1);
+        }
+        Ok(imported)
     }
 
     pub fn save_current_as_preset(&mut self, name: &str) {

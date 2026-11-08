@@ -3357,6 +3357,26 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                             }
                         }
                     }
+                    PendingFileAction::ImportBrush => {
+                        if let Some(path) = aurelia_ui::open_brush_dialog() {
+                            match std::fs::read(&path) {
+                                Ok(bytes) => match app.state.import_brush_file(&bytes, &path) {
+                                    Ok(count) => app.state.set_status(format!(
+                                        "Imported {count} brush stamp{} from {}",
+                                        if count == 1 { "" } else { "s" },
+                                        path.display()
+                                    )),
+                                    Err(error) => {
+                                        app.state.set_status(format!("Brush import failed: {error}"))
+                                    }
+                                },
+                                Err(error) => app.state.set_status(format!(
+                                    "Could not read {}: {error}",
+                                    path.display()
+                                )),
+                            }
+                        }
+                    }
                     PendingFileAction::OpenReferenceImage => {
                         if let Some(path) = aurelia_ui::open_image_dialog() {
                             if let Ok(img) = image::open(&path) {

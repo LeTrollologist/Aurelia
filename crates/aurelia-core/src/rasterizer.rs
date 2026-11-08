@@ -335,7 +335,10 @@ impl StrokeRasterizer {
 
                 if d_sq <= radius_sq {
                     let d = d_sq.sqrt();
-                    let mut alpha = match tool {
+                    let mut alpha = if let Some(stamp) = &brush.stamp {
+                        stamp.coverage(dx_f, dy_f, radius) * opacity
+                    } else {
+                        match tool {
                         ToolType::Pencil => {
                             if d_sq <= inner_radius_sq {
                                 opacity
@@ -394,6 +397,7 @@ impl StrokeRasterizer {
                             };
                             base_alpha * opacity
                         }
+                    }
                     };
 
                     // Apply Wet Edge Watercolor Pigment Pooling effect

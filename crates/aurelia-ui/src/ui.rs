@@ -1227,6 +1227,9 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 state.show_save_preset_dialog = true;
                                 state.new_preset_name = format!("Preset {}", state.presets.len() + 1);
                             }
+                            if ui.small_button("＋ Import brush").on_hover_text("Import a Photoshop .abr or GIMP .gbr brush").clicked() {
+                                state.pending_file_action = Some(PendingFileAction::ImportBrush);
+                            }
                         });
                     });
 

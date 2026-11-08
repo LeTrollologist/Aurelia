@@ -16,7 +16,7 @@ pub mod ui;
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub use dialogs::{
-    export_image_dialog, export_png_dialog, open_image_dialog, open_project_dialog,
+    export_image_dialog, export_png_dialog, open_brush_dialog, open_image_dialog, open_project_dialog,
     save_project_dialog,
 };
 pub use shell::{is_shell_registered, register_shell_associations, unregister_shell_associations};

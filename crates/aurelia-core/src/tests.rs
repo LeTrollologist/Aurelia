@@ -4704,3 +4704,50 @@ mod deferred_style_semantics {
         );
     }
 }
+
+mod imported_stamp_brush {
+    use crate::brush::{BrushPoint, BrushSettings, ToolType};
+    use crate::brush_import::BrushStamp;
+    use crate::color::Color;
+    use crate::document::Document;
+    use crate::rasterizer::StrokeRasterizer;
+    use crate::symmetry::SymmetryConfig;
+    use glam::Vec2;
+
+    #[test]
+    fn a_stamp_overrides_the_procedural_tip() {
+        let mut doc = Document::new(20, 20);
+        let mut alpha = vec![0u8; 16];
+        for y in 0..4 {
+            for x in 2..4 {
+                alpha[y * 4 + x] = 255;
+            }
+        }
+        let brush = BrushSettings {
+            tool: ToolType::Brush,
+            size: 10.0,
+            opacity: 1.0,
+            hardness: 1.0,
+            primary_color: Color::new(1.0, 0.0, 0.0, 1.0),
+            stamp: Some(BrushStamp {
+                name: "half".into(),
+                width: 4,
+                height: 4,
+                alpha,
+            }),
+            ..Default::default()
+        };
+        StrokeRasterizer::paint_dot(
+            &mut doc,
+            BrushPoint::new(Vec2::new(10.0, 10.0), 1.0),
+            &brush,
+            &SymmetryConfig::default(),
+            None,
+        );
+        let left = doc.layers[0].get_pixel(7, 10).unwrap();
+        let right = doc.layers[0].get_pixel(13, 10).unwrap();
+        assert_eq!(left[3], 0, "the transparent half of the stamp stays clear");
+        assert!(right[3] > 0, "the opaque half of the stamp paints");
+        assert_eq!(right[0], 255);
+    }
+}
