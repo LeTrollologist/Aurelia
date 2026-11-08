@@ -188,14 +188,41 @@ impl ClipboardImage {
             pixels: LayerBuffer::Srgb8(rgba[..size].to_vec()),
         })
     }
+
+    /// Wraps an internally composed 16-bit image without downconverting it.
+    ///
+    /// Copy Merged uses this so a 16-bit document keeps its sub-lattice values on the internal
+    /// clipboard; the 8-bit system clipboard is a separate, lossy export.
+    pub fn from_rgba16(
+        width: u32,
+        height: u32,
+        origin_x: i32,
+        origin_y: i32,
+        channels: &[u16],
+    ) -> Option<Self> {
+        let size = (width as usize)
+            .checked_mul(height as usize)?
+            .checked_mul(4)?;
+        if width == 0 || height == 0 || channels.len() < size {
+            return None;
+        }
+        Some(Self {
+            width,
+            height,
+            origin_x,
+            origin_y,
+            format: PixelFormat::Srgb16,
+            pixels: LayerBuffer::Srgb16(channels[..size].to_vec()),
+        })
+    }
 }
 
 /// Encodes 8-bit straight RGBA as a `BITMAPV5HEADER` DIB with 32-bit BGRA pixels.
 ///
 /// The clipboard DIB is bottom-up unless the height is negative; this writes a positive
 /// height and rows in bottom-up order, which is what every Windows application expects. Alpha
-/// is written to the fourth byte and `BI_RGB` is used: some consumers only understand that
-/// pair, and modern ones read the alpha byte from a 32-bit `BI_RGB` DIB.
+/// is written to the fourth byte with explicit BGRA masks (`BI_BITFIELDS`), so consumers know
+/// the fourth byte carries alpha rather than treating the image as opaque.
 pub fn encode_dibv5(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
     let pixel_bytes = (width as usize).checked_mul(height as usize)?.checked_mul(4)?;
     if width == 0 || height == 0 || rgba.len() < pixel_bytes {

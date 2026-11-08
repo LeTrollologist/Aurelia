@@ -2288,20 +2288,19 @@ impl AppState {
     }
 
     /// Copies the flattened visible document, honouring the selection as a mask.
+    ///
+    /// A 16-bit document (or a document containing a 16-bit layer) is flattened at 16 bits:
+    /// Copy Merged must not be the one clipboard path that silently quantises to the 8-bit
+    /// lattice when the internal clipboard is capable of keeping it.
     pub fn copy_merged(&mut self) {
         let (width, height) = (self.document.width, self.document.height);
-        let mut rgba = self.document.composite_layers(true);
-        if let Some(selection) = &self.selection {
-            for y in 0..height {
-                for x in 0..width {
-                    let coverage = selection.get_value(x, y) as u32;
-                    let at = ((y * width + x) * 4) as usize;
-                    if at + 3 < rgba.len() {
-                        rgba[at + 3] = ((rgba[at + 3] as u32 * coverage + 127) / 255) as u8;
-                    }
-                }
-            }
-        }
+        let sixteen_bit = self.document.pixel_format == aurelia_core::layer::PixelFormat::Srgb16
+            || self
+                .document
+                .layers
+                .iter()
+                .any(|layer| layer.format() == aurelia_core::layer::PixelFormat::Srgb16);
+
         let bounds = self
             .selection
             .as_ref()
@@ -2314,12 +2313,54 @@ impl AppState {
         }
         let region_w = x1 - x0;
         let region_h = y1 - y0;
-        let mut region = Vec::with_capacity((region_w * region_h * 4) as usize);
-        for y in y0..y1 {
-            let row = ((y * width + x0) * 4) as usize;
-            region.extend_from_slice(&rgba[row..row + (region_w * 4) as usize]);
+
+        if sixteen_bit {
+            let mut merged = self.document.composite_layers_srgb16(true);
+            if let Some(selection) = &self.selection {
+                for y in 0..height {
+                    for x in 0..width {
+                        let coverage = selection.get_value(x, y) as u32;
+                        let at = ((y * width + x) * 4) as usize;
+                        if at + 3 < merged.len() {
+                            merged[at + 3] =
+                                ((merged[at + 3] as u32 * coverage + 127) / 255).min(65535) as u16;
+                        }
+                    }
+                }
+            }
+            let mut region = Vec::with_capacity((region_w * region_h * 4) as usize);
+            for y in y0..y1 {
+                let row = ((y * width + x0) * 4) as usize;
+                region.extend_from_slice(&merged[row..row + (region_w * 4) as usize]);
+            }
+            let Some(image) =
+                ClipboardImage::from_rgba16(region_w, region_h, x0 as i32, y0 as i32, &region)
+            else {
+                self.set_status("Nothing to copy: the merged region is empty");
+                return;
+            };
+            self.clipboard = Some(image);
+        } else {
+            let mut rgba = self.document.composite_layers(true);
+            if let Some(selection) = &self.selection {
+                for y in 0..height {
+                    for x in 0..width {
+                        let coverage = selection.get_value(x, y) as u32;
+                        let at = ((y * width + x) * 4) as usize;
+                        if at + 3 < rgba.len() {
+                            rgba[at + 3] = ((rgba[at + 3] as u32 * coverage + 127) / 255) as u8;
+                        }
+                    }
+                }
+            }
+            let mut region = Vec::with_capacity((region_w * region_h * 4) as usize);
+            for y in y0..y1 {
+                let row = ((y * width + x0) * 4) as usize;
+                region.extend_from_slice(&rgba[row..row + (region_w * 4) as usize]);
+            }
+            self.clipboard =
+                ClipboardImage::from_rgba8(region_w, region_h, x0 as i32, y0 as i32, &region);
         }
-        self.clipboard = ClipboardImage::from_rgba8(region_w, region_h, x0 as i32, y0 as i32, &region);
         self.clipboard_sync_pending = true;
         self.set_status(format!("Copied merged {} x {} px", region_w, region_h));
     }
@@ -4303,5 +4344,99 @@ mod autosave_paths {
         assert!(snapshots_in(Path::new("Z:/definitely/missing")).is_empty());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod copy_merged_16bit {
+    use super::AppState;
+    use aurelia_core::document::Document;
+    use aurelia_core::layer::{LayerBuffer, PixelFormat};
+
+    #[test]
+    fn copy_merged_keeps_sub_lattice_values() {
+        let mut doc = Document::new_with_format(4, 4, PixelFormat::Srgb16);
+        doc.is_transparent = true;
+        let id = doc.active_layer_id;
+        {
+            let pixels = doc
+                .get_layer_mut(id)
+                .expect("layer")
+                .as_srgb16_mut()
+                .expect("16-bit");
+            let at = (1 * 4 + 1) * 4;
+            pixels[at] = 300; // deliberately not a multiple of 257
+            pixels[at + 1] = 1000;
+            pixels[at + 2] = 40000;
+            pixels[at + 3] = 65535;
+        }
+        let mut state = AppState::new(4, 4);
+        state.document = doc;
+        state.copy_merged();
+
+        let image = state.clipboard.as_ref().expect("clipboard");
+        assert_eq!(image.format, PixelFormat::Srgb16);
+        let LayerBuffer::Srgb16(channels) = &image.pixels else {
+            panic!("Copy Merged must keep 16-bit storage");
+        };
+        let at = (1 * 4 + 1) * 4;
+        assert_eq!(&channels[at..at + 4], &[300, 1000, 40000, 65535]);
+        assert!(channels.iter().any(|&v| v % 257 != 0), "sub-lattice survives");
+    }
+}
+
+#[cfg(test)]
+mod clipboard_16bit_round_trip {
+    use super::AppState;
+    use aurelia_core::document::Document;
+    use aurelia_core::layer::{LayerBuffer, PixelFormat};
+
+    fn sixteen_bit_state() -> AppState {
+        let mut doc = Document::new_with_format(6, 6, PixelFormat::Srgb16);
+        doc.is_transparent = true;
+        let id = doc.active_layer_id;
+        {
+            let pixels = doc
+                .get_layer_mut(id)
+                .expect("layer")
+                .as_srgb16_mut()
+                .expect("16-bit");
+            let at = (2 * 6 + 3) * 4;
+            pixels[at] = 301;
+            pixels[at + 1] = 1001;
+            pixels[at + 2] = 40001;
+            pixels[at + 3] = 65535;
+        }
+        let mut state = AppState::new(6, 6);
+        state.document = doc;
+        state
+    }
+
+    #[test]
+    fn copy_and_paste_keep_sub_lattice_values() {
+        let mut state = sixteen_bit_state();
+        assert!(state.copy_active_layer());
+        assert!(state.paste_clipboard());
+        let pasted = state.document.active_layer().expect("pasted layer");
+        assert_eq!(pasted.format(), PixelFormat::Srgb16);
+        let pixels = pasted.as_srgb16().expect("16-bit");
+        let at = (2 * 6 + 3) * 4;
+        assert_eq!(&pixels[at..at + 4], &[301, 1001, 40001, 65535]);
+    }
+
+    #[test]
+    fn copy_merged_in_a_mixed_document_uses_16bit() {
+        let mut doc = Document::new_with_format(4, 4, PixelFormat::Srgb16);
+        doc.is_transparent = true;
+        let id = doc.add_layer(Some("Eight".into()));
+        doc.get_layer_mut(id)
+            .expect("layer")
+            .convert_format(PixelFormat::Srgb8);
+        let mut state = AppState::new(4, 4);
+        state.document = doc;
+        state.copy_merged();
+        let image = state.clipboard.as_ref().expect("clipboard");
+        assert_eq!(image.format, PixelFormat::Srgb16);
+        assert!(matches!(image.pixels, LayerBuffer::Srgb16(_)));
     }
 }
