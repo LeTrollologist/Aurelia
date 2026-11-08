@@ -4596,3 +4596,111 @@ mod layer_style_composite {
         let _ = doc.composite_layers_srgb16(true);
     }
 }
+
+mod deferred_style_semantics {
+    use crate::Document;
+    use crate::color::Color;
+    use crate::layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
+
+    fn glow_style(radius: f32) -> LayerStyles {
+        LayerStyles {
+            outer_glow: Some(OuterGlowStyle {
+                radius,
+                color: Color::WHITE,
+                opacity: 1.0,
+            }),
+            ..LayerStyles::default()
+        }
+    }
+
+    #[test]
+    fn clipping_uses_the_styled_base_alpha() {
+        let mut doc = Document::new(20, 20);
+        doc.is_transparent = true;
+        let base_id = doc.active_layer_id;
+        {
+            let base = doc.get_layer_mut(base_id).expect("base");
+            let at = ((10 * 20) + 10) * 4;
+            base.as_srgb8_exact_mut()[at..at + 4].copy_from_slice(&[255, 0, 0, 255]);
+            base.styles = glow_style(2.0);
+        }
+        let clip = doc.add_layer(Some("Clipped".into()));
+        {
+            let layer = doc.get_layer_mut(clip).expect("clip");
+            layer.clipping_mask = true;
+            for px in layer.as_srgb8_exact_mut().chunks_exact_mut(4) {
+                px.copy_from_slice(&[0, 0, 255, 255]);
+            }
+        }
+
+        let flat = doc.composite_layers(false);
+        let glow_pixel = (10 * 20 + 12) * 4;
+        assert!(
+            flat[glow_pixel + 3] > 0,
+            "the clipped layer should appear over the base's glow"
+        );
+        assert_eq!(flat[glow_pixel + 2], 255, "the clipped blue reaches the glow");
+        assert!(flat[glow_pixel] < 255 && flat[glow_pixel + 1] < 255);
+        let outside = (0 * 20 + 0) * 4;
+        assert_eq!(flat[outside + 3], 0, "outside every effect stays clipped");
+    }
+
+    #[test]
+    fn scale_styles_scales_widths_offsets_and_radii() {
+        let mut doc = Document::new(10, 10);
+        let id = doc.active_layer_id;
+        doc.get_layer_mut(id).expect("layer").styles = LayerStyles {
+            stroke: Some(StrokeStyle { width: 2.0, color: Color::BLACK, opacity: 0.8 }),
+            drop_shadow: Some(DropShadowStyle {
+                offset_x: 3.0,
+                offset_y: 2.0,
+                blur: 4.0,
+                color: Color::BLACK,
+                opacity: 0.5,
+            }),
+            outer_glow: Some(OuterGlowStyle { radius: 4.0, color: Color::WHITE, opacity: 0.4 }),
+        };
+
+        doc.scale_canvas_with_styles(20, 20, true, true);
+        let styles = &doc.get_layer(id).expect("layer").styles;
+        assert_eq!(styles.stroke.as_ref().unwrap().width, 4.0);
+        let shadow = styles.drop_shadow.as_ref().unwrap();
+        assert_eq!((shadow.offset_x, shadow.offset_y, shadow.blur), (6.0, 4.0, 8.0));
+        assert_eq!(styles.outer_glow.as_ref().unwrap().radius, 8.0);
+
+        let mut unscaled = Document::new(10, 10);
+        let id = unscaled.active_layer_id;
+        unscaled.get_layer_mut(id).expect("layer").styles = LayerStyles {
+            stroke: Some(StrokeStyle { width: 2.0, color: Color::BLACK, opacity: 0.8 }),
+            ..LayerStyles::default()
+        };
+        unscaled.scale_canvas(20, 20, true);
+        assert_eq!(unscaled.get_layer(id).expect("layer").styles.stroke.as_ref().unwrap().width, 2.0);
+    }
+
+    #[test]
+    fn merge_down_bakes_styles_and_clears_the_record() {
+        let mut doc = Document::new(8, 8);
+        doc.is_transparent = true;
+        let lower = doc.active_layer_id;
+        let upper = doc.add_layer(Some("Styled".into()));
+        {
+            let layer = doc.get_layer_mut(upper).expect("upper");
+            let at = ((4 * 8) + 4) * 4;
+            layer.as_srgb8_exact_mut()[at..at + 4].copy_from_slice(&[255, 0, 0, 255]);
+            layer.styles = glow_style(2.0);
+        }
+        doc.active_layer_id = upper;
+        assert!(doc.merge_layer_down());
+
+        assert_eq!(doc.layers.len(), 1);
+        let merged = doc.get_layer(lower).expect("merged");
+        assert!(merged.styles.is_empty(), "the baked style must not apply twice");
+        let flat = doc.composite_layers(false);
+        let glow_pixel = (4 * 8 + 6) * 4;
+        assert!(
+            flat[glow_pixel + 3] > 0,
+            "the upper layer's glow must survive merge-down"
+        );
+    }
+}

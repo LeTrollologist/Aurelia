@@ -3030,6 +3030,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                 if state.resize_scale_mode {
                     ui.checkbox(&mut state.resize_bilinear, "Bilinear Smoothing (vs Nearest Neighbor)");
+                    ui.checkbox(&mut state.resize_scale_styles, "Scale Layer Styles");
                 } else {
                     ui.checkbox(&mut state.resize_anchor_center, "Anchor Center (vs Top-Left)");
                 }
@@ -3040,7 +3041,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         let (nw, nh) = (state.resize_canvas_w, state.resize_canvas_h);
                         if nw > 0 && nh > 0 {
                             if state.resize_scale_mode {
-                                state.document.scale_canvas(nw, nh, state.resize_bilinear);
+                                state.document.scale_canvas_with_styles(
+                                    nw,
+                                    nh,
+                                    state.resize_bilinear,
+                                    state.resize_scale_styles,
+                                );
                                 state.set_status(format!("Resampled canvas to {}×{}", nw, nh));
                             } else {
                                 let (ox, oy) = if state.resize_anchor_center {

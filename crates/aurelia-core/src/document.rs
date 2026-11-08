@@ -409,7 +409,27 @@ impl Document {
             _ => return false,
         };
 
-        let upper = self.layers.remove(active_idx);
+        let upper_owned = self.layers.remove(active_idx);
+        // Merge what the user sees: bake each side's styles before combining, then clear the
+        // lower style record so the baked pixels are not styled a second time.
+        let styled_lower = {
+            let lower = &self.layers[active_idx - 1];
+            if (lower.is_raster() || lower.is_text()) && lower.styles.has_visible_effect() {
+                Some(lower.with_buffer(crate::layer_style::render_styled(lower)))
+            } else {
+                None
+            }
+        };
+        let styled_upper =
+            if (upper_owned.is_raster() || upper_owned.is_text()) && upper_owned.styles.has_visible_effect() {
+                Some(upper_owned.with_buffer(crate::layer_style::render_styled(&upper_owned)))
+            } else {
+                None
+            };
+        let upper = match &styled_upper {
+            Some(styled) => styled,
+            None => &upper_owned,
+        };
         let lower = &mut self.layers[active_idx - 1];
         let (width, height) = (self.width, self.height);
 
@@ -420,7 +440,10 @@ impl Document {
                 let lx = x as i32 - lower.offset_x;
                 let ly = y as i32 - lower.offset_y;
                 let lower_px = if lx >= 0 && ly >= 0 {
-                    layer_pixel_working(lower, lx as u32, ly as u32)
+                    match &styled_lower {
+                        Some(styled) => layer_pixel_working(styled, lx as u32, ly as u32),
+                        None => layer_pixel_working(lower, lx as u32, ly as u32),
+                    }
                 } else {
                     None
                 }
@@ -437,7 +460,7 @@ impl Document {
                 let ux = x as i32 - upper.offset_x;
                 let uy = y as i32 - upper.offset_y;
                 let upper_px = if ux >= 0 && uy >= 0 {
-                    layer_pixel_working(&upper, ux as u32, uy as u32)
+                    layer_pixel_working(upper, ux as u32, uy as u32)
                 } else {
                     None
                 }
@@ -457,6 +480,9 @@ impl Document {
         lower.opacity = 1.0;
         lower.offset_x = 0;
         lower.offset_y = 0;
+        // The lower style record was baked into its pixels above; keeping it would apply the
+        // effect to the merged upper artwork as well, and applying it twice.
+        lower.styles = crate::layer_style::LayerStyles::default();
         self.active_layer_id = lower.id;
         true
     }
@@ -555,6 +581,21 @@ impl Document {
     /// interpolates on unscaled channel values so the 8-bit result is byte-for-byte what it
     /// always was while a 16-bit layer keeps its precision.
     pub fn scale_canvas(&mut self, new_w: u32, new_h: u32, bilinear: bool) {
+        self.scale_canvas_with_styles(new_w, new_h, bilinear, false);
+    }
+
+    /// [`scale_canvas`] with an explicit choice for layer styles.
+    ///
+    /// When `scale_styles` is true, stroke widths, blur radii, glow radii and shadow offsets
+    /// scale with the image, matching the "Scale Styles" option in other editors. The default
+    /// keeps the legacy behaviour (styles stay at their authored pixel sizes).
+    pub fn scale_canvas_with_styles(
+        &mut self,
+        new_w: u32,
+        new_h: u32,
+        bilinear: bool,
+        scale_styles: bool,
+    ) {
         if new_w == 0 || new_h == 0 {
             return;
         }
@@ -573,6 +614,14 @@ impl Document {
             layer.width = new_w;
             layer.height = new_h;
             *layer.buffer_mut() = resampled;
+        }
+
+        if scale_styles && old_w > 0 && old_h > 0 {
+            let scale_x = new_w as f32 / old_w as f32;
+            let scale_y = new_h as f32 / old_h as f32;
+            for layer in &mut self.layers {
+                layer.styles = layer.styles.scaled(scale_x, scale_y);
+            }
         }
 
         self.width = new_w;
@@ -817,8 +866,19 @@ impl Document {
                 .filter(|m| m.enabled)
                 .map(|m| m.pixels.as_slice());
             let layer_pixels: &[u8] = layer.as_srgb8_exact();
+            // Clipping uses the base layer's *rendered* silhouette, including its styles: a
+            // stroke/glow/shadow changes the base's visible alpha, and clipping to the raw
+            // pixels would cut the clipped layer out of those effect pixels.
+            let styled_base = prev_layer
+                .filter(|base| (base.is_raster() || base.is_text()) && base.styles.has_visible_effect())
+                .map(crate::layer_style::render_styled);
+            let base_pixels: &[u8] = match (&styled_base, prev_layer) {
+                (Some(LayerBuffer::Srgb8(pixels)), _) => pixels,
+                (_, Some(base)) => base.as_srgb8_exact(),
+                _ => &[],
+            };
             let base = prev_layer.map(|b| ClipBase {
-                pixels: b.as_srgb8_exact(),
+                pixels: base_pixels,
                 offset_x: b.offset_x,
                 offset_y: b.offset_y,
                 width: b.width,
@@ -1424,13 +1484,28 @@ pub(crate) fn compose_u16_prepared(
                 &promoted.0[index]
             };
 
-        let base = if layer.clipping_mask && index > 0 {
+        let clipping = layer.clipping_mask && index > 0;
+        let styled_base = if clipping {
             let b = &doc.layers[index - 1];
             if !doc.is_layer_effective_visible(b.id) {
                 continue;
             }
+            // Same rule as the 8-bit path: clip to the base's styled silhouette, evaluated at
+            // 16-bit precision even if the base stores 8-bit pixels.
+            if (b.is_raster() || b.is_text()) && b.styles.has_visible_effect() {
+                Some(crate::layer_style::render_styled_srgb16(b))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let base = if clipping {
+            let b = &doc.layers[index - 1];
             Some(ClipBase {
-                pixels: &promoted.0[index - 1],
+                pixels: styled_base
+                    .as_deref()
+                    .unwrap_or(&promoted.0[index - 1]),
                 offset_x: b.offset_x,
                 offset_y: b.offset_y,
                 width: b.width,

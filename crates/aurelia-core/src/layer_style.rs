@@ -34,6 +34,34 @@ impl LayerStyles {
         self.stroke.is_none() && self.drop_shadow.is_none() && self.outer_glow.is_none()
     }
 
+    /// Scales pixel lengths with a canvas resize. Offsets scale per axis; widths, blurs and
+    /// radii use the geometric mean of the two axes because the effects are isotropic.
+    pub fn scaled(&self, scale_x: f32, scale_y: f32) -> Self {
+        let uniform = (scale_x * scale_y).sqrt();
+        if !uniform.is_finite() || uniform <= 0.0 {
+            return self.clone();
+        }
+        Self {
+            stroke: self.stroke.as_ref().map(|stroke| StrokeStyle {
+                width: (stroke.width * uniform).max(0.0),
+                color: stroke.color,
+                opacity: stroke.opacity,
+            }),
+            drop_shadow: self.drop_shadow.as_ref().map(|shadow| DropShadowStyle {
+                offset_x: shadow.offset_x * scale_x,
+                offset_y: shadow.offset_y * scale_y,
+                blur: (shadow.blur * uniform).max(0.0),
+                color: shadow.color,
+                opacity: shadow.opacity,
+            }),
+            outer_glow: self.outer_glow.as_ref().map(|glow| OuterGlowStyle {
+                radius: (glow.radius * uniform).max(0.0),
+                color: glow.color,
+                opacity: glow.opacity,
+            }),
+        }
+    }
+
     /// Styles that would actually draw: present, with non-zero width/radius and opacity.
     pub fn has_visible_effect(&self) -> bool {
         self.stroke.as_ref().is_some_and(|s| s.width > 0.0 && s.opacity > 0.0)

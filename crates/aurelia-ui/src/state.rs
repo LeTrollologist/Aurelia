@@ -534,6 +534,8 @@ pub struct AppState {
     pub resize_canvas_h: u32,
     pub resize_scale_mode: bool, // false: crop/extend, true: resample scale
     pub resize_bilinear: bool,
+    /// Scale layer style radii/offsets with a resample (Photoshop's "Scale Styles").
+    pub resize_scale_styles: bool,
     pub resize_anchor_center: bool,
 
     // Wand Tool Settings
@@ -853,6 +855,7 @@ impl AppState {
             resize_canvas_h: height,
             resize_scale_mode: false,
             resize_bilinear: true,
+            resize_scale_styles: true,
             resize_anchor_center: true,
 
             wand_tolerance: 24,
