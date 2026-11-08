@@ -86,27 +86,34 @@ instead of upscaling. The per-refresh cost measured earlier (1.62 ms at 1080p, 2
 320 px) scales with the square of the width; at the default 324 px dock the target is ~298 px, so
 the default path is unchanged. The ~30 Hz live cap still applies during a stroke.
 
-## Styled-layer cost (v3.8.1)
+## Styled-layer cost (consistent workload, v3.9.0 planning baseline)
 
-`cargo run --release -p aurelia-render --example bench_styles`, same machine, median of 12 runs.
-Each styled layer has stroke (3 px), drop shadow (6 px offset, 8 px blur) and outer glow (6 px).
+`cargo run --release -p aurelia-render --example bench_styles`, same machine, 3 warm-up runs and
+20 measured runs per configuration. **Identical** art pattern and effect parameters at every layer
+count: stroke 3 px, shadow offset (6, 6) with 8 px blur, glow 6 px. Raw samples:
+[docs/benchmarks/style-baseline.json](benchmarks/style-baseline.json).
 
-| Document | Layers | Style render | Composite | Viewport | Navigator |
+| Document | Layers | Style render | Composite (median) | Composite min / p95 | Viewport (median) |
 | :--- | --: | --: | --: | --: | --: |
-| 1920×1080 | 1 | 141 ms | 143 ms | 150 ms | 1.8 ms |
-| 1920×1080 | 4 | 121 ms | 499 ms | 508 ms | 1.7 ms |
-| 3840×2160 | 1 | 500 ms | 508 ms | 573 ms | 1.8 ms |
-| 3840×2160 | 4 | 502 ms | 2091 ms | 2212 ms | 1.8 ms |
+| 1920×1080 | 1 | 129 ms | 133 ms | 123 / 143 ms | 143 ms |
+| 1920×1080 | 2 | 129 ms | 267 ms | 253 / 274 ms | 280 ms |
+| 1920×1080 | 4 | 130 ms | 541 ms | 510 / 572 ms | 550 ms |
+| 1920×1080 | 8 | 125 ms | 1030 ms | 1008 / 1081 ms | 1044 ms |
+| 3840×2160 | 1 | 551 ms | 588 ms | 530 / 776 ms | 630 ms |
+| 3840×2160 | 2 | 547 ms | 1095 ms | 997 / 1249 ms | 1163 ms |
+| 3840×2160 | 4 | 526 ms | 2190 ms | 2134 / 2373 ms | 2219 ms |
+| 3840×2160 | 8 | 788 ms | 6415 ms | 4190 / 7167 ms | 6492 ms |
 
-Before the v3.8.1 cache-friendly vertical blur and reciprocal changes, the same bench measured
-~187 ms / ~769 ms / ~1109 ms / ~4676 ms for composite at the four configurations. Removing the
-styled-layer buffer clone is inside the noise; the style render itself is the cost.
+Before the v3.8.1 cache-friendly vertical blur and reciprocal changes, the earlier harness
+measured ~187 ms / ~769 ms / ~1109 ms / ~4676 ms for composite at 1080p×1, 1080p×4, 4K×1 and
+4K×4. Those numbers used a per-layer-varying art pattern, so they are not directly comparable to
+this table; the consistent-workload baseline above supersedes them for planning. (The published
+v3.8.1 release notes cite the earlier harness.)
 
-Style rendering is O(canvas × effects), so styled layers are currently a large-canvas budget
-item. The planned optimization is to evaluate effects only within the content bounds expanded by
-the largest effect radius (and to keep mask passes in u8/u16 rather than f32). Until then, treat
-several styled layers at 4K as not viewport-interactive; plain and mask-only documents are
-unaffected.
+Removing the styled-layer buffer clone was inside the noise; style rendering is the cost.
+Rendering is O(canvas × effects) and stays a budget item until the v3.9.0 content-bounds work
+lands. Until then, treat several styled layers at 4K as not viewport-interactive; plain and
+mask-only documents are unaffected.
 
 ## 16-bit completion baseline
 

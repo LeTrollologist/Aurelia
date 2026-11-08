@@ -14,42 +14,38 @@ with a short proposal in `docs/` before code.
 
 ---
 
-## Now — v3.9.0: Multi-document tabs
+## Now — v3.9.0: Styled-layer performance
 
-**Goal:** open several documents at once instead of one window per project.
+**Goal:** make layer styles interactive at the sizes Aurelia claims to handle. Styled layers are
+currently O(canvas × effects) and cost ~130 ms per layer at 1080p / ~550 ms at 4K (consistent-workload bench).
 
 | | |
 | :--- | :--- |
-| **Feature** | Tab bar (new/open/reorder/close), per-tab dirty marker, close/quit prompts, recovery of all open tabs. |
-| **Implementation** | `DocumentSession` per document: document, history, path, saved generation, pan/zoom, selection, view state. `AppState` keeps the active index; UI reads the active session. |
-| **Hardening** | Unsaved-changes prompt per tab (Save / Discard / Cancel), no cross-tab history or path leakage, autosave per tab, safe close order. |
-| **Gates** | Per-session history isolation; zoom/pan restored per tab; save/reopen keeps the session set; existing single-document tests unchanged. |
+| **Feature** | Content-bounds evaluation: render each style only inside the layer's nontransparent bounds, expanded by the effect's true support (blur passes, shadow offset, stroke width), then composite that sub-rect. |
+| **Hardening** | Pixel-equivalent output against the full-canvas reference (including transparent-edge behaviour at canvas borders and layers whose art touches an edge); mask caching keyed on layer/style revisions; no full-canvas allocations for small objects. |
+| **Gates** | Bit-identical composite vs the reference on randomized fixtures; v3.8.1-style bench improves materially with identical effect parameters and workload across layer counts; existing 301 tests unchanged. |
 
-**Out of scope:** split view, tab tear-off into windows, session persistence across app restarts
-(after v3.9.0 if wanted).
+**Out of scope:** new style effects, GPU work, changing the blur boundary policy. The proposal is
+[docs/v3.9.0-STYLE_PERFORMANCE.md](docs/v3.9.0-STYLE_PERFORMANCE.md).
 
 ---
 
 ## Next — queued in order
 
-1. **v3.10.0 — Colour management.** ICC profile reference on documents, working-space conversion,
-   soft proofing, explicit "convert vs assign". **Gate:** the byte-identical 8-bit oracle must be
-   preserved for untagged documents; a tagged document's colour change is opt-in. **Kill
-   criterion:** if conversion cannot be made deterministic and measurable, ship reference/proofing
-   only.
-2. **Interop batch — brush imports and native 16-bit PNG export.**
+1. **AUR persistence and recovery hardening.** Fuzz the optional sections (`AED1`, `ASTY`), crash
+   recovery with multiple sections, save/load idempotency, and a permanent historical fixture
+   corpus. Gate: no panic or misparse on a crafted corpus; recovery restores the same bytes.
+2. **Viewport correctness and invalidation.** Audit style/transform/mask invalidation, pan/zoom
+   edge cases and DPI changes after v3.8/v3.9; add a deterministic "what was redrawn" test seam.
+3. **Clipboard and external interoperability.** Complete DIB coverage (paletted inputs), add a
+   PNG clipboard format where supported, and test against real producer fixtures.
+4. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
+   Styles" option, and Merge Down compositing styles before it is exposed.
+5. **Interop batch — brush imports and native 16-bit PNG export.**
    - `.abr` / `.gbr` stamp decoding through the existing `aurelia-core::assets` seam
      (source → decode boundary → RGBA stamp), with malformed-input tests.
    - Native RGBA16 PNG export using `composite_layers_srgb16`; PNG is the only format that can
      carry the precision, so JPEG/WebP stay 8-bit with a documented reason.
-3. **Layer style extensions.** Inner shadow/glow, bevel, style presets and copy/paste of styles —
-   reuse the mask pipeline from v3.8.0.
-4. **Style renderer content-bounds pass.** Evaluate effects only inside the layer's alpha bounds
-   expanded by the largest effect radius (u8/u16 mask passes), so styled layers stop costing
-   O(canvas × effects). Benchmark first: the v3.8.1 baseline is in PERFORMANCE.md.
-5. **Decide the three cross-feature style semantics:** clipping to a styled base, a "Scale
-   Styles" option on canvas scaling, and whether Merge Down composites styles before it is
-   exposed in the UI.
 
 ---
 
@@ -57,6 +53,9 @@ with a short proposal in `docs/` before code.
 
 | Candidate | Why it waits |
 | :--- | :--- |
+| **Multi-document tabs** | `DocumentSession` refactor; valuable but not on the reliability/performance critical path. |
+| **Colour management** | ICC profiles, working-space conversion, soft proofing; needs its own oracle design. |
+| **Layer style extensions** | Inner shadow/glow, bevel, presets — explicitly after performance work; do not add effects to a slow renderer. |
 | **PSD import/export** | Third-party file format and codecs; separate compatibility matrix and fixtures. |
 | **Animated WebP / MP4 export** | New encoders and timeline semantics; independent of the renderer. |
 | **GPU acceleration** | Only when a measured CPU limit blocks a real workflow; the software path is the baseline. |
