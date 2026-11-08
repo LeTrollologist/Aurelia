@@ -949,10 +949,36 @@ impl Layer {
     }
 
     /// A copy of this layer with different pixels, used for composite-time styling.
+    ///
+    /// This deliberately does **not** go through `clone()`: cloning the layer would copy the
+    /// whole pixel buffer (and mask) only to replace the buffer immediately. At 1080p that is
+    /// an 8 MB copy per styled layer per composite, so the fields are copied individually and
+    /// the buffer is moved in.
     pub fn with_buffer(&self, buffer: LayerBuffer) -> Layer {
-        let mut copy = self.clone();
-        copy.buffer = buffer;
-        copy
+        Layer {
+            id: self.id,
+            name: self.name.clone(),
+            kind: self.kind,
+            adjustment: self.adjustment.clone(),
+            text: self.text.clone(),
+            parent_id: self.parent_id,
+            is_expanded: self.is_expanded,
+            pass_through: self.pass_through,
+            width: self.width,
+            height: self.height,
+            visible: self.visible,
+            locked: self.locked,
+            alpha_locked: self.alpha_locked,
+            clipping_mask: self.clipping_mask,
+            is_reference: self.is_reference,
+            opacity: self.opacity,
+            blend_mode: self.blend_mode,
+            offset_x: self.offset_x,
+            offset_y: self.offset_y,
+            buffer,
+            mask: self.mask.clone(),
+            styles: self.styles.clone(),
+        }
     }
 
     #[inline]
