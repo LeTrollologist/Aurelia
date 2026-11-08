@@ -179,7 +179,7 @@ Aurelia/
 | Project files | AUR v3 (`.aur`), legacy HCV v2–v5 (`.hcv`) | AUR v1/v2 are read-only compatibility formats; saves always write v3 |
 | Pixel formats | 8-bit and 16-bit sRGB documents; native 16-bit editing and compositing | Viewport presents an 8-bit image; mixed-format documents round-trip but are not created by the editor |
 | Layer features | Raster, groups, masks, adjustment layers, text, clipping | Animation is timeline-only; no video export |
-| Exports | PNG, JPEG, WebP, GIF, sprite sheets, frame sequences | Color profiles are not embedded yet; no ICC/Display P3 workflow |
+| Exports | PNG, JPEG, WebP, GIF, sprite sheets, frame sequences | PNG export is currently 8-bit (native RGBA16 export is queued); color profiles are not embedded yet; no ICC/Display P3 workflow |
 | Rich Presence | Optional Discord IPC | Off by default; no artwork previews; Windows Discord desktop only |
 | Distribution | Portable zip + per-user Inno installer | Unsigned by policy (no Authenticode path); artifacts are Ed25519-signed and SHA-256 verified |
 

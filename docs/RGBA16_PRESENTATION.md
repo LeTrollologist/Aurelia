@@ -1,9 +1,10 @@
 # RGBA16 viewport presentation — investigation and decision (#44)
 
-Status: **rejected** — the 8-bit presentation path stays. This document records what was
-investigated, what was measured, and why a native RGBA16 presentation path is not justified for
-v3.7.0. The decision is deliberately conservative: no renderer rewrite, no egui fork, and no
-silent colour conversion.
+Status: **superseded as a closed decision** — the 8-bit GDI path is the current implementation, but
+high-bit-depth presentation is now a tracked architecture track, not a permanent rejection. See
+[high-bit-depth-viewport.md](high-bit-depth-viewport.md) for the target and gates. This document
+records the original v3.7 investigation and why, under its "keep GDI and the UI unchanged"
+constraint, no path passed.
 
 ## What the viewport actually is
 
@@ -17,7 +18,9 @@ silent colour conversion.
   its nearest 8-bit code.
 
 So the limitation is in the *last step* (DIB + egui texture), not in storage, compositing,
-filters, transform or export — all of which are native 16-bit.
+filters, transforms or internal editing. (File export is a separate gap: PNG export is still
+8-bit, so "native 16-bit output" is not yet true for files either; native RGBA16 PNG export is in
+the interop queue.)
 
 ## Paths considered
 
@@ -57,9 +60,10 @@ demonstrably higher fidelity on an SDR 8-bit panel.
 3. **Native output stays available to non-display consumers.** `Document::composite_layers_srgb16`
    and `composite_layers_into_srgb16` remain the API for export and any future presentation path;
    the conversion used for display is rounded so it does not add bias.
-4. **Re-open only with a hardware target.** A future D3D11/DXGI presentation path needs a machine
-   with a 10-bit-capable display chain and a measured visible-difference test; without both, the
-   issue stays rejected.
+4. **Re-open only with a hardware target and a measured visible-difference test.** That condition
+   is now accepted as a planned track rather than a permanent rejection; the target is 10-bit SDR
+   presentation via DXGI, with a GDI fallback. See
+   [high-bit-depth-viewport.md](high-bit-depth-viewport.md).
 
 ## Acceptance mapping
 
@@ -71,3 +75,23 @@ demonstrably higher fidelity on an SDR 8-bit panel.
 | Retain 8-bit fallback | Status quo is the fallback. |
 | Document implement-or-reject decision | This document, linked from ROADMAP and the release notes. |
 | No silent colour conversion | Display conversion is explicit in the renderer and unchanged. |
+
+## Reassessment (post-v3.11)
+
+The original decision was correct under its constraint: preserve the GDI framebuffer and UI
+unchanged. That constraint made the issue look permanently closed, which was a mistake in
+presentation: the engine preserves 16-bit data while the artist still sees 8 bits.
+
+The capability gap is real:
+
+| Capability | State |
+| :--- | :--- |
+| 16-bit document storage | implemented |
+| 16-bit editing/compositing | implemented |
+| 16-bit file export | **not yet** (PNG export is 8-bit; native RGBA16 export queued) |
+| 10-bit/high-bit-depth display | **missing** (this document's subject) |
+| Professional colour workflow | incomplete (ICC/soft proofing queued) |
+
+Reassessed position: 10-bit SDR presentation is the next architecture track after the current
+clipboard work, with the gates in [high-bit-depth-viewport.md](high-bit-depth-viewport.md). It is
+not marketed as complete until the display path and colour management both land.

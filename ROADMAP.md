@@ -3,11 +3,11 @@
 **Status:** v3.11.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
 permanent policy.
 
-**Baseline:** 315 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
+**Baseline:** 323 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
 Sparse 16-bit composite **0.75** against the **0.60** budget. The viewport is an **8-bit
-presentation** of 16-bit documents — a recorded decision, not an open item
-([docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md)). Styled layers now render inside their
-effect bounds: small-art style time is 3 ms at 1080p / 13 ms at 4K (was 129/551 ms).
+presentation** of 16-bit documents — a current limitation, not a closed decision: high-bit-depth
+presentation is a tracked architecture track
+([docs/high-bit-depth-viewport.md](docs/high-bit-depth-viewport.md)).
 
 **How to read this:** *Now* is the next release, *Next* is queued in order, *Later* is designed but
 unscoped, *Not now* is closed. Every feature ships with tests and a written gate; P3 work starts
@@ -36,9 +36,15 @@ the gap is what other applications put on and expect from the Windows clipboard.
 
 ## Next — queued in order
 
-1. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
+1. **High-bit-depth presentation (10-bit DXGI).** Feasibility spike, then a 10-bit SDR canvas
+   present path with the GDI path as fallback; egui UI overlay decided by the spike. Gates:
+   visible banding removed on 10-bit hardware, byte-identical fallback, no startup/perf regression,
+   mixed-monitor and Remote Desktop safety. Proposal:
+   [docs/high-bit-depth-viewport.md](docs/high-bit-depth-viewport.md). Colour management is the
+   paired milestone; neither alone is a professional-colour claim.
+2. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
    Styles" option, and Merge Down compositing styles before it is exposed.
-2. **Interop batch — brush imports and native 16-bit PNG export.**
+3. **Interop batch — brush imports and native 16-bit PNG export.**
    - `.abr` / `.gbr` stamp decoding through the existing `aurelia-core::assets` seam
      (source → decode boundary → RGBA stamp), with malformed-input tests.
    - Native RGBA16 PNG export using `composite_layers_srgb16`; PNG is the only format that can
@@ -65,9 +71,6 @@ the gap is what other applications put on and expect from the Windows clipboard.
 - **32-bit float / linear-light editing.** Changes how values combine and invalidates the
   byte-identical 8-bit oracle; needs its own proposal and gate.
 - **Forking or replacing egui, or a renderer rewrite.** Not justified by the current bug class.
-- **Native RGBA16 viewport presentation.** Investigated and rejected; GDI/egui are 8-bit paths and
-  a real 16-bit display needs D3D/DXGI. Re-open only with a 10-bit-capable target and a measured
-  visible-fidelity test.
 - **Authenticode.** No public certificate path; Ed25519 artifact signatures plus SHA-256 manifests
   are the integrity boundary.
 
