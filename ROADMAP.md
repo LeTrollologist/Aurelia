@@ -1,12 +1,12 @@
 # Aurelia · Roadmap
 
-**Status:** v3.11.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
+**Status:** v3.12.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
 permanent policy.
 
-**Baseline:** 323 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
-Sparse 16-bit composite **0.75** against the **0.60** budget. The viewport is an **8-bit
-presentation** of 16-bit documents — a current limitation, not a closed decision: high-bit-depth
-presentation is a tracked architecture track
+**Baseline:** 338 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
+Sparse 16-bit composite **0.68** against the **0.60** budget on the last quality run. The viewport
+is an **8-bit presentation** of 16-bit documents — a current limitation, not a closed decision:
+high-bit-depth presentation is a tracked architecture track
 ([docs/high-bit-depth-viewport.md](docs/high-bit-depth-viewport.md)).
 
 **How to read this:** *Now* is the next release, *Next* is queued in order, *Later* is designed but
@@ -15,24 +15,24 @@ with a short proposal in `docs/` before code.
 
 ---
 
-## Now — v3.12.0: Clipboard and external interoperability
+## Now — v3.13.0: Colour management
 
-**Status:** implemented in `main`, unreleased. Paletted 1/4/8-bit DIB decoding, registered PNG
-clipboard read/write, a 64-megapixel PNG input cap, mutation tests, native RGBA16 PNG export for
-16-bit/mixed documents, the deferred style semantics (styled clipping base, Scale Styles,
-style-safe Merge Down), and `.abr`/`.gbr` brush stamp import are in; release is deferred by
-request.
+**Status:** proposal stage. No code yet; the first task is the written design and oracle plan.
 
-**Goal:** the remaining external boundary. Internal clipboard precision is now covered end to end;
-the gap is what other applications put on and expect from the Windows clipboard.
+**Goal:** make colour meaning explicit. Untagged documents keep the current sRGB behaviour exactly;
+tagged documents can carry an ICC profile, be converted into a chosen working space, and be soft
+proofed in the viewport.
 
 | | |
 | :--- | :--- |
-| **Feature** | Paletted DIB decoding (8-bit with palette), a PNG clipboard format where the OS/consumer supports it, and producer fixtures from real applications. |
-| **Hardening** | Malformed DIB corpus (masks, palettes, oversized headers, truncated pixels); round-trip tests for every supported format; explicit status when a format is unsupported instead of a silent fallback. |
-| **Gates** | Real-producer fixtures decode correctly; no panic on the mutation corpus; 8-bit DIB/PNG output unchanged where already supported. |
+| **Feature** | ICC profile attach/reference on documents and export; explicit **assign vs convert**; working-space selection; soft proofing approximation on the current 8-bit viewport. |
+| **Hardening** | Byte-identical output for untagged 8-bit documents (the existing oracle is the gate); tagged files round-trip their profile; conversion is deterministic and documented at the 8/16-bit boundaries. |
+| **Gates** | Untagged oracle unchanged; profile round-trip; a converted tagged document differs only by the documented transform; no silent profile dropping on export. |
 
-**Out of scope:** cross-application layer interchange.
+**Out of scope:** CMYK/PDF-X print production, full HDR, and a complete colour-engine rewrite.
+
+**First decision:** `lcms2` versus a deliberately small matrix/TRC parser with a documented profile
+subset. The choice and the untagged-oracle gate belong in the proposal before code.
 
 ---
 
@@ -97,6 +97,7 @@ the gap is what other applications put on and expect from the Windows clipboard.
 | Editing workflows | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
 | Clipboard & smart layers | Cut/Copy/Copy Merged/Paste (lossless RGBA16 internal, DIBV5 interop), Adaptive auto-contrast blend mode |
 | Viewport & stability | DPI-preserving framing, DPI-sized Navigator, premultiplied bilinear edges, perf/soak/eviction records |
+| Clipboard, output & brushes (v3.12.0) | Paletted DIB and PNG clipboard, RGBA16 PNG export, styled clipping/Scale Styles/style-safe Merge Down, `.abr`/`.gbr` stamp import, presence-log privacy fix, full in-house quality gate |
 | 16-bit integration (v3.11.0) | Copy Merged composites at 16 bits for 16-bit/mixed documents; sub-lattice round-trip tests for copy/paste and merged copy |
 | Persistence & recovery (v3.10.0) | Path-hashed autosave names, whole-directory recovery scan, payload-bound section counts, truncation/bit-flip corpus, atomic-save failure test |
 | Style performance (v3.9.0) | Content-bounds effect rendering: 3 ms small-art style pass at 1080p (was 129 ms); bit-identical to the full-canvas reference |
