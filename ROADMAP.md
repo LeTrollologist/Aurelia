@@ -33,10 +33,13 @@ test work is not done.
 
 ## Release baseline
 
-- **v3.7.1** is the current release. Assets, SHA-256 manifests and Ed25519 signatures verify;
+- **v3.8.0** is the current release. Assets, SHA-256 manifests and Ed25519 signatures verify;
   the installer is unsigned by permanent policy.
-- **281 tests pass, 2 ignored** (the soak and the 60-second sparse gate); clippy reports no new
+- **293 tests pass, 2 ignored** (the soak and the 60-second sparse gate); clippy reports no new
   lints.
+- Layer styles: stroke, drop shadow and outer glow are composited at working precision, stored in
+  the optional `ASTY` section (no container-format bump) and undoable per gesture. No-style
+  documents remain byte-identical against the 702-case oracle.
 - Clipboard: Cut/Copy/Copy Merged/Paste with a lossless RGBA16 internal payload and an 8-bit
   DIBV5 system copy; paste adds an undoable layer at the copied position.
 - Adaptive (auto-contrast) is a fourteenth blend mode: per pixel it keeps the layer colour or
@@ -150,6 +153,21 @@ regressions from Phase 0.
 
 ---
 
+## Shipped — Phase 3: v3.8.0 layer styles
+
+**Status: shipped 2026-11-08.** Stroke, drop shadow and outer glow are composite-time layer
+styles: non-destructive, working-precision at 8 and 16 bits, persisted in the optional `ASTY`
+section without a container-format bump, and undoable as one step per edit gesture. The design
+record and gates are in [docs/v3.8.0-LAYER_STYLES.md](docs/v3.8.0-LAYER_STYLES.md).
+
+**Goal:** add the first P3 feature without changing the renderer or the document format.
+
+**Next in P3:** multi-document tabs (`DocumentSession` refactor) is the natural second
+workstream — format-neutral and touching different code from styles. Colour management, PSD
+I/O, GPU and the cross-platform port remain later bets and still need their own proposals.
+
+---
+
 ## Parallel — stabilization and performance
 
 These are continuous, but only one correctness item is active at a time.
@@ -182,7 +200,6 @@ These are continuous, but only one correctness item is active at a time.
 
 Only after Phase 0/1 exit criteria and a written proposal:
 
-- **Layer styles**: stroke, glow, drop shadow as composite-time effects.
 - **Multi-document tabs**: `DocumentSession` refactor with per-document history/path/pan/zoom.
 - **Colour management**: ICC profile reference, working-space conversion and soft proofing.
 - **PSD import/export, animated WebP/MP4**: third-party codecs; separate scoping.
@@ -231,6 +248,7 @@ stable fixtures; timing tests need paired rounds and recorded machine/build cont
 | Release engineering | Journaled release tool, Ed25519 signatures, SHA-256, VirusTotal advisory scan, installer + portable zip |
 | Platform | Windows 10/11 x86-64, per-monitor V2 DPI, Win32 + GDI |
 | Editing workflows (v3.6.0) | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
+| Layer styles (v3.8.0) | Stroke, drop shadow and outer glow as composite-time effects; ASTY persistence, Layer Styles panel, gesture-level undo |
 | Clipboard & smart layers (v3.7.1) | Cut/Copy/Copy Merged/Paste with RGBA16 internal payload, DIBV5 interop, undoable paste; Adaptive auto-contrast blend mode |
 | Viewport & stabilization (v3.7.0) | DPI-preserving zoom/pan, DPI/dock-sized Navigator, premultiplied bilinear edges, RGBA16 presentation decision, paired perf records, soak + eviction tests |
 

@@ -80,9 +80,40 @@ Semantics:
 - The section does not affect pixel/layer round-trip guarantees and does not bump the container
   version. Older readers that ignore trailing bytes remain compatible.
 
+## Layer styles section (`ASTY`, v3.8.0)
+
+After the editor section, AUR v3 may append a per-layer style section. It is only written when at
+least one layer has styles:
+
+```
+magic           4 bytes   "ASTY"
+payload_len     u32 LE    bytes after this field (1 .. 1 MiB)
+payload:
+  version       u8        1
+  count         u32 LE    layers with styles
+  each entry:
+    layer_id    u64 LE
+    flags       u8        bit0 stroke, bit1 drop shadow, bit2 outer glow
+    stroke:     width f32, opacity f32, r/g/b/a u8   (if bit0)
+    shadow:     offset x/y f32, blur f32, opacity f32, r/g/b/a u8 (if bit1)
+    glow:       radius f32, opacity f32, r/g/b/a u8   (if bit2)
+```
+
+Semantics:
+
+- Optional and additive: a file without the section loads with empty styles, and a file saved by
+  an older build simply ends earlier. The container version is unchanged.
+- The section is ignored when it is absent, truncated, longer than 1 MiB, has an unknown version,
+  a count above 100 000, or non-finite floats. A damaged optional section never fails the load.
+- Opacity is clamped to `0..=1` and width/radius/blur to `>= 0` on read; unknown flag bits are
+  skipped by their field layout only through known versions, so a future bit requires a version
+  bump.
+- Styles never change layer pixels or the layer record; they are a composite-time property.
+
 ## Round-trip policy
 
 `load → save → load` must preserve layer order, names, masks, blend modes, offsets, adjustment
-settings and 8/16-bit channel data. Tests under `crates/aurelia-io/src/tests.rs` enforce this for
-the supported versions; a permanent fixture corpus for historical files is listed as follow-up
-work in [RELEASE_PROCESS.md](../RELEASE_PROCESS.md).
+settings, layer styles and 8/16-bit channel data. Tests under `crates/aurelia-io/src/tests.rs`
+and `crates/aurelia-io/tests/layer_styles_roundtrip.rs` enforce this for the supported versions; a
+permanent fixture corpus for historical files is listed as follow-up work in
+[RELEASE_PROCESS.md](../RELEASE_PROCESS.md).
