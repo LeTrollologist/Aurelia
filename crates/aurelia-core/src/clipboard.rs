@@ -242,9 +242,11 @@ pub fn encode_dibv5(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
 
 /// Decodes a clipboard DIB (BITMAPINFOHEADER, V4 or V5) into straight 8-bit RGBA.
 ///
-/// Only uncompressed `BI_RGB` / `BI_BITFIELDS` inputs are accepted. 24-bit DIBs are expanded
-/// with opaque alpha; 32-bit DIBs keep their fourth byte as alpha when it is present, and are
-/// treated as opaque when the whole alpha channel is zero (some producers leave it unused).
+/// Accepts uncompressed `BI_RGB` and `BI_BITFIELDS` inputs. `BI_BITFIELDS` channel masks are
+/// honoured, so an RGBA-ordered DIB from another application decodes with the right channels
+/// rather than assuming BGRA. 24-bit DIBs expand with opaque alpha. For plain 32-bit `BI_RGB`
+/// the fourth byte is alpha, and an entirely zero alpha channel is treated as "unused" (some
+/// producers leave it clear); an explicit alpha mask disables that heuristic.
 pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     if bytes.len() < 40 {
         return None;
@@ -270,16 +272,59 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     if compression != 0 && compression != 3 {
         return None;
     }
+    if compression == 3 && bit_count != 32 {
+        return None;
+    }
+
+    // Where the pixel data starts and, for BI_BITFIELDS, the channel masks.
+    let (pixel_offset, masks) = if compression == 3 {
+        if header_size >= 52 {
+            let masks = (
+                read_u32(40)?,
+                read_u32(44)?,
+                read_u32(48)?,
+                read_u32(52)?,
+            );
+            (header_size, Some(masks))
+        } else {
+            // BITMAPINFOHEADER + BI_BITFIELDS: the three masks follow the header; for a
+            // 32-bit DIB an alpha mask follows them, and the pixels start after that.
+            let offset = header_size + 12;
+            if bytes.len() < offset {
+                return None;
+            }
+            let masks = (read_u32(header_size)?, read_u32(header_size + 4)?, read_u32(header_size + 8)?, 0);
+            (offset, Some(masks))
+        }
+    } else {
+        (header_size, None)
+    };
+
     let width = width as u32;
     let height = height_raw.unsigned_abs();
     let top_down = height_raw < 0;
     let stride = (width as usize * bit_count as usize).div_ceil(32) * 4;
-    let needed = header_size.checked_add(stride.checked_mul(height as usize)?)?;
+    let needed = pixel_offset.checked_add(stride.checked_mul(height as usize)?)?;
     if bytes.len() < needed {
         return None;
     }
-    let pixels = &bytes[header_size..needed];
+    let pixels = &bytes[pixel_offset..needed];
     let mut rgba = vec![0u8; (width * height * 4) as usize];
+
+    fn masked_channel(raw: u32, mask: u32) -> u8 {
+        if mask == 0 {
+            return 0;
+        }
+        let shift = mask.trailing_zeros();
+        let bits = (mask >> shift).count_ones();
+        let value = (raw & mask) >> shift;
+        let quantised = if bits >= 8 {
+            value >> (bits - 8)
+        } else {
+            (value * 255) / ((1u32 << bits) - 1).max(1)
+        };
+        quantised.min(255) as u8
+    }
 
     for y in 0..height as usize {
         let source_row = if top_down { y } else { height as usize - 1 - y } * stride;
@@ -290,19 +335,39 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
             if s + 2 >= pixels.len() {
                 continue;
             }
-            rgba[d] = pixels[s + 2];
-            rgba[d + 1] = pixels[s + 1];
-            rgba[d + 2] = pixels[s];
-            rgba[d + 3] = if bit_count == 32 && s + 3 < pixels.len() {
-                pixels[s + 3]
-            } else {
-                255
-            };
+            match masks {
+                Some((red, green, blue, alpha)) => {
+                    if s + 3 >= pixels.len() {
+                        continue;
+                    }
+                    let raw = u32::from_le_bytes([
+                        pixels[s],
+                        pixels[s + 1],
+                        pixels[s + 2],
+                        pixels[s + 3],
+                    ]);
+                    rgba[d] = masked_channel(raw, red);
+                    rgba[d + 1] = masked_channel(raw, green);
+                    rgba[d + 2] = masked_channel(raw, blue);
+                    rgba[d + 3] = if alpha == 0 { 255 } else { masked_channel(raw, alpha) };
+                }
+                None => {
+                    rgba[d] = pixels[s + 2];
+                    rgba[d + 1] = pixels[s + 1];
+                    rgba[d + 2] = pixels[s];
+                    rgba[d + 3] = if bit_count == 32 && s + 3 < pixels.len() {
+                        pixels[s + 3]
+                    } else {
+                        255
+                    };
+                }
+            }
         }
     }
 
-    // A 32-bit DIB whose alpha is entirely zero carries no alpha information.
-    if bit_count == 32 && rgba.chunks_exact(4).all(|px| px[3] == 0) {
+    // A plain 32-bit DIB whose alpha is entirely zero carries no alpha information. An
+    // explicit alpha mask is authoritative instead, so it is excluded.
+    if compression == 0 && bit_count == 32 && rgba.chunks_exact(4).all(|px| px[3] == 0) {
         for px in rgba.chunks_exact_mut(4) {
             px[3] = 255;
         }
@@ -463,5 +528,68 @@ mod tests {
         if let LayerBuffer::Srgb8(px) = &clip.pixels {
             assert_eq!(px[3], 255, "mask coverage must not leak into the copied alpha");
         }
+    }
+}
+
+#[cfg(test)]
+mod dib_masks {
+    use super::decode_dib;
+
+    fn v5_header(width: u32, height: u32, masks: [u32; 4]) -> Vec<u8> {
+        let mut header = vec![0u8; 124];
+        header[0..4].copy_from_slice(&124u32.to_le_bytes());
+        header[4..8].copy_from_slice(&width.to_le_bytes());
+        header[8..12].copy_from_slice(&height.to_le_bytes());
+        header[12..14].copy_from_slice(&1u16.to_le_bytes());
+        header[14..16].copy_from_slice(&32u16.to_le_bytes());
+        header[16..20].copy_from_slice(&3u32.to_le_bytes()); // BI_BITFIELDS
+        for (index, mask) in masks.iter().enumerate() {
+            let at = 40 + index * 4;
+            header[at..at + 4].copy_from_slice(&mask.to_le_bytes());
+        }
+        header
+    }
+
+    /// RGBA-ordered masks must be honoured; the old decoder always assumed BGRA.
+    #[test]
+    fn rgab_masks_decode_to_the_right_channels() {
+        let mut dib = v5_header(1, 1, [0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000]);
+        let pixel = (0x40u32 << 24) | (0x20u32 << 16) | (0x10u32 << 8) | 0x08u32;
+        dib.extend_from_slice(&pixel.to_le_bytes());
+        let (w, h, rgba) = decode_dib(&dib).expect("decode");
+        assert_eq!((w, h), (1, 1));
+        assert_eq!(rgba, vec![0x08, 0x10, 0x20, 0x40]);
+    }
+
+    /// An explicit alpha mask is authoritative: an all-zero alpha must stay transparent rather
+    /// than being rewritten to opaque by the BI_RGB heuristic.
+    #[test]
+    fn explicit_alpha_mask_is_not_overridden() {
+        let mut dib = v5_header(2, 1, [0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000]);
+        dib.extend_from_slice(&0x00000000u32.to_le_bytes());
+        dib.extend_from_slice(&0x80000000u32.to_le_bytes());
+        let (_, _, rgba) = decode_dib(&dib).expect("decode");
+        assert_eq!(rgba[3], 0);
+        assert_eq!(rgba[7], 0x80);
+    }
+
+    /// A BITMAPINFOHEADER (`biSize = 40`) BI_BITFIELDS DIB carries its three masks immediately
+    /// after the header; the pixel data starts after them.
+    #[test]
+    fn forty_byte_header_masks_shift_the_pixel_offset() {
+        let mut dib = vec![0u8; 40];
+        dib[0..4].copy_from_slice(&40u32.to_le_bytes());
+        dib[4..8].copy_from_slice(&1i32.to_le_bytes());
+        dib[8..12].copy_from_slice(&1i32.to_le_bytes());
+        dib[12..14].copy_from_slice(&1u16.to_le_bytes());
+        dib[14..16].copy_from_slice(&32u16.to_le_bytes());
+        dib[16..20].copy_from_slice(&3u32.to_le_bytes());
+        for mask in [0x00ff0000u32, 0x0000ff00, 0x000000ff] {
+            dib.extend_from_slice(&mask.to_le_bytes());
+        }
+        dib.extend_from_slice(&0x00332211u32.to_le_bytes()); // B=0x11 G=0x22 R=0x33
+        let (_, _, rgba) = decode_dib(&dib).expect("decode");
+        assert_eq!(&rgba[0..3], &[0x33, 0x22, 0x11]);
+        assert_eq!(rgba[3], 255, "no alpha mask means opaque");
     }
 }
