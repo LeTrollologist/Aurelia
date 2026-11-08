@@ -1,12 +1,13 @@
 # Aurelia · Roadmap
 
-**Status:** v3.8.1 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
+**Status:** v3.9.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
 permanent policy.
 
-**Baseline:** 301 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
+**Baseline:** 305 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
 Sparse 16-bit composite **0.75** against the **0.60** budget. The viewport is an **8-bit
 presentation** of 16-bit documents — a recorded decision, not an open item
-([docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md)).
+([docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md)). Styled layers now render inside their
+effect bounds: small-art style time is 3 ms at 1080p / 13 ms at 4K (was 129/551 ms).
 
 **How to read this:** *Now* is the next release, *Next* is queued in order, *Later* is designed but
 unscoped, *Not now* is closed. Every feature ships with tests and a written gate; P3 work starts
@@ -14,34 +15,30 @@ with a short proposal in `docs/` before code.
 
 ---
 
-## Now — v3.9.0: Styled-layer performance
+## Now — v3.10.0: AUR persistence and recovery hardening
 
-**Goal:** make layer styles interactive at the sizes Aurelia claims to handle. Styled layers are
-currently O(canvas × effects) and cost ~130 ms per layer at 1080p / ~550 ms at 4K (consistent-workload bench).
+**Goal:** the remaining data-integrity surface. Optional sections and crash recovery must fail
+closed, never misparse and never lose bytes.
 
 | | |
 | :--- | :--- |
-| **Feature** | Content-bounds evaluation: render each style only inside the layer's nontransparent bounds, expanded by the effect's true support (blur passes, shadow offset, stroke width), then composite that sub-rect. |
-| **Hardening** | Pixel-equivalent output against the full-canvas reference (including transparent-edge behaviour at canvas borders and layers whose art touches an edge); mask caching keyed on layer/style revisions; no full-canvas allocations for small objects. |
-| **Gates** | Bit-identical composite vs the reference on randomized fixtures; v3.8.1-style bench improves materially with identical effect parameters and workload across layer counts; existing 301 tests unchanged. |
+| **Feature** | Fuzz `AED1`/`ASTY` (lengths, counts, truncation, bit flips); recovery with multiple sections; save/load idempotency; multi-tab-independent session restore. |
+| **Hardening** | A crafted corpus that must never panic; damaged optional sections ignored with the document still loading; recovery restores the same bytes; save/load/save stable. |
+| **Gates** | No panic or allocation blow-up on the corpus; byte-equal round-trip for valid files; corrupted-section tests stay ignored-not-fatal. |
 
-**Out of scope:** new style effects, GPU work, changing the blur boundary policy. The proposal is
-[docs/v3.9.0-STYLE_PERFORMANCE.md](docs/v3.9.0-STYLE_PERFORMANCE.md).
+**Out of scope:** new file formats (PSD), encryption, and cloud sync.
 
 ---
 
 ## Next — queued in order
 
-1. **AUR persistence and recovery hardening.** Fuzz the optional sections (`AED1`, `ASTY`), crash
-   recovery with multiple sections, save/load idempotency, and a permanent historical fixture
-   corpus. Gate: no panic or misparse on a crafted corpus; recovery restores the same bytes.
-2. **Viewport correctness and invalidation.** Audit style/transform/mask invalidation, pan/zoom
+1. **Viewport correctness and invalidation.** Audit style/transform/mask invalidation, pan/zoom
    edge cases and DPI changes after v3.8/v3.9; add a deterministic "what was redrawn" test seam.
-3. **Clipboard and external interoperability.** Complete DIB coverage (paletted inputs), add a
+2. **Clipboard and external interoperability.** Complete DIB coverage (paletted inputs), add a
    PNG clipboard format where supported, and test against real producer fixtures.
-4. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
+3. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
    Styles" option, and Merge Down compositing styles before it is exposed.
-5. **Interop batch — brush imports and native 16-bit PNG export.**
+4. **Interop batch — brush imports and native 16-bit PNG export.**
    - `.abr` / `.gbr` stamp decoding through the existing `aurelia-core::assets` seam
      (source → decode boundary → RGBA stamp), with malformed-input tests.
    - Native RGBA16 PNG export using `composite_layers_srgb16`; PNG is the only format that can
@@ -99,6 +96,7 @@ currently O(canvas × effects) and cost ~130 ms per layer at 1080p / ~550 ms at 
 | Editing workflows | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
 | Clipboard & smart layers | Cut/Copy/Copy Merged/Paste (lossless RGBA16 internal, DIBV5 interop), Adaptive auto-contrast blend mode |
 | Viewport & stability | DPI-preserving framing, DPI-sized Navigator, premultiplied bilinear edges, perf/soak/eviction records |
+| Style performance (v3.9.0) | Content-bounds effect rendering: 3 ms small-art style pass at 1080p (was 129 ms); bit-identical to the full-canvas reference |
 | Style reliability (v3.8.1) | Style edits mark the document dirty and commit on keyboard/wheel/leave/save; pinned blur boundary policy; metadata-only styled copy; DIB mask/alpha fixes |
 | Layer styles | Stroke, drop shadow, outer glow at composite time; `ASTY` persistence; gesture-level undo |
 | Platform & release | Windows x86-64, per-monitor V2 DPI, journaled release tool, signatures, VirusTotal scans |

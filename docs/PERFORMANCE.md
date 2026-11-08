@@ -86,34 +86,49 @@ instead of upscaling. The per-refresh cost measured earlier (1.62 ms at 1080p, 2
 320 px) scales with the square of the width; at the default 324 px dock the target is ~298 px, so
 the default path is unchanged. The ~30 Hz live cap still applies during a stroke.
 
-## Styled-layer cost (consistent workload, v3.9.0 planning baseline)
+## Styled-layer cost (content bounds, v3.9.0)
 
 `cargo run --release -p aurelia-render --example bench_styles`, same machine, 3 warm-up runs and
 20 measured runs per configuration. **Identical** art pattern and effect parameters at every layer
 count: stroke 3 px, shadow offset (6, 6) with 8 px blur, glow 6 px. Raw samples:
 [docs/benchmarks/style-baseline.json](benchmarks/style-baseline.json).
 
-| Document | Layers | Style render | Composite (median) | Composite min / p95 | Viewport (median) |
-| :--- | --: | --: | --: | --: | --: |
-| 1920×1080 | 1 | 129 ms | 133 ms | 123 / 143 ms | 143 ms |
-| 1920×1080 | 2 | 129 ms | 267 ms | 253 / 274 ms | 280 ms |
-| 1920×1080 | 4 | 130 ms | 541 ms | 510 / 572 ms | 550 ms |
-| 1920×1080 | 8 | 125 ms | 1030 ms | 1008 / 1081 ms | 1044 ms |
-| 3840×2160 | 1 | 551 ms | 588 ms | 530 / 776 ms | 630 ms |
-| 3840×2160 | 2 | 547 ms | 1095 ms | 997 / 1249 ms | 1163 ms |
-| 3840×2160 | 4 | 526 ms | 2190 ms | 2134 / 2373 ms | 2219 ms |
-| 3840×2160 | 8 | 788 ms | 6415 ms | 4190 / 7167 ms | 6492 ms |
+Rows marked *small* use a 10%-wide object in the centre; the others use art covering ~75% of the
+canvas.
 
-Before the v3.8.1 cache-friendly vertical blur and reciprocal changes, the earlier harness
-measured ~187 ms / ~769 ms / ~1109 ms / ~4676 ms for composite at 1080p×1, 1080p×4, 4K×1 and
-4K×4. Those numbers used a per-layer-varying art pattern, so they are not directly comparable to
-this table; the consistent-workload baseline above supersedes them for planning. (The published
-v3.8.1 release notes cite the earlier harness.)
+| Document | Layers | Art | Style render | Composite (median) | Composite min / p95 | Viewport (median) |
+| :--- | --: | :--- | --: | --: | --: | --: |
+| 1920×1080 | 1 | large | 79 ms | 83 ms | 79 / 99 ms | 96 ms |
+| 1920×1080 | 2 | large | 79 ms | 163 ms | 158 / 174 ms | 177 ms |
+| 1920×1080 | 4 | large | 88 ms | 382 ms | 327 / 488 ms | 398 ms |
+| 1920×1080 | 8 | large | 86 ms | 788 ms | 679 / 1174 ms | 782 ms |
+| 1920×1080 | 1 | **small** | 3 ms | 8 ms | 7 / 12 ms | 19 ms |
+| 3840×2160 | 1 | large | 355 ms | 367 ms | 346 / 386 ms | 427 ms |
+| 3840×2160 | 2 | large | 354 ms | 730 ms | 689 / 816 ms | 788 ms |
+| 3840×2160 | 4 | large | 332 ms | 1457 ms | 1358 / 1568 ms | 1441 ms |
+| 3840×2160 | 8 | large | 348 ms | 2843 ms | 2696 / 3451 ms | 3046 ms |
+| 3840×2160 | 1 | **small** | 13 ms | 35 ms | 28 / 43 ms | 85 ms |
 
-Removing the styled-layer buffer clone was inside the noise; style rendering is the cost.
-Rendering is O(canvas × effects) and stays a budget item until the v3.9.0 content-bounds work
-lands. Until then, treat several styled layers at 4K as not viewport-interactive; plain and
-mask-only documents are unaffected.
+Compared with the v3.9.0 planning baseline (129/133 ms at 1080p×1, 551/588 ms at 4K×1, 6415 ms at
+4K×8), content bounds cut the large-art cases by roughly 35–55%, and the small-art case by two
+orders of magnitude: style rendering drops from 129 ms to 3 ms at 1080p and from 551 ms to 13 ms
+at 4K. The output is gated to be bit-identical to the full-canvas renderer (see below).
+
+Full-canvas art is deliberately not faster: its bounds clamp to the canvas, so it pays the same
+effect passes plus one alpha scan. The win scales with the fraction of the canvas that is empty.
+The remaining 4K×8 cost is eight full-canvas style passes; per-layer bounds already apply, but
+the art itself covers most of the canvas.
+
+**Equivalence gate:** `render` remains the full-canvas reference. `bounded_equivalence` compares
+bounded output against it for empty, single-pixel, corner, edge-touching, full-canvas and
+rectangular art, at 8 and 16 bits; `bounded_randomized` adds 24 deterministic random fixtures with
+random styles and alpha blobs. Pixels outside the rectangle must be transparent, and every pixel
+with non-zero alpha must match exactly.
+
+Mask caching was not added: the small-art path is already single-digit milliseconds, and the
+large-art cost is genuine effect work. Revisit only if a many-small-layers profile shows the alpha
+scan or allocation dominating. The design record is
+[docs/v3.9.0-STYLE_PERFORMANCE.md](v3.9.0-STYLE_PERFORMANCE.md).
 
 ## 16-bit completion baseline
 
