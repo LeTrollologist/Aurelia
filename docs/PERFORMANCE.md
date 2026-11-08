@@ -86,6 +86,28 @@ instead of upscaling. The per-refresh cost measured earlier (1.62 ms at 1080p, 2
 320 px) scales with the square of the width; at the default 324 px dock the target is ~298 px, so
 the default path is unchanged. The ~30 Hz live cap still applies during a stroke.
 
+## Styled-layer cost (v3.8.1)
+
+`cargo run --release -p aurelia-render --example bench_styles`, same machine, median of 12 runs.
+Each styled layer has stroke (3 px), drop shadow (6 px offset, 8 px blur) and outer glow (6 px).
+
+| Document | Layers | Style render | Composite | Viewport | Navigator |
+| :--- | --: | --: | --: | --: | --: |
+| 1920×1080 | 1 | 141 ms | 143 ms | 150 ms | 1.8 ms |
+| 1920×1080 | 4 | 121 ms | 499 ms | 508 ms | 1.7 ms |
+| 3840×2160 | 1 | 500 ms | 508 ms | 573 ms | 1.8 ms |
+| 3840×2160 | 4 | 502 ms | 2091 ms | 2212 ms | 1.8 ms |
+
+Before the v3.8.1 cache-friendly vertical blur and reciprocal changes, the same bench measured
+~187 ms / ~769 ms / ~1109 ms / ~4676 ms for composite at the four configurations. Removing the
+styled-layer buffer clone is inside the noise; the style render itself is the cost.
+
+Style rendering is O(canvas × effects), so styled layers are currently a large-canvas budget
+item. The planned optimization is to evaluate effects only within the content bounds expanded by
+the largest effect radius (and to keep mask passes in u8/u16 rather than f32). Until then, treat
+several styled layers at 4K as not viewport-interactive; plain and mask-only documents are
+unaffected.
+
 ## 16-bit completion baseline
 
 Measured at `checkpoint/v3.4.0-16bit-complete` (`bfa6709`) on Intel64 Family 6 Model 154

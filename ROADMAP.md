@@ -1,9 +1,9 @@
 # Aurelia · Roadmap
 
-**Status:** v3.8.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
+**Status:** v3.8.1 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
 permanent policy.
 
-**Baseline:** 293 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
+**Baseline:** 301 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
 Sparse 16-bit composite **0.75** against the **0.60** budget. The viewport is an **8-bit
 presentation** of 16-bit documents — a recorded decision, not an open item
 ([docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md)).
@@ -44,6 +44,12 @@ with a short proposal in `docs/` before code.
      carry the precision, so JPEG/WebP stay 8-bit with a documented reason.
 3. **Layer style extensions.** Inner shadow/glow, bevel, style presets and copy/paste of styles —
    reuse the mask pipeline from v3.8.0.
+4. **Style renderer content-bounds pass.** Evaluate effects only inside the layer's alpha bounds
+   expanded by the largest effect radius (u8/u16 mask passes), so styled layers stop costing
+   O(canvas × effects). Benchmark first: the v3.8.1 baseline is in PERFORMANCE.md.
+5. **Decide the three cross-feature style semantics:** clipping to a styled base, a "Scale
+   Styles" option on canvas scaling, and whether Merge Down composites styles before it is
+   exposed in the UI.
 
 ---
 
@@ -94,6 +100,7 @@ with a short proposal in `docs/` before code.
 | Editing workflows | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
 | Clipboard & smart layers | Cut/Copy/Copy Merged/Paste (lossless RGBA16 internal, DIBV5 interop), Adaptive auto-contrast blend mode |
 | Viewport & stability | DPI-preserving framing, DPI-sized Navigator, premultiplied bilinear edges, perf/soak/eviction records |
+| Style reliability (v3.8.1) | Style edits mark the document dirty and commit on keyboard/wheel/leave/save; pinned blur boundary policy; metadata-only styled copy; DIB mask/alpha fixes |
 | Layer styles | Stroke, drop shadow, outer glow at composite time; `ASTY` persistence; gesture-level undo |
 | Platform & release | Windows x86-64, per-monitor V2 DPI, journaled release tool, signatures, VirusTotal scans |
 
