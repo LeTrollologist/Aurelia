@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are provided for the latest release only. The current release is
-[v3.9.0](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.10.0).
+[v3.9.0](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.11.0).
 
 ## Reporting a vulnerability
 
@@ -28,7 +28,7 @@ You should receive an acknowledgement within 48 hours.
   SmartScreen trust. SmartScreen reputation is independent of the artifact signature.
 
 ```powershell
-certutil -hashfile Aurelia-Setup-3.10.0.exe SHA256
+certutil -hashfile Aurelia-Setup-3.11.0.exe SHA256
 Get-Content SHA256SUMS.txt
 ```
 
