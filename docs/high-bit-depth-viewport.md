@@ -1,8 +1,8 @@
 # High-bit-depth viewport presentation — architecture proposal
 
-Status: **proposed** (reassesses the v3.7 "8-bit presentation" decision). This is not a promise of
-immediate delivery; it defines the target, the path, and the gates so the gap is tracked as
-architecture work rather than closed as out of scope.
+Status: **proposed; feasibility spike complete**. This is not a promise of immediate delivery; it
+defines the target, the path, and the gates so the gap is tracked as architecture work rather than
+closed as out of scope.
 
 ## The distinction
 
@@ -60,6 +60,43 @@ not simpler than the D3D11 route.
 
 Dithering the 16→8 conversion was rejected for fidelity reasons: it trades banding for visible
 noise at 100% zoom and prevents judging colour accurately.
+
+## Feasibility spike (2026-11-08)
+
+`tools/dxgi-spike` is a standalone, dependency-free diagnostic (raw COM, no `windows` crate) that
+enumerates the output, creates a D3D11 device, and attempts composition and HWND swapchains at
+`R10G10B10A2_UNORM` and `B8G8R8A8_UNORM`.
+
+Run:
+
+```
+cargo run --offline --manifest-path tools/dxgi-spike/Cargo.toml
+```
+
+Result on the development machine:
+
+```
+d3d11: ok (driver=hardware, feature_level=0xb100)
+dxgi: factory2 ok
+display \\.\DISPLAY1: bits_per_color=8 color_space=0 max_luminance=270.0
+composition swapchain 10-bit: created (present hr=0x00000000)
+composition swapchain 8-bit fallback: created (present hr=0x00000000)
+hwnd swapchain 10-bit: created (present hr=0x00000000)
+hwnd swapchain 8-bit fallback: created (present hr=0x00000000)
+result: device=ok 10-bit-swapchain=ok 8-bit-fallback=ok 10-bit-display=no
+```
+
+What this proves:
+
+- A D3D11 hardware device (feature level 11.1) is available and a 10-bit composition **and** HWND
+  swapchain can be created and `Present` returns S_OK, alongside the 8-bit fallback.
+- The attachment is an 8-bit-per-colour output, so the **visible-banding gate cannot be evaluated
+  on this machine**. No window was shown and no DirectComposition commit was performed, so this is
+  format/device feasibility, not proof of visible 10-bit scanout.
+
+What it does not prove: actual 10-bit scanout, colour-managed output, resize/DPI/device-loss
+behaviour, or egui overlay composition. Those remain the integration phase and need a machine with
+a 10-bit display chain.
 
 ## Dependency: colour management
 

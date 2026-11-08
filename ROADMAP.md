@@ -36,10 +36,12 @@ the gap is what other applications put on and expect from the Windows clipboard.
 
 ## Next — queued in order
 
-1. **High-bit-depth presentation (10-bit DXGI).** Feasibility spike, then a 10-bit SDR canvas
-   present path with the GDI path as fallback; egui UI overlay decided by the spike. Gates:
-   visible banding removed on 10-bit hardware, byte-identical fallback, no startup/perf regression,
-   mixed-monitor and Remote Desktop safety. Proposal:
+1. **High-bit-depth presentation (10-bit DXGI).** Feasibility spike complete: D3D11 FL11.1 device
+   and 10-bit composition/HWND swapchains create and present, with the 8-bit fallback working; the
+   development display reports 8 bits per colour, so the visible-banding gate needs a 10-bit
+   machine. Next is the canvas present path and egui overlay decision. Gates: visible banding
+   removed on 10-bit hardware, byte-identical fallback, no startup/perf regression, mixed-monitor
+   and Remote Desktop safety. Proposal:
    [docs/high-bit-depth-viewport.md](docs/high-bit-depth-viewport.md). Colour management is the
    paired milestone; neither alone is a professional-colour claim.
 2. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
