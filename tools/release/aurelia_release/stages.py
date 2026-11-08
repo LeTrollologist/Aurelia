@@ -15,7 +15,7 @@ from typing import Any
 
 from .config import ReleaseConfig
 from .engine import Context, Operation
-from .errors import CompensationError, PreflightError, VerificationError
+from .errors import CommandError, CompensationError, PreflightError, VerificationError
 from .gitops import Git
 from .github import client_for_context
 from .journal import OpState
@@ -418,11 +418,27 @@ def _publish_verify(ctx: Context, outputs: dict[str, Any]) -> dict[str, Any]:
     remote = ctx.cfg.git.remote
     refs = ctx.git.ls_remote(remote)
     desired = _desired_refs(ctx)
+    branch_ref = f"refs/heads/{ctx.cfg.git.branch}"
     for name, sha in desired.items():
-        if refs.get(name) != sha:
-            raise VerificationError(
-                f"{remote}/{name} is {refs.get(name)!r}, expected {sha!r}"
-            )
+        actual = refs.get(name)
+        if actual == sha:
+            continue
+        if name == branch_ref and actual:
+            # Someone may have pushed a normal follow-up commit during the release. That is not
+            # a failed publish as long as the release commit is still in the branch's history;
+            # only require equality for refs that cannot legitimately advance (the tag).
+            if not ctx.git.is_ancestor(sha, actual):
+                try:
+                    ctx.git.fetch(remote, f"{name}:refs/remotes/{remote}/{ctx.cfg.git.branch}")
+                except CommandError:
+                    pass
+                refs = ctx.git.ls_remote(remote)
+                actual = refs.get(name)
+            if actual and ctx.git.is_ancestor(sha, actual):
+                continue
+        raise VerificationError(
+            f"{remote}/{name} is {actual!r}, expected {sha!r}"
+        )
     if ctx.git.tag_commit(ctx.tag) != ctx.git.head():
         raise VerificationError(f"remote tag {ctx.tag} does not resolve to HEAD")
     if ctx.cfg.git.sign_tags:

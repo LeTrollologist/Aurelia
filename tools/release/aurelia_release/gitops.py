@@ -110,6 +110,10 @@ class Git:
     def is_ancestor(self, older: str, newer: str) -> bool:
         return self._run("merge-base", "--is-ancestor", older, newer).returncode == 0
 
+    def fetch(self, remote: str, refspec: str) -> None:
+        """Fetch one refspec, e.g. to inspect a branch that advanced during a release."""
+        self._checked("fetch", remote, refspec)
+
     # ── writes ──────────────────────────────────────────────────────────
     def add(self, paths: Sequence[str]) -> None:
         self._checked("add", "--", *paths)
