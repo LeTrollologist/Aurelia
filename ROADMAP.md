@@ -17,6 +17,10 @@ with a short proposal in `docs/` before code.
 
 ## Now — v3.12.0: Clipboard and external interoperability
 
+**Status:** implemented in `main`, unreleased. Paletted 1/4/8-bit DIB decoding, registered PNG
+clipboard read/write, a 64-megapixel PNG input cap, and mutation tests are in; release is deferred
+by request.
+
 **Goal:** the remaining external boundary. Internal clipboard precision is now covered end to end;
 the gap is what other applications put on and expect from the Windows clipboard.
 

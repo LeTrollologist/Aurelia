@@ -269,9 +269,9 @@ pub fn encode_dibv5(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
 
 /// Decodes a clipboard DIB (BITMAPINFOHEADER, V4 or V5) into straight 8-bit RGBA.
 ///
-/// Accepts uncompressed `BI_RGB` and `BI_BITFIELDS` inputs. `BI_BITFIELDS` channel masks are
-/// honoured, so an RGBA-ordered DIB from another application decodes with the right channels
-/// rather than assuming BGRA. 24-bit DIBs expand with opaque alpha. For plain 32-bit `BI_RGB`
+/// Accepts uncompressed `BI_RGB` and `BI_BITFIELDS` inputs. 24-bit and 32-bit DIBs are expanded
+/// to RGBA; paletted 1/4/8-bit `BI_RGB` DIBs use their colour table (common from Paint, scanners
+/// and older applications). 24-bit DIBs expand with opaque alpha. For plain 32-bit `BI_RGB`
 /// the fourth byte is alpha, and an entirely zero alpha channel is treated as "unused" (some
 /// producers leave it clear); an explicit alpha mask disables that heuristic.
 pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
@@ -292,7 +292,12 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     let planes = u16::from_le_bytes([*bytes.get(12)?, *bytes.get(13)?]);
     let bit_count = u16::from_le_bytes([*bytes.get(14)?, *bytes.get(15)?]);
     let compression = read_u32(16)?;
-    if planes != 1 || width <= 0 || height_raw == 0 || !matches!(bit_count, 24 | 32) {
+    let paletted = matches!(bit_count, 1 | 4 | 8);
+    if planes != 1
+        || width <= 0
+        || height_raw == 0
+        || !(matches!(bit_count, 24 | 32) || paletted)
+    {
         return None;
     }
     // 0 = BI_RGB, 3 = BI_BITFIELDS. Anything else (RLE, JPEG, PNG) is not a plain DIB.
@@ -302,6 +307,23 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     if compression == 3 && bit_count != 32 {
         return None;
     }
+    if paletted && compression != 0 {
+        return None;
+    }
+
+    // Colour table for paletted images. `biClrUsed` may be zero, meaning the full 2^bpp table.
+    let paletted_entries = if paletted {
+        let used = read_u32(32)? as usize;
+        let max = 1usize << bit_count;
+        let entries = if used == 0 { max } else { used };
+        if entries > max {
+            return None;
+        }
+        entries
+    } else {
+        0
+    };
+    let palette_bytes = paletted_entries.checked_mul(4)?;
 
     // Where the pixel data starts and, for BI_BITFIELDS, the channel masks.
     let (pixel_offset, masks) = if compression == 3 {
@@ -324,7 +346,19 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
             (offset, Some(masks))
         }
     } else {
-        (header_size, None)
+        (
+            header_size.checked_add(palette_bytes)?,
+            None,
+        )
+    };
+    let palette = if paletted {
+        let end = header_size.checked_add(palette_bytes)?;
+        if bytes.len() < end {
+            return None;
+        }
+        Some(&bytes[header_size..end])
+    } else {
+        None
     };
 
     let width = width as u32;
@@ -357,8 +391,41 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
         let source_row = if top_down { y } else { height as usize - 1 - y } * stride;
         let destination_row = y * width as usize * 4;
         for x in 0..width as usize {
-            let s = source_row + x * (bit_count as usize / 8);
             let d = destination_row + x * 4;
+            if let Some(table) = palette {
+                let s = source_row
+                    + match bit_count {
+                        8 => x,
+                        4 => x / 2,
+                        1 => x / 8,
+                        _ => 0,
+                    };
+                if s >= pixels.len() {
+                    continue;
+                }
+                let index = match bit_count {
+                    8 => pixels[s] as usize,
+                    4 => {
+                        let byte = pixels[s];
+                        if x % 2 == 0 {
+                            (byte >> 4) as usize
+                        } else {
+                            (byte & 0x0f) as usize
+                        }
+                    }
+                    1 => ((pixels[s] >> (7 - (x % 8))) & 1) as usize,
+                    _ => 0,
+                };
+                let at = index * 4;
+                if at + 2 < table.len() {
+                    rgba[d] = table[at + 2];
+                    rgba[d + 1] = table[at + 1];
+                    rgba[d + 2] = table[at];
+                }
+                rgba[d + 3] = 255;
+                continue;
+            }
+            let s = source_row + x * (bit_count as usize / 8);
             if s + 2 >= pixels.len() {
                 continue;
             }
@@ -618,5 +685,125 @@ mod dib_masks {
         let (_, _, rgba) = decode_dib(&dib).expect("decode");
         assert_eq!(&rgba[0..3], &[0x33, 0x22, 0x11]);
         assert_eq!(rgba[3], 255, "no alpha mask means opaque");
+    }
+}
+
+#[cfg(test)]
+mod dib_palette {
+    use super::decode_dib;
+
+    fn palette_entry(r: u8, g: u8, b: u8) -> [u8; 4] {
+        [b, g, r, 0]
+    }
+
+    fn header(width: u32, height: i32, bpp: u16, clr_used: u32) -> Vec<u8> {
+        let mut header = vec![0u8; 40];
+        header[0..4].copy_from_slice(&40u32.to_le_bytes());
+        header[4..8].copy_from_slice(&(width as i32).to_le_bytes());
+        header[8..12].copy_from_slice(&height.to_le_bytes());
+        header[12..14].copy_from_slice(&1u16.to_le_bytes());
+        header[14..16].copy_from_slice(&bpp.to_le_bytes());
+        header[16..20].copy_from_slice(&0u32.to_le_bytes()); // BI_RGB
+        header[32..36].copy_from_slice(&clr_used.to_le_bytes());
+        header
+    }
+
+    #[test]
+    fn eight_bit_palette_is_decoded_bottom_up() {
+        let mut dib = header(2, 2, 8, 4);
+        for entry in [
+            palette_entry(255, 0, 0),
+            palette_entry(0, 255, 0),
+            palette_entry(0, 0, 255),
+            palette_entry(255, 255, 255),
+        ] {
+            dib.extend_from_slice(&entry);
+        }
+        // Bottom row first: red, green. Top row: blue, white.
+        dib.extend_from_slice(&[0, 1, 0, 0]);
+        dib.extend_from_slice(&[2, 3, 0, 0]);
+        let (w, h, rgba) = decode_dib(&dib).expect("decode");
+        assert_eq!((w, h), (2, 2));
+        assert_eq!(&rgba[0..4], &[0, 0, 255, 255], "top-left is palette 2 (blue)");
+        assert_eq!(&rgba[4..8], &[255, 255, 255, 255]);
+        assert_eq!(&rgba[8..12], &[255, 0, 0, 255], "bottom-left is red");
+        assert_eq!(&rgba[12..16], &[0, 255, 0, 255]);
+    }
+
+    #[test]
+    fn four_bit_and_one_bit_rows_are_unpacked() {
+        let mut four = header(4, 1, 4, 4);
+        for entry in [
+            palette_entry(10, 0, 0),
+            palette_entry(20, 0, 0),
+            palette_entry(30, 0, 0),
+            palette_entry(40, 0, 0),
+        ] {
+            four.extend_from_slice(&entry);
+        }
+        four.extend_from_slice(&[0x01, 0x23, 0x00, 0x00]);
+        let (_, _, rgba) = decode_dib(&four).expect("4bpp");
+        assert_eq!(&rgba[0..4], &[10, 0, 0, 255]);
+        assert_eq!(&rgba[4..8], &[20, 0, 0, 255]);
+        assert_eq!(&rgba[8..12], &[30, 0, 0, 255]);
+        assert_eq!(&rgba[12..16], &[40, 0, 0, 255]);
+
+        let mut one = header(8, 1, 1, 0);
+        one.extend_from_slice(&palette_entry(0, 0, 0));
+        one.extend_from_slice(&palette_entry(255, 255, 255));
+        one.extend_from_slice(&[0b1010_0000, 0, 0, 0]);
+        let (_, _, rgba) = decode_dib(&one).expect("1bpp");
+        assert_eq!(&rgba[0..4], &[255, 255, 255, 255]);
+        assert_eq!(&rgba[4..8], &[0, 0, 0, 255]);
+        assert_eq!(&rgba[8..12], &[255, 255, 255, 255]);
+        assert_eq!(&rgba[12..16], &[0, 0, 0, 255]);
+    }
+
+    #[test]
+    fn truncated_or_overclaimed_palettes_are_rejected() {
+        let mut short = header(2, 1, 8, 4);
+        short.extend_from_slice(&palette_entry(1, 2, 3)); // only one of four entries
+        assert!(decode_dib(&short).is_none());
+
+        let mut overclaimed = header(1, 1, 8, 999);
+        for _ in 0..8 {
+            overclaimed.extend_from_slice(&palette_entry(0, 0, 0));
+        }
+        assert!(decode_dib(&overclaimed).is_none());
+    }
+}
+
+#[cfg(test)]
+mod dib_palette_mutations {
+    use super::decode_dib;
+
+    fn sample() -> Vec<u8> {
+        let mut dib = vec![0u8; 40];
+        dib[0..4].copy_from_slice(&40u32.to_le_bytes());
+        dib[4..8].copy_from_slice(&3i32.to_le_bytes());
+        dib[8..12].copy_from_slice(&2i32.to_le_bytes());
+        dib[12..14].copy_from_slice(&1u16.to_le_bytes());
+        dib[14..16].copy_from_slice(&8u16.to_le_bytes());
+        dib[32..36].copy_from_slice(&4u32.to_le_bytes());
+        for value in [3u8, 1, 0, 0, 2, 1, 0, 0] {
+            dib.push(value);
+        }
+        // stride 4, two rows, bottom-up
+        dib.extend_from_slice(&[0, 1, 0, 0]);
+        dib.extend_from_slice(&[2, 3, 0, 0]);
+        dib
+    }
+
+    #[test]
+    fn truncations_and_bit_flips_never_panic() {
+        let bytes = sample();
+        for cut in 0..=bytes.len() {
+            let _ = decode_dib(&bytes[..cut]);
+        }
+        for offset in 0..bytes.len() {
+            let mut mutated = bytes.clone();
+            mutated[offset] ^= 0xff;
+            let _ = decode_dib(&mutated);
+        }
     }
 }

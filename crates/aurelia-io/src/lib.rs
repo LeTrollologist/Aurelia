@@ -1,5 +1,8 @@
+pub mod clipboard_png;
 pub mod export;
 pub mod project;
+
+pub use clipboard_png::{decode_png_rgba8, encode_png_rgba8, MAX_CLIPBOARD_PIXELS};
 
 pub use export::{
     export_animated_gif, export_animated_gif_stream, export_animated_gif_with_limits,

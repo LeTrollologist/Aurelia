@@ -208,6 +208,7 @@ extern "system" {
     fn GlobalLock(hMem: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
     fn GlobalUnlock(hMem: *mut std::ffi::c_void) -> i32;
     fn SetClipboardData(uFormat: UINT, hMem: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
+    fn RegisterClipboardFormatW(lpszFormat: *const u16) -> UINT;
     fn EmptyClipboard() -> i32;
     fn GetClipboardSequenceNumber() -> u32;
     fn GlobalAlloc(uFlags: UINT, dwBytes: usize) -> *mut std::ffi::c_void;
@@ -339,7 +340,48 @@ unsafe fn set_clipboard_text(hwnd: HWND, text: &str) -> bool {
     true
 }
 
-/// Places an 8-bit RGBA image on the Windows clipboard as a 32-bit DIBV5.
+/// Publishes `bytes` under an already-empty clipboard. Must be called while the clipboard is open.
+unsafe fn put_clipboard_bytes(format: UINT, bytes: &[u8]) -> bool {
+    let h_mem = GlobalAlloc(0x0042 /* GMEM_MOVEABLE | GMEM_ZEROINIT */, bytes.len());
+    if h_mem.is_null() {
+        return false;
+    }
+    let ptr = GlobalLock(h_mem) as *mut u8;
+    if ptr.is_null() {
+        GlobalFree(h_mem);
+        return false;
+    }
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+    GlobalUnlock(h_mem);
+    let stored = !SetClipboardData(format, h_mem).is_null();
+    if !stored {
+        GlobalFree(h_mem);
+    }
+    stored
+}
+
+/// Reads and copies one clipboard format's bytes, if that format is present.
+unsafe fn clipboard_bytes(format: UINT) -> Option<Vec<u8>> {
+    let handle = GetClipboardData(format);
+    if handle.is_null() {
+        return None;
+    }
+    let ptr = GlobalLock(handle) as *const u8;
+    if ptr.is_null() {
+        return None;
+    }
+    let size = GlobalSize(handle);
+    let bytes = if size == 0 {
+        None
+    } else {
+        Some(std::slice::from_raw_parts(ptr, size).to_vec())
+    };
+    GlobalUnlock(handle);
+    bytes
+}
+
+/// Places an 8-bit RGBA image on the Windows clipboard as a 32-bit DIBV5 and, when it encodes,
+/// a registered `PNG` format that preserves alpha without DIB-mask ambiguity.
 ///
 /// The internal clipboard keeps 16-bit precision; this is the interoperability copy other
 /// applications can read. Returns false when the clipboard is locked by another process.
@@ -347,56 +389,56 @@ unsafe fn set_clipboard_image(hwnd: HWND, width: u32, height: u32, rgba: &[u8]) 
     let Some(dib) = aurelia_core::clipboard::encode_dibv5(width, height, rgba) else {
         return false;
     };
+    let png = aurelia_io::encode_png_rgba8(width, height, rgba);
     if OpenClipboard(hwnd) == 0 {
         return false;
     }
     EmptyClipboard();
-    let h_mem = GlobalAlloc(0x0042 /* GMEM_MOVEABLE | GMEM_ZEROINIT */, dib.len());
-    if h_mem.is_null() {
-        CloseClipboard();
-        return false;
-    }
-    let ptr = GlobalLock(h_mem) as *mut u8;
-    if ptr.is_null() {
-        GlobalFree(h_mem);
-        CloseClipboard();
-        return false;
-    }
-    std::ptr::copy_nonoverlapping(dib.as_ptr(), ptr, dib.len());
-    GlobalUnlock(h_mem);
-    let stored = !SetClipboardData(17 /* CF_DIBV5 */, h_mem).is_null();
-    if !stored {
-        GlobalFree(h_mem);
-    }
+    let dib_ok = put_clipboard_bytes(17 /* CF_DIBV5 */, &dib);
+    let png_format = RegisterClipboardFormatW(to_wide("PNG").as_ptr());
+    let png_ok = png
+        .as_deref()
+        .filter(|_| png_format != 0)
+        .is_some_and(|bytes| put_clipboard_bytes(png_format, bytes));
     CloseClipboard();
-    stored
+    dib_ok || png_ok
 }
 
-/// Reads a DIB image (DIBV5 or DIB) from the Windows clipboard, if one is present.
+/// Reads an image from the Windows clipboard: a registered PNG first (lossless alpha), then a
+/// DIBV5 or CF_DIB fallback.
 unsafe fn get_clipboard_image(hwnd: HWND) -> Option<(u32, u32, Vec<u8>)> {
     if OpenClipboard(hwnd) == 0 {
         return None;
     }
     let mut result = None;
-    for format in [17u32 /* CF_DIBV5 */, 8u32 /* CF_DIB */] {
-        let handle = GetClipboardData(format);
-        if handle.is_null() {
+
+    let png_formats = [
+        RegisterClipboardFormatW(to_wide("PNG").as_ptr()),
+        RegisterClipboardFormatW(to_wide("image/png").as_ptr()),
+    ];
+    for format in png_formats {
+        if format == 0 {
             continue;
         }
-        let ptr = GlobalLock(handle) as *const u8;
-        if ptr.is_null() {
-            continue;
+        if let Some(bytes) = clipboard_bytes(format) {
+            result = aurelia_io::decode_png_rgba8(&bytes);
         }
-        let size = GlobalSize(handle);
-        if size > 0 {
-            let bytes = std::slice::from_raw_parts(ptr, size);
-            result = aurelia_core::clipboard::decode_dib(bytes);
-        }
-        GlobalUnlock(handle);
         if result.is_some() {
             break;
         }
     }
+
+    if result.is_none() {
+        for format in [17u32 /* CF_DIBV5 */, 8u32 /* CF_DIB */] {
+            if let Some(bytes) = clipboard_bytes(format) {
+                result = aurelia_core::clipboard::decode_dib(&bytes);
+            }
+            if result.is_some() {
+                break;
+            }
+        }
+    }
+
     CloseClipboard();
     result
 }

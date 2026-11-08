@@ -37,11 +37,22 @@ undoable through `AddLayerCommand`: undo removes the layer, redo restores it.
 ### System clipboard encoding
 
 `encode_dibv5` writes a 124-byte `BITMAPV5HEADER` plus bottom-up 32-bit BGRA with `BI_BITFIELDS`
-masks and sRGB colour space. `decode_dib` accepts 40/108/124-byte headers, 24- and 32-bit
-`BI_RGB`/`BI_BITFIELDS`, top-down or bottom-up rows, and treats an all-zero 32-bit alpha channel
-as opaque (some producers leave alpha unused). Malformed or compressed DIBs are rejected, not
-guessed at. The conversions are pure functions in `aurelia-core::clipboard` and are unit-tested;
-only the Win32 handle plumbing lives in `aurelia-app`.
+masks and sRGB colour space. The same image is also published as a registered `PNG` format when
+PNG encoding succeeds; consumers that prefer PNG get lossless alpha without DIB-mask ambiguity,
+while DIB-only consumers still get the DIBV5 copy.
+
+`decode_dib` accepts 40/108/124-byte headers, 24- and 32-bit `BI_RGB`/`BI_BITFIELDS`, paletted
+1/4/8-bit `BI_RGB` with its colour table, top-down or bottom-up rows, and treats an all-zero
+32-bit alpha channel as opaque (some producers leave alpha unused). Palette entries are BGRA
+`RGBQUAD`s, the table length comes from `biClrUsed` (or `2^bpp` when zero), and a truncated or
+over-claimed palette is rejected rather than guessed at. Malformed or compressed DIBs are
+rejected, not guessed at.
+
+Paste prefers a registered `PNG`/`image/png` clipboard entry, then DIBV5, then CF_DIB. PNG input
+has its IHDR dimensions checked before decoding (64-megapixel cap), so a crafted header cannot
+force a large allocation. The conversions are pure functions (`aurelia-core::clipboard` for DIB,
+`aurelia_io::clipboard_png` for PNG) and are unit-tested; only Win32 handle plumbing lives in
+`aurelia-app`.
 
 ### Limits
 
