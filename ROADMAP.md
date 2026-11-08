@@ -18,8 +18,9 @@ with a short proposal in `docs/` before code.
 ## Now — v3.12.0: Clipboard and external interoperability
 
 **Status:** implemented in `main`, unreleased. Paletted 1/4/8-bit DIB decoding, registered PNG
-clipboard read/write, a 64-megapixel PNG input cap, mutation tests, and native RGBA16 PNG export
-for 16-bit/mixed documents are in; release is deferred by request.
+clipboard read/write, a 64-megapixel PNG input cap, mutation tests, native RGBA16 PNG export for
+16-bit/mixed documents, and the deferred style semantics (styled clipping base, Scale Styles,
+style-safe Merge Down) are in; release is deferred by request.
 
 **Goal:** the remaining external boundary. Internal clipboard precision is now covered end to end;
 the gap is what other applications put on and expect from the Windows clipboard.
@@ -44,14 +45,9 @@ the gap is what other applications put on and expect from the Windows clipboard.
    and Remote Desktop safety. Proposal:
    [docs/high-bit-depth-viewport.md](docs/high-bit-depth-viewport.md). Colour management is the
    paired milestone; neither alone is a professional-colour claim.
-2. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
-   Styles" option, and Merge Down compositing styles before it is exposed.
-3. **Interop batch — brush imports.**
+2. **Interop batch — brush imports.**
    - `.abr` / `.gbr` stamp decoding through the existing `aurelia-core::assets` seam
      (source → decode boundary → RGBA stamp), with malformed-input tests.
-   - Native RGBA16 PNG export is now implemented in `main` (16-bit and mixed documents export a
-     16-bit PNG; 8-bit documents keep their byte-identical 8-bit output). Aurelia's current
-     JPEG/WebP encoders remain 8-bit, with a documented reason.
 
 ---
 
