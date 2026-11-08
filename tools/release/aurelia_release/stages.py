@@ -155,6 +155,36 @@ def notes_encoding_problem(text: str) -> str | None:
     return None
 
 
+def notes_relative_link_problem(text: str) -> str | None:
+    """Reject relative Markdown links in release notes.
+
+    GitHub renders a release body under ``/releases/...``, so ``[x](../docs/y.md)`` resolves to a
+    URL under the release path and returns 404. Release pages need absolute ``https://`` links
+    (tag-pinned ``blob`` URLs are the stable choice). Anchors and mailto links are fine.
+    """
+    index = 0
+    while True:
+        opened = text.find("](", index)
+        if opened < 0:
+            return None
+        closed = text.find(")", opened + 2)
+        if closed < 0:
+            return None
+        target = text[opened + 2 : closed].strip()
+        if target.startswith("<") and ">" in target:
+            target = target[1 : target.index(">")]
+        if not (
+            target.startswith(("http://", "https://", "mailto:", "#"))
+            or target == ""
+        ):
+            return (
+                f"contains a relative link ({target!r}); release bodies are rendered under "
+                "/releases, so use an absolute https:// URL (for repository docs, "
+                "https://github.com/<owner>/<repo>/blob/<tag>/<path>)"
+            )
+        index = closed + 1
+
+
 def _preflight(ctx: Context) -> dict[str, Any]:
     git = ctx.git
     if not git.is_worktree():
@@ -225,6 +255,9 @@ def _preflight(ctx: Context) -> dict[str, Any]:
         problem = notes_encoding_problem(notes_text)
         if problem:
             raise PreflightError(f"release-notes/{ctx.tag}.md {problem}")
+        link_problem = notes_relative_link_problem(notes_text)
+        if link_problem:
+            raise PreflightError(f"release-notes/{ctx.tag}.md {link_problem}")
 
     problems = _current_versions_problem(ctx)
     if problems:
