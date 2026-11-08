@@ -1,6 +1,6 @@
-# Privacy Policy
+# Privacy Policy v2
 
-**Last Updated: November 4, 2026**
+**Last Updated: November 8, 2026**
 
 When using **Aurelia**, your privacy and creative ownership are absolute priorities. This Privacy Policy explains our data practices, architecture, and commitments.
 
@@ -9,7 +9,7 @@ When using **Aurelia**, your privacy and creative ownership are absolute priorit
 ## 1. Zero Telemetry & Local-First Philosophy
 
 - **No Data Collection**: Aurelia does not collect, record, track, or transmit any personal information, telemetry, usage statistics, diagnostic reports, or crash logs.
-- **100% Offline**: The application operates entirely offline. It does not initiate outbound network requests or connect to remote servers.
+- **100% Offline**: Aurelia does not directly initiate outbound network requests or communicate with remote servers. Optional integrations, such as Discord Rich Presence, communicate with locally installed applications that may independently access their own online services.
 - **Your Artwork Stays Yours**: All artwork, project files (`.aur`), image exports, palettes, and configurations remain strictly on your local device.
 
 ---
@@ -44,7 +44,7 @@ The application never scans, indexes, or accesses files outside the specific dir
 
 ## 4. Third-Party Services & Dependencies
 
-- **No Third-Party SDKs**: Aurelia contains no analytics SDKs, advertising networks, tracking pixels, or cloud storage integrations.
+- **Third-Party SDKs**: Aurelia does not integrate third-party analytics, advertising, tracking, or cloud-storage SDKs.
 - **Pure Native Build**: The codebase is compiled directly to native binary code with zero external telemetry dependencies.
 
 ---
@@ -55,7 +55,19 @@ Because Aurelia does not communicate with external servers, it does not perform 
 
 ---
 
-## 6. Contact & Inquiries
+## 6. Privacy Architecture
+
+Aurelia is designed as a local-first desktop application. Its image-processing engine, document system, rendering pipeline, and editing operations execute locally on your device.
+
+Project contents are not uploaded to external services, processed by remote servers, or synchronized to cloud infrastructure.
+
+Optional integrations are isolated from the core editing workflow and require explicit user activation.
+
+Aurelia does not require an online account, subscription authentication, or remote service to open, edit, save, or export artwork.
+
+---
+
+## 7. Contact & Inquiries
 
 If you have any questions regarding this Privacy Policy or Aurelia's privacy architecture, please contact:
 
