@@ -1,4 +1,5 @@
 use crate::blend::BlendMode;
+use crate::layer_style::LayerStyles;
 use serde::{Deserialize, Serialize};
 
 pub type LayerId = u64;
@@ -340,6 +341,9 @@ pub struct Layer {
     /// Optional layer mask applied when compositing.
     #[serde(default)]
     pub mask: Option<LayerMask>,
+    /// Non-destructive composite-time styles (stroke, shadow, glow).
+    #[serde(default)]
+    pub styles: LayerStyles,
 }
 
 fn default_expanded() -> bool {
@@ -754,6 +758,7 @@ impl Layer {
             offset_y: 0,
             buffer: LayerBuffer::Srgb8(vec![0; size]),
             mask: None,
+            styles: LayerStyles::default(),
         }
     }
 
@@ -780,6 +785,7 @@ impl Layer {
             offset_y: 0,
             buffer: LayerBuffer::Srgb8(Vec::new()),
             mask: None,
+            styles: LayerStyles::default(),
         }
     }
 
@@ -806,6 +812,7 @@ impl Layer {
             offset_y: 0,
             buffer: LayerBuffer::Srgb8(Vec::new()),
             mask: None,
+            styles: LayerStyles::default(),
         }
     }
 
@@ -833,6 +840,7 @@ impl Layer {
             offset_y: 0,
             buffer: LayerBuffer::Srgb8(vec![0; size]),
             mask: None,
+            styles: LayerStyles::default(),
         }
     }
 
@@ -936,7 +944,15 @@ impl Layer {
             offset_y: 0,
             buffer: LayerBuffer::Srgb8(pixels),
             mask: None,
+            styles: LayerStyles::default(),
         }
+    }
+
+    /// A copy of this layer with different pixels, used for composite-time styling.
+    pub fn with_buffer(&self, buffer: LayerBuffer) -> Layer {
+        let mut copy = self.clone();
+        copy.buffer = buffer;
+        copy
     }
 
     #[inline]
@@ -1036,6 +1052,7 @@ impl Layer {
             offset_y: self.offset_y,
             buffer: self.buffer.clone(),
             mask: self.mask.clone(),
+            styles: self.styles.clone(),
         }
     }
 }

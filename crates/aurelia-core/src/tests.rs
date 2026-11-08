@@ -4516,3 +4516,83 @@ fn layer_content_bounds_and_alpha_follow_native_storage() {
     assert_eq!(wide.content_bounds(), Some((1, 4, 1, 4)));
     assert_eq!(wide.alpha_at(1, 4), Some(1024));
 }
+
+/// Composite-time layer styles (v3.8.0): a styled layer changes the composite, and the
+/// 16-bit path keeps sub-lattice values instead of quantising to 8 bits.
+#[cfg(test)]
+mod layer_style_composite {
+    use crate::color::Color;
+    use crate::document::Document;
+    use crate::layer::PixelFormat;
+    use crate::layer_style::{DropShadowStyle, OuterGlowStyle};
+
+    fn square_layer(doc: &mut Document, x0: u32, y0: u32, size: u32, rgba: [u8; 4]) {
+        let id = doc.active_layer_id;
+        let width = doc.width;
+        let layer = doc.get_layer_mut(id).expect("layer");
+        let pixels = layer.as_srgb8_mut().expect("8-bit");
+        for y in y0..y0 + size {
+            for x in x0..x0 + size {
+                let at = ((y * width + x) * 4) as usize;
+                pixels[at..at + 4].copy_from_slice(&rgba);
+            }
+        }
+    }
+
+    #[test]
+    fn styled_composite_draws_the_shadow_and_unstyled_does_not() {
+        let mut doc = Document::new(24, 24);
+        square_layer(&mut doc, 6, 6, 4, [255, 0, 0, 255]);
+        let plain = doc.composite_layers(false);
+        let at = ((8 * 24 + 12) * 4) as usize;
+        assert_eq!(plain[at + 3], 0, "unstyled square has nothing to its right");
+
+        let id = doc.active_layer_id;
+        doc.get_layer_mut(id).expect("layer").styles.drop_shadow = Some(DropShadowStyle {
+            offset_x: 5.0,
+            offset_y: 0.0,
+            blur: 0.0,
+            color: Color::BLACK,
+            opacity: 1.0,
+        });
+        let styled = doc.composite_layers(false);
+        assert_eq!(styled[at + 3], 255, "shadow is composited at the offset");
+        assert_eq!(&styled[at..at + 3], &[0, 0, 0], "and in the shadow colour");
+    }
+
+    #[test]
+    fn sixteen_bit_styled_composite_keeps_sub_lattice_alpha() {
+        let mut doc = Document::new(24, 24);
+        square_layer(&mut doc, 8, 8, 4, [255, 0, 0, 255]);
+        let id = doc.active_layer_id;
+        doc.get_layer_mut(id)
+            .expect("layer")
+            .convert_format(PixelFormat::Srgb16);
+        doc.get_layer_mut(id).expect("layer").styles.outer_glow = Some(OuterGlowStyle {
+            radius: 2.0,
+            color: Color::WHITE,
+            opacity: 0.5,
+        });
+        assert_eq!(
+            doc.get_layer(id).expect("layer").format(),
+            PixelFormat::Srgb16,
+            "styles must not convert the layer"
+        );
+        let composed = doc.composite_layers_srgb16(false);
+        let outside = ((8 * 24 + 6) * 4) as usize;
+        let alpha = composed[outside + 3];
+        assert!(alpha > 0, "glow must reach outside the square");
+        assert_ne!(alpha % 257, 0, "16-bit glow must not collapse to the 8-bit lattice");
+    }
+
+    #[test]
+    fn styles_on_a_group_are_ignored_without_panicking() {
+        let mut doc = Document::new(8, 8);
+        let group = doc.add_group(None);
+        if let Some(layer) = doc.get_layer_mut(group) {
+            layer.styles.drop_shadow = Some(DropShadowStyle::default());
+        }
+        let _ = doc.composite_layers(false);
+        let _ = doc.composite_layers_srgb16(true);
+    }
+}

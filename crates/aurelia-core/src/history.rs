@@ -279,6 +279,33 @@ impl Command for AddLayerCommand {
     }
 }
 
+/// A layer-style edit (v3.8.0). Styles are small, so the whole before/after record is kept:
+/// undo restores exactly the stack the user saw, including which effects were enabled.
+#[derive(Debug)]
+pub struct LayerStyleCommand {
+    pub layer_id: u64,
+    pub before: crate::layer_style::LayerStyles,
+    pub after: crate::layer_style::LayerStyles,
+}
+
+impl Command for LayerStyleCommand {
+    fn name(&self) -> &'static str {
+        "Layer Style"
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            layer.styles = self.before.clone();
+        }
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            layer.styles = self.after.clone();
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct DeleteLayerCommand {
     pub layer: Layer,

@@ -694,6 +694,16 @@ impl Document {
                 continue;
             }
 
+            // Composite-time layer styles: substitute a styled copy of the layer's pixels. The
+            // clone keeps the layer's offset/mask/blend metadata, so only the pixels change.
+            let styled_layer;
+            let layer = if (layer.is_raster() || layer.is_text()) && layer.styles.has_visible_effect() {
+                styled_layer = layer.with_buffer(crate::layer_style::render_styled(layer));
+                &styled_layer
+            } else {
+                layer
+            };
+
             // ── Non-Destructive Adjustment Layer Pass ──
             if layer.is_adjustment() {
                 if let Some(adj_cfg) = &layer.adjustment {
@@ -1403,6 +1413,17 @@ pub(crate) fn compose_u16_prepared(
             continue;
         }
 
+        // Styles are evaluated at 16-bit precision here even when the layer stores 8-bit
+        // pixels, because this path exists precisely to avoid quantising the composite.
+        let styled_pixels;
+        let layer_pixels: &[u16] =
+            if (layer.is_raster() || layer.is_text()) && layer.styles.has_visible_effect() {
+                styled_pixels = crate::layer_style::render_styled_srgb16(layer);
+                &styled_pixels
+            } else {
+                &promoted.0[index]
+            };
+
         let base = if layer.clipping_mask && index > 0 {
             let b = &doc.layers[index - 1];
             if !doc.is_layer_effective_visible(b.id) {
@@ -1429,7 +1450,7 @@ pub(crate) fn compose_u16_prepared(
         macro_rules! run {
             ($compose:path) => {
                 compose_layer(
-                    &mut out[..total], layer, w, h, opacity, mask, base, &promoted.0[index], $compose,
+                    &mut out[..total], layer, w, h, opacity, mask, base, layer_pixels, $compose,
                 )
             };
         }
