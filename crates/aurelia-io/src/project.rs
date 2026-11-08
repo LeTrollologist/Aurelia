@@ -456,7 +456,10 @@ fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_st
         return None;
     }
     let count = cursor.u32()? as usize;
-    if count > 100_000 {
+    // The smallest entry is 9 bytes (id + flags); a count that cannot fit in the payload is a
+    // lie. Reject it before reserving, so a 1 MiB section cannot ask for 100k records and make
+    // the allocator do the work before the first EOF.
+    if count > 100_000 || count > payload.len().saturating_sub(5) / 9 {
         return None;
     }
     let mut out = Vec::with_capacity(count);
@@ -566,7 +569,8 @@ fn parse_editor_payload(payload: &[u8]) -> Option<EditorState> {
     let mut count = [0u8; 4];
     cursor.read_exact(&mut count).ok()?;
     let count = u32::from_le_bytes(count);
-    if count > 4096 {
+    // Each guide is 5 bytes; a larger count cannot fit in the payload.
+    if count > 4096 || count as usize > payload.len().saturating_sub(14) / 5 {
         return None;
     }
     let mut editor = EditorState::default();
