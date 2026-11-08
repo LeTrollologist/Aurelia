@@ -21,7 +21,14 @@ pub const LARGE_IMAGE: &str = "aurelia_logo";
 pub const LARGE_TEXT: &str = "Aurelia";
 pub const APPLICATION_NAME: &str = "Aurelia Studio";
 
+fn trace_enabled() -> bool {
+    matches!(std::env::var("AURELIA_PRESENCE_TRACE"), Ok(value) if value == "1")
+}
+
 fn trace(message: &str) {
+    if !trace_enabled() {
+        return;
+    }
     let Ok(local) = std::env::var("LOCALAPPDATA") else {
         return;
     };
@@ -33,6 +40,35 @@ fn trace(message: &str) {
     {
         let _ = writeln!(file, "{message}");
     }
+}
+
+/// Removes the pre-privacy diagnostic log when tracing is off.
+///
+/// Older builds wrote project names into `presence.log` even with Rich Presence disabled. The
+/// file is an app-owned diagnostic, not user artwork, so the privacy fix removes it rather than
+/// leaving previously recorded names on disk. Opting into `AURELIA_PRESENCE_TRACE=1` keeps it.
+fn clear_legacy_log() {
+    if trace_enabled() {
+        return;
+    }
+    let Ok(local) = std::env::var("LOCALAPPDATA") else {
+        return;
+    };
+    let _ = std::fs::remove_file(Path::new(&local).join("Aurelia").join("presence.log"));
+}
+
+/// Diagnostic line for an update, or `None` when there is nothing safe to record.
+///
+/// Project names and paths never appear here: they are user content, and the presence log is a
+/// local file. Disabled updates produce no line at all, so turning Rich Presence off cannot
+/// record which project was open.
+fn update_trace(update: &PresenceUpdate, connected: bool) -> Option<String> {
+    update.enabled.then(|| {
+        format!(
+            "update enabled show_project_name={} painting={} conn={connected}",
+            update.show_project_name, update.painting
+        )
+    })
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -125,6 +161,7 @@ pub struct PresenceManager {
 
 impl PresenceManager {
     pub fn new(client_id: impl Into<String>) -> Self {
+        clear_legacy_log();
         let client_id = client_id.into();
         let started_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -203,12 +240,6 @@ fn worker(client_id: String, started_at: i64, rx: Receiver<PresenceUpdate>) {
         let Some(update) = pending.clone() else {
             continue;
         };
-        trace(&format!(
-            "update enabled={} key={} conn={}",
-            update.enabled,
-            update.key(),
-            connection.is_some()
-        ));
 
         if !update.enabled {
             if let Some(mut conn) = connection.take() {
@@ -216,7 +247,13 @@ fn worker(client_id: String, started_at: i64, rx: Receiver<PresenceUpdate>) {
             }
             last_key = None;
             pending = None;
+            // Deliberately no update trace here: a disabled presence must not record anything
+            // about the open project.
             continue;
+        }
+
+        if let Some(line) = update_trace(&update, connection.is_some()) {
+            trace(&line);
         }
 
         if client_id.is_empty() {
@@ -360,5 +397,34 @@ mod tests {
         let long = "x".repeat(200);
         let name = project_name(Some(Path::new(&format!("{long}.aur")))).unwrap();
         assert_eq!(name.len(), 80);
+    }
+}
+
+#[cfg(test)]
+mod privacy_trace {
+    use super::{update_trace, PresenceUpdate};
+
+    fn update(enabled: bool) -> PresenceUpdate {
+        PresenceUpdate {
+            enabled,
+            show_project_name: true,
+            project_name: Some("secret-client-work".into()),
+            painting: true,
+        }
+    }
+
+    #[test]
+    fn disabled_presence_records_nothing() {
+        assert!(update_trace(&update(false), true).is_none());
+    }
+
+    #[test]
+    fn enabled_trace_never_contains_the_project_name() {
+        let line = update_trace(&update(true), false).expect("line");
+        assert!(line.contains("enabled"));
+        assert!(line.contains("painting=true"));
+        assert!(!line.contains("secret-client-work"));
+        assert!(!line.contains("Project:"));
+        assert!(!line.contains("|"), "the old key format included the project name");
     }
 }

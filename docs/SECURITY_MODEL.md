@@ -19,6 +19,11 @@ every instruction executing in the process is memory-safe; the Win32/CRT/FFI lay
   for updates.
 - Discord Rich Presence is **off by default**. When enabled it talks only to the local Discord
   client over `\\.\pipe\discord-ipc-*`; it uses no token, bot, webhook or remote endpoint.
+- Presence diagnostics do not record project names or paths. File logging is **off by default**;
+  setting `AURELIA_PRESENCE_TRACE=1` opts into a local `presence.log` containing only generic
+  state (`enabled`, `show_project_name`, `painting`, connection status). A disabled presence writes
+  no update line at all, and startup removes a legacy `presence.log` left by older builds when
+  tracing is off.
 - The release tooling contacts GitHub and (optionally) VirusTotal; it is not part of the app.
 
 ## Input handling
