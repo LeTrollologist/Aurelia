@@ -18,8 +18,8 @@ with a short proposal in `docs/` before code.
 ## Now — v3.12.0: Clipboard and external interoperability
 
 **Status:** implemented in `main`, unreleased. Paletted 1/4/8-bit DIB decoding, registered PNG
-clipboard read/write, a 64-megapixel PNG input cap, and mutation tests are in; release is deferred
-by request.
+clipboard read/write, a 64-megapixel PNG input cap, mutation tests, and native RGBA16 PNG export
+for 16-bit/mixed documents are in; release is deferred by request.
 
 **Goal:** the remaining external boundary. Internal clipboard precision is now covered end to end;
 the gap is what other applications put on and expect from the Windows clipboard.
@@ -30,7 +30,7 @@ the gap is what other applications put on and expect from the Windows clipboard.
 | **Hardening** | Malformed DIB corpus (masks, palettes, oversized headers, truncated pixels); round-trip tests for every supported format; explicit status when a format is unsupported instead of a silent fallback. |
 | **Gates** | Real-producer fixtures decode correctly; no panic on the mutation corpus; 8-bit DIB/PNG output unchanged where already supported. |
 
-**Out of scope:** native 16-bit file export (interop batch) and cross-application layer interchange.
+**Out of scope:** cross-application layer interchange.
 
 ---
 
@@ -44,12 +44,12 @@ the gap is what other applications put on and expect from the Windows clipboard.
    paired milestone; neither alone is a professional-colour claim.
 2. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
    Styles" option, and Merge Down compositing styles before it is exposed.
-3. **Interop batch — brush imports and native 16-bit PNG export.**
+3. **Interop batch — brush imports.**
    - `.abr` / `.gbr` stamp decoding through the existing `aurelia-core::assets` seam
      (source → decode boundary → RGBA stamp), with malformed-input tests.
-   - Native RGBA16 PNG export using `composite_layers_srgb16`; PNG is the only format that can
-     carry the precision. Aurelia's current JPEG/WebP encoders are 8-bit, so those remain 8-bit
-     with a documented reason (baseline JPEG and mainstream WebP are 8-bit-per-channel).
+   - Native RGBA16 PNG export is now implemented in `main` (16-bit and mixed documents export a
+     16-bit PNG; 8-bit documents keep their byte-identical 8-bit output). Aurelia's current
+     JPEG/WebP encoders remain 8-bit, with a documented reason.
 
 ---
 

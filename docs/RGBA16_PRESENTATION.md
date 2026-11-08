@@ -18,9 +18,8 @@ constraint, no path passed.
   its nearest 8-bit code.
 
 So the limitation is in the *last step* (DIB + egui texture), not in storage, compositing,
-filters, transforms or internal editing. (File export is a separate gap: PNG export is still
-8-bit, so "native 16-bit output" is not yet true for files either; native RGBA16 PNG export is in
-the interop queue.)
+filters, transforms or internal editing. (File export was a separate gap, now closed in `main`:
+16-bit and mixed documents export RGBA16 PNG; this document remains about presentation.)
 
 ## Paths considered
 
@@ -88,7 +87,7 @@ The capability gap is real:
 | :--- | :--- |
 | 16-bit document storage | implemented |
 | 16-bit editing/compositing | implemented |
-| 16-bit file export | **not yet** (PNG export is 8-bit; native RGBA16 export queued) |
+| 16-bit file export | implemented in `main` (16-bit/mixed documents export RGBA16 PNG; 8-bit documents keep 8-bit PNG; JPEG/WebP remain 8-bit) |
 | 10-bit/high-bit-depth display | **missing** (this document's subject) |
 | Professional colour workflow | incomplete (ICC/soft proofing queued) |
 

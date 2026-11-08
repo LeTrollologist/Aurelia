@@ -36,5 +36,5 @@ same composite, not a second document render.
 - 16-bit compositing, editing and transforms are native; the canvas presentation is 8-bit
   (GDI BGRA framebuffer) and the egui Navigator textures are RGBA8. That display boundary is a
   tracked architecture item, not a closed decision — see
-  [high-bit-depth-viewport.md](high-bit-depth-viewport.md). PNG export is also still 8-bit; the
-  native RGBA16 export path is queued.
+  [high-bit-depth-viewport.md](high-bit-depth-viewport.md). PNG export is 16-bit for 16-bit/mixed
+  documents and 8-bit for 8-bit documents.

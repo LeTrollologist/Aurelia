@@ -16,7 +16,7 @@
 | AUR v3 | ✅ | ✅ | current format |
 | AUR v2 | ✅ | — | masks supported; saves migrate to v3 |
 | AUR v1 / HCV v2–v5 | ✅ | — | legacy compatibility |
-| PNG / JPEG / WebP | ✅ | ✅ | 8-bit export; no RGBA16 PNG export yet (Aurelia's JPEG/WebP encoders are 8-bit) |
+| PNG / JPEG / WebP | ✅ | ✅ | PNG is 16-bit for 16-bit/mixed documents and 8-bit otherwise; Aurelia's JPEG/WebP encoders are 8-bit |
 | GIF / sprite sheet / frame sequence | ✅ (import) | ✅ | animation timeline export |
 | ICC / Display P3 | ❌ | ❌ | no color-management workflow yet |
 

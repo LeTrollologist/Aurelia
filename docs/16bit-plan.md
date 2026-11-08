@@ -601,8 +601,8 @@ Integration requirements, for the follow-up issues:
 
 | Consumer | Requirement |
 | :--- | :--- |
-| Viewport | egui 0.28 `ColorImage` is 8-bit. The viewport keeps showing a downconverted *presentation* of a 16-bit document; that is a display limitation, not data loss, and the UI should say so rather than imply the document is 8-bit. No 16-bit texture path is proposed. |
-| PNG export | `image` can write `ExtendedColorType::Rgba16`, so a native export path is a straight call once the export module accepts 16-bit input. Tracked as a follow-up. |
+| Viewport | egui 0.28 `ColorImage` is 8-bit. The viewport keeps showing a downconverted *presentation* of a 16-bit document; that is a display limitation, not data loss. It is now tracked as the 10-bit DXGI architecture proposal, [high-bit-depth-viewport.md](high-bit-depth-viewport.md), not a closed decision. |
+| PNG export | Implemented: 16-bit and mixed documents use `composite_layers_srgb16` and write `ExtendedColorType::Rgba16`; 8-bit documents keep byte-identical 8-bit PNG output. |
 | Flipbook / GIF | GIF is 8-bit by definition; frames composite through `Document::composite_layers` and downconvert at the end, which is correct. |
 | AUR save | Already native (v3). |
 
@@ -655,7 +655,7 @@ What the editor can and cannot do with a 16-bit document today:
 | Merge down | yes (native; writes into the lower layer's format) |
 | Free transform (affine, quad, mesh, TPS) | yes (native) |
 | Selection fill / stroke, scratchpad | yes (native) as of this change |
-| PNG export | no: 8-bit only; native RGBA16 PNG export is queued in the interop batch |
+| PNG export | yes: 16-bit and mixed documents export RGBA16 PNG; 8-bit documents export 8-bit PNG |
 | Viewport | 8-bit presentation (GDI framebuffer, egui RGBA8); 10-bit presentation is a tracked architecture track, see [high-bit-depth-viewport.md](high-bit-depth-viewport.md) |
 
 There are no 8-bit-only editing paths left. `require_8bit` remains as a guard for any future
