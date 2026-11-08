@@ -3600,38 +3600,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app_state.load_preferences();
 
-    // Offer the crash-recovery snapshot left behind by a previous session.
-    {
-        let recovery_path = app_state.autosave_path();
-        if recovery_path.exists() {
-            let text = to_wide(&format!(
-                "A crash-recovery snapshot was found:\n{}\n\nRestore it?\n\nYes = open the snapshot\nNo = discard it and keep the saved file",
-                recovery_path.display()
-            ));
-            let caption = to_wide("Aurelia · Recover artwork");
-            let answer = unsafe {
-                MessageBoxW(
-                    std::ptr::null_mut(),
-                    text.as_ptr(),
-                    caption.as_ptr(),
-                    0x0000_0004 | 0x0000_0040, // MB_YESNO | MB_ICONINFORMATION
-                )
-            };
-            if answer == 6 {
-                match load_project_file(&recovery_path) {
-                    Ok(doc) => {
-                        app_state = AppState::from_document(doc);
-                        app_state.load_preferences();
-                        app_state.mark_dirty();
-                        app_state.note_recent_file(&recovery_path);
-                        app_state
-                            .set_status("Recovered autosave snapshot - use Save As to keep it");
-                    }
-                    Err(e) => eprintln!("Failed to restore autosave snapshot: {}", e),
+    // Offer crash-recovery snapshots left behind by a previous session. This scans the whole
+    // autosave directory, not just the current document: a fresh launch has no document path,
+    // so looking only at `autosave_path()` would never find a named project's snapshot. The list
+    // is collected once so a snapshot that cannot be deleted cannot make this loop forever.
+    for recovery_path in AppState::autosave_snapshots() {
+        let text = to_wide(&format!(
+            "A crash-recovery snapshot was found:\n{}\n\nRestore it?\n\nYes = open the snapshot\nNo = discard it and check the next one",
+            recovery_path.display()
+        ));
+        let caption = to_wide("Aurelia · Recover artwork");
+        let answer = unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                caption.as_ptr(),
+                0x0000_0004 | 0x0000_0040, // MB_YESNO | MB_ICONINFORMATION
+            )
+        };
+        if answer == 6 {
+            match load_project_file(&recovery_path) {
+                Ok(doc) => {
+                    app_state = AppState::from_document(doc);
+                    app_state.load_preferences();
+                    app_state.mark_dirty();
+                    // Consume the snapshot: it is now the open document and has been marked
+                    // dirty, so it will be re-saved if the user keeps working.
+                    let _ = std::fs::remove_file(&recovery_path);
+                    app_state
+                        .set_status("Recovered autosave snapshot - use Save As to keep it");
+                    break;
                 }
-            } else {
-                let _ = std::fs::remove_file(&recovery_path);
+                Err(error) => {
+                    eprintln!("Failed to restore autosave snapshot: {error}");
+                    // A corrupt snapshot should not block recovery of the others.
+                    let _ = std::fs::remove_file(&recovery_path);
+                }
             }
+        } else {
+            let _ = std::fs::remove_file(&recovery_path);
         }
     }
 

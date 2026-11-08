@@ -1,6 +1,6 @@
 use glam::Vec2;
-use std::path::PathBuf;
-use std::time::Instant;
+use std::path::{Path, PathBuf};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use aurelia_core::blend::BlendMode;
 use aurelia_core::brush::BrushSettings;
 use aurelia_core::clipboard::ClipboardImage;
@@ -732,6 +732,40 @@ pub struct AppState {
     /// Physical-pixel width the current `navigator_texture` was rendered at. A DPI change or a
     /// panel resize can move this without moving the document revision (#45).
     pub navigator_texture_w: u32,
+}
+
+/// Stable, case-insensitive tag for an autosave filename (FNV-1a over the full path).
+fn autosave_tag(path: &Path) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in path.to_string_lossy().to_lowercase().as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// Recovery snapshots in `dir`, newest first. Missing directories yield an empty list.
+fn snapshots_in(dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut snapshots: Vec<(SystemTime, PathBuf)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = path.file_name()?.to_string_lossy();
+            if !name.ends_with("-autosave.aur") {
+                return None;
+            }
+            let modified = entry
+                .metadata()
+                .and_then(|metadata| metadata.modified())
+                .unwrap_or(UNIX_EPOCH);
+            Some((modified, path))
+        })
+        .collect();
+    snapshots.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| left.1.cmp(&right.1)));
+    snapshots.into_iter().map(|(_, path)| path).collect()
 }
 
 impl AppState {
@@ -2662,15 +2696,37 @@ impl AppState {
         base.join("Aurelia").join("autosave")
     }
 
-    /// `%LOCALAPPDATA%\Aurelia\autosave\<stem>-autosave.aur`.
+    /// `%LOCALAPPDATA%\Aurelia\autosave\<stem>-<path-hash>-autosave.aur`.
+    ///
+    /// The path hash matters: two projects named `poster.aur` in different folders used to share
+    /// one snapshot, so a crash could restore the wrong artwork (or lose the newer one). The hash
+    /// is FNV-1a over the lowercased full path, which is stable across runs and case-insensitive
+    /// on Windows.
     pub fn autosave_path(&self) -> PathBuf {
-        let stem = self
-            .document_path
+        let tag = match &self.document_path {
+            Some(path) => autosave_tag(path),
+            None => autosave_tag(Path::new("untitled")),
+        };
+        Self::autosave_dir().join(format!(
+            "{}-{tag}-autosave.aur",
+            self.autosave_stem()
+        ))
+    }
+
+    fn autosave_stem(&self) -> String {
+        self.document_path
             .as_ref()
-            .and_then(|p| p.file_stem())
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "untitled".to_string());
-        Self::autosave_dir().join(format!("{}-autosave.aur", stem))
+            .and_then(|path| path.file_stem())
+            .map(|stem| stem.to_string_lossy().to_lowercase())
+            .unwrap_or_else(|| "untitled".to_string())
+    }
+
+    /// Recovery snapshots on disk, newest first.
+    ///
+    /// Startup recovery must not look only at the current document's path: on a fresh launch
+    /// that path is `untitled-...`, so a named project's snapshot would never be offered.
+    pub fn autosave_snapshots() -> Vec<PathBuf> {
+        snapshots_in(&Self::autosave_dir())
     }
 
     /// Writes a recovery snapshot if the interval elapsed and there are unsaved edits.
@@ -2702,6 +2758,12 @@ impl AppState {
     pub fn clear_autosave(&mut self) {
         let path = self.autosave_path();
         let _ = std::fs::remove_file(&path);
+        // v3.9 and earlier named snapshots `<stem>-autosave.aur`; remove that too so an upgrade
+        // cannot keep offering a stale recovery file for a document that has just been saved.
+        if let Some(parent) = path.parent() {
+            let legacy = parent.join(format!("{}-autosave.aur", self.autosave_stem()));
+            let _ = std::fs::remove_file(legacy);
+        }
         self.autosave_pending = false;
     }
     // ─────────────────────────────────────────────────────────────────────
@@ -4196,5 +4258,50 @@ mod layer_style_transactions {
         assert!(!state.is_dirty(), "the just-saved document must not be dirty");
         let entries = state.history.undo_entries();
         assert_eq!(entries.last().map(|entry| entry.label), Some("Layer Style"));
+    }
+}
+
+#[cfg(test)]
+mod autosave_paths {
+    use super::{snapshots_in, AppState};
+    use std::path::Path;
+
+    #[test]
+    fn same_stem_in_different_folders_gets_different_snapshots() {
+        let mut state = AppState::new(8, 8);
+        state.document_path = Some("C:/Art/poster.aur".into());
+        let first = state.autosave_path();
+        state.document_path = Some("D:/Archive/poster.aur".into());
+        let second = state.autosave_path();
+        assert_ne!(first, second, "same stem must not share a recovery file");
+        assert!(first.file_name().unwrap().to_string_lossy().ends_with("-autosave.aur"));
+
+        // Windows paths are case-insensitive: the same file must map to the same snapshot.
+        state.document_path = Some("C:/ART/POSTER.AUR".into());
+        assert_eq!(first, state.autosave_path());
+    }
+
+    #[test]
+    fn untitled_has_a_stable_snapshot_and_scanning_ignores_other_files() {
+        let state = AppState::new(8, 8);
+        let untitled = state.autosave_path();
+        assert_eq!(untitled, state.autosave_path());
+
+        let dir = std::env::temp_dir().join(format!(
+            "aurelia-autosave-scan-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let snapshot = dir.join("poster-0123456789abcdef-autosave.aur");
+        std::fs::write(&snapshot, b"snapshot").expect("write");
+        std::fs::write(dir.join("poster.aur"), b"project").expect("write");
+        std::fs::write(dir.join("notes.txt"), b"notes").expect("write");
+
+        let found = snapshots_in(&dir);
+        assert_eq!(found, vec![snapshot]);
+        assert!(snapshots_in(Path::new("Z:/definitely/missing")).is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
