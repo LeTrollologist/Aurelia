@@ -28,7 +28,7 @@ branch = "main"
 sign_tags = false
 
 [commands]
-quality = "cargo test --release --workspace"
+quality = "python scripts/quality.py"
 build = "cargo build --release -p aurelia-app"
 package = "python scripts/package_aurelia.py --tag {tag} --version {version} --dist {dist} --exe \"target/release/aurelia-app.exe\" --iscc \"{iscc}\""
 

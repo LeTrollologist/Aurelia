@@ -75,10 +75,11 @@ and that every redraw has a deterministic reason.
 
 1. **Performance:** sparse 16-bit ratio ≥ 0.60 (record paired runs); Luminosity rollback reference
    68.3 MPix/s full pass / 92.2 isolated. No optimization without a paired win.
-2. **Stability:** run `cargo test -p aurelia-io --test soak --release -- --ignored` before each
-   stability release; eviction-integrity tests stay green.
+2. **Stability:** `python scripts/quality.py` runs the soak and sparse gate on every release;
+   eviction-integrity tests stay green.
 3. **Correctness:** the 702-case compositor oracle and the 8/16-bit digest suites are gates for
-   every compositor, style or blend change.
+   every compositor, style or blend change; the quality script also runs the release tool's
+   pytest suite.
 4. **Release:** notes before tag, preflight rejects missing notes/BOM/mojibake, assets signed and
    VirusTotal-scanned, published release re-downloaded and verified.
 5. **Manual hardware:** pen pressure/tilt, 100–200% DPI, two monitors, install/uninstall before a

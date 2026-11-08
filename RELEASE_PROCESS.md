@@ -72,7 +72,7 @@ python -m aurelia_release --repo . yank v3.1.0 --reason "…"  # withdrawn publi
 | :--- | :--- | :--- |
 | `preflight` | clean tree, branch, remote, tag, signing key, version consistency | no mutations |
 | `version` | rewrite declarations, commit `chore(release): vX.Y.Z` | includes every crate, docs and `Cargo.lock` |
-| `quality` | `cargo test --release --workspace` | configurable command |
+| `quality` | `python scripts/quality.py`: cargo workspace, release-tool pytest, sparse-16-bit gate, soak | configurable command; every release runs the in-house suites |
 | `build` | `cargo build --release -p aurelia-app` | configurable command |
 | `package` | portable zip + Inno installer | `scripts/package_aurelia.py` |
 | `sign` | Ed25519-sign assets and `SHA256SUMS.txt`, verify locally | no changelog generation |
@@ -185,14 +185,17 @@ integrity. Existing workflows must still pass a smoke test.
 Acceptance commands/evidence to keep with the release record:
 
 ```powershell
-cargo test --release --workspace
-cargo test -p aurelia-core gate_2 --release -- --ignored --nocapture
+python scripts/quality.py
 python -m aurelia_release --repo . doctor
 python -m aurelia_release --repo . plan v3.5.0
 python -m aurelia_release --repo . run v3.5.0
 python -m aurelia_release --repo . verify v3.5.0
 git status --short
 ```
+
+`scripts/quality.py` runs the cargo workspace, the release tool's pytest suite, the ignored
+sparse-16-bit gate and the long-session soak. It requires `pytest` on the release machine; a
+missing pytest fails the gate rather than silently skipping the suite.
 
 The release is not accepted until the downloaded assets verify independently and the working
 tree is clean after publishing.
