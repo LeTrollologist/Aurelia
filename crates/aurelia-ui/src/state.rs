@@ -24,6 +24,13 @@ pub struct SelectionEdit {
     pub after: Option<SelectionMask>,
 }
 
+/// One in-progress layer-style edit gesture, so dragging a slider produces one undo step.
+#[derive(Debug, Clone)]
+pub struct StyleEditSession {
+    pub layer_id: u64,
+    pub before: aurelia_core::layer_style::LayerStyles,
+}
+
 /// Human label for a storage format, used in copy/paste status messages.
 fn format_label(format: PixelFormat) -> &'static str {
     match format {
@@ -594,6 +601,8 @@ pub struct AppState {
     pub clipboard: Option<ClipboardImage>,
     /// Set when the internal clipboard should be mirrored to the Win32 clipboard by the host.
     pub clipboard_sync_pending: bool,
+    /// Open style-edit gesture; see `begin_layer_style_edit`.
+    pub style_edit: Option<StyleEditSession>,
     pub show_discord_presence_dialog: bool,
     // ── Custom window chrome ──
     pub window_action: Option<WindowAction>,
@@ -856,6 +865,7 @@ impl AppState {
             discord_show_project_name: false,
             clipboard: None,
             clipboard_sync_pending: false,
+            style_edit: None,
             show_discord_presence_dialog: false,
             window_action: None,
             is_maximized: false,
@@ -2319,6 +2329,44 @@ impl AppState {
             image.width, image.height
         ));
         true
+    }
+
+    /// Starts (or joins) a style-edit gesture for `layer_id`, capturing the pre-edit stack.
+    ///
+    /// The UI calls this before the first mutation of a drag, then [`finish_layer_style_edit`]
+    /// when the gesture ends, so a slider drag is one undo step rather than one per frame.
+    pub fn begin_layer_style_edit(&mut self, layer_id: u64) {
+        if self
+            .style_edit
+            .as_ref()
+            .is_some_and(|session| session.layer_id == layer_id)
+        {
+            return;
+        }
+        if let Some(before) = self.document.get_layer(layer_id).map(|layer| layer.styles.clone()) {
+            self.style_edit = Some(StyleEditSession { layer_id, before });
+        }
+    }
+
+    /// Closes the open style gesture and records one undo step if anything changed.
+    pub fn finish_layer_style_edit(&mut self) {
+        let Some(session) = self.style_edit.take() else {
+            return;
+        };
+        let Some(after) = self
+            .document
+            .get_layer(session.layer_id)
+            .map(|layer| layer.styles.clone())
+        else {
+            return;
+        };
+        if after != session.before {
+            self.history.push(Box::new(aurelia_core::history::LayerStyleCommand {
+                layer_id: session.layer_id,
+                before: session.before,
+                after,
+            }));
+        }
     }
 
     pub fn fill_selection_active_layer(&mut self) {
@@ -4015,5 +4063,48 @@ mod clipboard_actions {
         let pixels = layer.as_srgb8().expect("8-bit");
         assert_eq!(pixels[centre], 200);
         assert_eq!(pixels[centre + 3], 255);
+    }
+}
+
+#[cfg(test)]
+mod layer_styles_ui {
+    use super::AppState;
+    use aurelia_core::layer_style::{DropShadowStyle, StrokeStyle};
+
+    #[test]
+    fn one_gesture_is_one_undo_step_and_undo_restores_the_stack() {
+        let mut state = AppState::new(16, 16);
+        let id = state.document.active_layer_id;
+        assert!(state.document.get_layer(id).expect("layer").styles.is_empty());
+        let depth = state.history.len();
+
+        state.begin_layer_style_edit(id);
+        state.document.get_layer_mut(id).expect("layer").styles.stroke = Some(StrokeStyle::default());
+        state.begin_layer_style_edit(id); // joining the same gesture must not reset the baseline
+        state.document.get_layer_mut(id).expect("layer").styles.drop_shadow =
+            Some(DropShadowStyle::default());
+        state.finish_layer_style_edit();
+
+        assert_eq!(state.history.len(), depth + 1, "the whole gesture is one history step");
+        assert!(state.document.get_layer(id).expect("layer").styles.stroke.is_some());
+        assert!(state.document.get_layer(id).expect("layer").styles.drop_shadow.is_some());
+
+        state.undo_action();
+        assert!(
+            state.document.get_layer(id).expect("layer").styles.is_empty(),
+            "undo restores the pre-gesture style stack"
+        );
+        state.redo_action();
+        assert!(state.document.get_layer(id).expect("layer").styles.stroke.is_some());
+    }
+
+    #[test]
+    fn a_gesture_that_changes_nothing_records_nothing() {
+        let mut state = AppState::new(8, 8);
+        let id = state.document.active_layer_id;
+        let depth = state.history.len();
+        state.begin_layer_style_edit(id);
+        state.finish_layer_style_edit();
+        assert_eq!(state.history.len(), depth);
     }
 }

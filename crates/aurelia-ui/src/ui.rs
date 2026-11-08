@@ -2637,6 +2637,108 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         }
                     }
 
+                    // ── LAYER STYLES (v3.8.0) ──
+                    // Styles are edited on the active layer only; effects are composite-time,
+                    // so every change is visible immediately and undoable as one step per
+                    // gesture.
+                    {
+                        let active_id = state.document.active_layer_id;
+                        let stylable = state
+                            .document
+                            .get_layer(active_id)
+                            .is_some_and(|layer| layer.is_raster() || layer.is_text());
+                        if stylable {
+                            design::section(ui, "LAYER STYLES");
+                            let mut styles = state
+                                .document
+                                .get_layer(active_id)
+                                .map(|layer| layer.styles.clone())
+                                .unwrap_or_default();
+                            let mut changed = false;
+                            let mut finished = false;
+
+                            // Stroke
+                            let mut stroke_on = styles.stroke.is_some();
+                            if ui.checkbox(&mut stroke_on, "Stroke").changed() {
+                                styles.stroke = stroke_on.then(aurelia_core::layer_style::StrokeStyle::default);
+                                changed = true;
+                                finished = true;
+                            }
+                            if let Some(stroke) = &mut styles.stroke {
+                                if ui.add(egui::Slider::new(&mut stroke.width, 0.5..=40.0).text("Width")).changed() {
+                                    changed = true;
+                                }
+                                if ui.add(egui::Slider::new(&mut stroke.opacity, 0.0..=1.0).text("Opacity")).changed() {
+                                    changed = true;
+                                }
+                                let rgba = stroke.color.to_rgba8();
+                                let mut rgb = [rgba[0], rgba[1], rgba[2]];
+                                if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                    stroke.color = Color::from_rgba8(rgb[0], rgb[1], rgb[2], rgba[3]);
+                                    changed = true;
+                                    finished = true;
+                                }
+                                changed |= ui.input(|i| i.pointer.any_released());
+                                finished |= ui.input(|i| i.pointer.any_released());
+                            }
+
+                            // Drop shadow
+                            let mut shadow_on = styles.drop_shadow.is_some();
+                            if ui.checkbox(&mut shadow_on, "Drop Shadow").changed() {
+                                styles.drop_shadow = shadow_on.then(aurelia_core::layer_style::DropShadowStyle::default);
+                                changed = true;
+                                finished = true;
+                            }
+                            if let Some(shadow) = &mut styles.drop_shadow {
+                                changed |= ui.add(egui::Slider::new(&mut shadow.offset_x, -96.0..=96.0).text("Offset X")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut shadow.offset_y, -96.0..=96.0).text("Offset Y")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut shadow.blur, 0.0..=60.0).text("Blur")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut shadow.opacity, 0.0..=1.0).text("Opacity")).changed();
+                                let rgba = shadow.color.to_rgba8();
+                                let mut rgb = [rgba[0], rgba[1], rgba[2]];
+                                if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                    shadow.color = Color::from_rgba8(rgb[0], rgb[1], rgb[2], rgba[3]);
+                                    changed = true;
+                                    finished = true;
+                                }
+                                changed |= ui.input(|i| i.pointer.any_released());
+                                finished |= ui.input(|i| i.pointer.any_released());
+                            }
+
+                            // Outer glow
+                            let mut glow_on = styles.outer_glow.is_some();
+                            if ui.checkbox(&mut glow_on, "Outer Glow").changed() {
+                                styles.outer_glow = glow_on.then(aurelia_core::layer_style::OuterGlowStyle::default);
+                                changed = true;
+                                finished = true;
+                            }
+                            if let Some(glow) = &mut styles.outer_glow {
+                                changed |= ui.add(egui::Slider::new(&mut glow.radius, 0.5..=60.0).text("Radius")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut glow.opacity, 0.0..=1.0).text("Opacity")).changed();
+                                let rgba = glow.color.to_rgba8();
+                                let mut rgb = [rgba[0], rgba[1], rgba[2]];
+                                if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                    glow.color = Color::from_rgba8(rgb[0], rgb[1], rgb[2], rgba[3]);
+                                    changed = true;
+                                    finished = true;
+                                }
+                                changed |= ui.input(|i| i.pointer.any_released());
+                                finished |= ui.input(|i| i.pointer.any_released());
+                            }
+
+                            if changed {
+                                state.begin_layer_style_edit(active_id);
+                                if let Some(layer) = state.document.get_layer_mut(active_id) {
+                                    layer.styles = styles;
+                                }
+                                state.mark_canvas_dirty();
+                                if finished {
+                                    state.finish_layer_style_edit();
+                                }
+                            }
+                        }
+                    }
+
                     ui.add_space(8.0);
                     ui.separator();
 
