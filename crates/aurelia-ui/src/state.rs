@@ -2343,8 +2343,28 @@ impl AppState {
         {
             return;
         }
+        // Switching layers mid-gesture must not abandon the previous transaction: commit it
+        // first, so its styles stay undoable.
+        if self.style_edit.is_some() {
+            self.finish_layer_style_edit();
+        }
         if let Some(before) = self.document.get_layer(layer_id).map(|layer| layer.styles.clone()) {
             self.style_edit = Some(StyleEditSession { layer_id, before });
+            // The document is visibly modified as soon as a control moves, even though the
+            // undo command is only pushed at the end of the gesture. Dirty tracking must see
+            // that, or a close during the gesture loses the edit without an unsaved prompt.
+            self.mark_editor_dirty();
+        }
+    }
+
+    /// Commits an open style gesture if it belongs to a layer that is no longer active.
+    pub fn finish_layer_style_edit_if_inactive(&mut self, active_layer_id: u64) {
+        if self
+            .style_edit
+            .as_ref()
+            .is_some_and(|session| session.layer_id != active_layer_id)
+        {
+            self.finish_layer_style_edit();
         }
     }
 
@@ -2601,6 +2621,10 @@ impl AppState {
 
     /// Saves to an explicit path and updates path/recent/preferences bookkeeping.
     pub fn save_project_to(&mut self, path: &std::path::Path) -> Result<(), String> {
+        // Resolve any open style gesture first: the live styles are already in the document,
+        // but the undo command must be recorded before the saved generation is captured, or a
+        // later finish would mark the just-saved document dirty again.
+        self.finish_layer_style_edit();
         // Snapshot the recovery path before the document gains its real name, so an
         // untitled document's snapshot is also cleaned up after "Save As".
         let previous_autosave = self.autosave_path();
@@ -4106,5 +4130,71 @@ mod layer_styles_ui {
         state.begin_layer_style_edit(id);
         state.finish_layer_style_edit();
         assert_eq!(state.history.len(), depth);
+    }
+}
+
+#[cfg(test)]
+mod layer_style_transactions {
+    use super::AppState;
+    use aurelia_core::layer_style::StrokeStyle;
+
+    fn state_with_two_layers() -> (AppState, u64, u64) {
+        let mut state = AppState::new(16, 16);
+        let first = state.document.active_layer_id;
+        let second = state.document.add_layer(Some("Second".into()));
+        (state, first, second)
+    }
+
+    /// A live style mutation must mark the document dirty even before the gesture ends, or a
+    /// close during the gesture loses the edit without an unsaved prompt.
+    #[test]
+    fn an_open_style_gesture_is_dirty() {
+        let (mut state, first, _) = state_with_two_layers();
+        state.mark_saved();
+        assert!(!state.is_dirty());
+        state.begin_layer_style_edit(first);
+        assert!(state.is_dirty(), "starting a style gesture modifies the document");
+        state.document.get_layer_mut(first).expect("layer").styles.stroke =
+            Some(StrokeStyle::default());
+        state.finish_layer_style_edit();
+        assert!(state.is_dirty());
+    }
+
+    /// Switching layers must commit the previous gesture, not abandon it.
+    #[test]
+    fn switching_layers_commits_the_previous_gesture() {
+        let (mut state, first, second) = state_with_two_layers();
+        let baseline = state.history.len();
+        state.begin_layer_style_edit(first);
+        state.document.get_layer_mut(first).expect("layer").styles.stroke =
+            Some(StrokeStyle::default());
+        state.begin_layer_style_edit(second);
+        assert_eq!(state.history.len(), baseline + 1, "first gesture is committed");
+        assert_eq!(
+            state.history.undo_entries().last().map(|entry| entry.label),
+            Some("Layer Style")
+        );
+        assert!(state.document.get_layer(first).expect("layer").styles.stroke.is_some());
+        state.finish_layer_style_edit();
+    }
+
+    /// Saving resolves the pending gesture before the saved generation is captured, so a save
+    /// followed by no further edit is not immediately dirty again.
+    #[test]
+    fn saving_resolves_the_pending_gesture() {
+        let (mut state, first, _) = state_with_two_layers();
+        state.begin_layer_style_edit(first);
+        state.document.get_layer_mut(first).expect("layer").styles.stroke =
+            Some(StrokeStyle::default());
+        let path = std::env::temp_dir().join(format!(
+            "aurelia-style-save-{}.aur",
+            std::process::id()
+        ));
+        state.save_project_to(&path).expect("save");
+        let _ = std::fs::remove_file(&path);
+        assert!(state.style_edit.is_none(), "save commits the open gesture");
+        assert!(!state.is_dirty(), "the just-saved document must not be dirty");
+        let entries = state.history.undo_entries();
+        assert_eq!(entries.last().map(|entry| entry.label), Some("Layer Style"));
     }
 }

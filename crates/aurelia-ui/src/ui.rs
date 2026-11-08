@@ -2643,6 +2643,9 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     // gesture.
                     {
                         let active_id = state.document.active_layer_id;
+                        // Leaving the layer (or selecting a group) ends the open gesture, so its
+                        // change stays undoable instead of lingering as an uncommitted edit.
+                        state.finish_layer_style_edit_if_inactive(active_id);
                         let stylable = state
                             .document
                             .get_layer(active_id)
@@ -2678,8 +2681,6 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                     changed = true;
                                     finished = true;
                                 }
-                                changed |= ui.input(|i| i.pointer.any_released());
-                                finished |= ui.input(|i| i.pointer.any_released());
                             }
 
                             // Drop shadow
@@ -2701,8 +2702,6 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                     changed = true;
                                     finished = true;
                                 }
-                                changed |= ui.input(|i| i.pointer.any_released());
-                                finished |= ui.input(|i| i.pointer.any_released());
                             }
 
                             // Outer glow
@@ -2722,8 +2721,6 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                     changed = true;
                                     finished = true;
                                 }
-                                changed |= ui.input(|i| i.pointer.any_released());
-                                finished |= ui.input(|i| i.pointer.any_released());
                             }
 
                             if changed {
@@ -2735,6 +2732,11 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 if finished {
                                     state.finish_layer_style_edit();
                                 }
+                            }
+                            // Ends a drag on the release frame (a release produces no value
+                            // change, so it cannot be detected from `changed`).
+                            if !ui.input(|i| i.pointer.primary_down()) {
+                                state.finish_layer_style_edit();
                             }
                         }
                     }
