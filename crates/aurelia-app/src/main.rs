@@ -3339,11 +3339,20 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                                 !app.state.document.is_transparent,
                                 Some(app.state.jpeg_quality),
                             ) {
-                                Ok(_) => app.state.set_status(format!(
-                                    "Exported {} to {}",
-                                    extension.to_uppercase(),
-                                    path.display()
-                                )),
+                                Ok(_) => {
+                                    let depth = if format == ExportFormat::Png
+                                        && aurelia_io::export::png_will_be_16bit(&app.state.document)
+                                    {
+                                        "16-bit "
+                                    } else {
+                                        ""
+                                    };
+                                    app.state.set_status(format!(
+                                        "Exported {depth}{} to {}",
+                                        extension.to_uppercase(),
+                                        path.display()
+                                    ))
+                                }
                                 Err(e) => app.state.set_status(format!("Export error: {}", e)),
                             }
                         }

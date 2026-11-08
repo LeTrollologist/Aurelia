@@ -167,6 +167,55 @@ fn check_frame_len(frame: &[u8], index: usize, expected: usize) -> Result<(), Ex
     Ok(())
 }
 
+fn check_frame_len_16(frame: &[u16], index: usize, expected: usize) -> Result<(), ExportError> {
+    if frame.len() != expected {
+        return Err(ExportError::FrameSizeMismatch {
+            index,
+            expected,
+            actual: frame.len(),
+        });
+    }
+    Ok(())
+}
+
+/// Bytes in one RGBA16 frame, with the same geometry validation as [`frame_bytes`].
+fn frame_bytes_16(width: u32, height: u32, limits: &ExportLimits) -> Result<usize, ExportError> {
+    // Reuse the dimension checks (and their error shape) before widening the pixel size.
+    let _ = frame_bytes(width, height, limits)?;
+    let bytes = (width as u64)
+        .checked_mul(height as u64)
+        .and_then(|pixels| pixels.checked_mul(8))
+        .ok_or(ExportError::DimensionTooLarge {
+            width,
+            height,
+            max: limits.max_dimension,
+        })?;
+    usize::try_from(bytes).map_err(|_| ExportError::DimensionTooLarge {
+        width,
+        height,
+        max: limits.max_dimension,
+    })
+}
+
+/// Whether a PNG export of this document will be written at 16 bits.
+///
+/// Exposed for the UI's status text so the user knows which depth was written.
+pub fn png_will_be_16bit(doc: &Document) -> bool {
+    document_needs_16bit(doc)
+}
+
+/// Whether a PNG export should be written at 16 bits.
+///
+/// The document tag is authoritative, but a mixed document with a 16-bit layer also needs the
+/// wide path: compositing it at 8 bits would discard the layer's sub-lattice values.
+fn document_needs_16bit(doc: &Document) -> bool {
+    doc.pixel_format == aurelia_core::layer::PixelFormat::Srgb16
+        || doc
+            .layers
+            .iter()
+            .any(|layer| layer.format() == aurelia_core::layer::PixelFormat::Srgb16)
+}
+
 // ── Atomic output ────────────────────────────────────────────────────────────────────────────
 
 /// Sibling path the encoder writes to before the result is moved into place.
@@ -245,8 +294,24 @@ pub fn export_flat_image_with_limits(
     limits: &ExportLimits,
 ) -> Result<(), ExportError> {
     // Validate before compositing: a rejected size must not cost a canvas-sized allocation.
-    let expected = frame_bytes(doc.width, doc.height, limits)?;
+    let wide_png = format == ExportFormat::Png && document_needs_16bit(doc);
+    let expected = if wide_png {
+        frame_bytes_16(doc.width, doc.height, limits)?
+    } else {
+        frame_bytes(doc.width, doc.height, limits)?
+    };
     check_budget(1, expected, limits)?;
+
+    if wide_png {
+        let pixels = doc.composite_layers_srgb16(include_background);
+        let pixel_count = (doc.width as usize)
+            .checked_mul(doc.height as usize)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .ok_or(ExportError::UnsupportedFormat)?;
+        check_frame_len_16(&pixels, 0, pixel_count)?;
+        return write_rgba16_to_path(&pixels, doc.width, doc.height, path.as_ref());
+    }
+
     let pixels = doc.composite_layers(include_background);
     check_frame_len(&pixels, 0, expected)?;
     write_rgba_to_path(
@@ -258,6 +323,22 @@ pub fn export_flat_image_with_limits(
         format,
         jpeg_quality,
     )
+}
+
+/// Writes one RGBA16 buffer as a 16-bit PNG. Geometry must already have been validated.
+fn write_rgba16_to_path(
+    pixels: &[u16],
+    width: u32,
+    height: u32,
+    path: &Path,
+) -> Result<(), ExportError> {
+    write_atomically(path, |target| {
+        let img: ImageBuffer<Rgba<u16>, &[u16]> =
+            ImageBuffer::from_raw(width, height, pixels).ok_or(ExportError::UnsupportedFormat)?;
+        let mut file = File::create(target)?;
+        img.write_to(&mut file, ImageFormat::Png)?;
+        Ok(())
+    })
 }
 
 /// Writes one RGBA8 buffer to `path`. Geometry must already have been validated.
