@@ -1,9 +1,11 @@
 # 16-bit presentation: spike decision
 
-**Status:** deferred with a review gate. Not adopted in v3.4.x.
+**Status:** deferred, now carried by the active architecture proposal
+[high-bit-depth-viewport.md](high-bit-depth-viewport.md). The v3.5 review gate below is historical;
+the 10-bit DXGI path is now tracked in ROADMAP.md.
 **Decision date:** 2026-11-05
-**Review at:** next major-version planning (v3.5); revisit earlier only if a 10-bit/HDR output
-proposal exists.
+**Review:** superseded by [high-bit-depth-viewport.md](high-bit-depth-viewport.md) (10-bit SDR
+DXGI proposal with GDI fallback).
 
 ## The question
 

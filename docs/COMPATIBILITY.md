@@ -16,7 +16,7 @@
 | AUR v3 | ✅ | ✅ | current format |
 | AUR v2 | ✅ | — | masks supported; saves migrate to v3 |
 | AUR v1 / HCV v2–v5 | ✅ | — | legacy compatibility |
-| PNG / JPEG / WebP | ✅ | ✅ | 8-bit export |
+| PNG / JPEG / WebP | ✅ | ✅ | 8-bit export; no RGBA16 PNG export yet (Aurelia's JPEG/WebP encoders are 8-bit) |
 | GIF / sprite sheet / frame sequence | ✅ (import) | ✅ | animation timeline export |
 | ICC / Display P3 | ❌ | ❌ | no color-management workflow yet |
 
@@ -25,7 +25,7 @@
 | Area | Limits |
 | :--- | :--- |
 | Layers | raster, groups, clipping masks, adjustment layers, text |
-| Pixel formats | native 8-bit and 16-bit sRGB editing, compositing and transforms; the viewport presents an 8-bit image, and mixed-format files load but are not created |
+| Pixel formats | native 8-bit and 16-bit sRGB editing, compositing and transforms; the viewport presents an 8-bit image, and mixed-format files load but are not created. High-bit-depth presentation is a tracked architecture track, not a closed decision |
 | Animation | timeline + GIF/sprite/frame export; no video container |
 | Reference images | single dock; not persisted as a library |
 | Workspace | panel toggles persisted; no named workspace presets |

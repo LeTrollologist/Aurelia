@@ -33,5 +33,8 @@ same composite, not a second document render.
 
 - Compositing is CPU-bound by canvas area and layer count.
 - Very large canvases are limited by available memory and the 2 GiB per-layer format cap.
-- 16-bit compositing, editing and transforms are native; only the viewport presentation is
-  8-bit, because `egui` 0.28 textures are 8-bit.
+- 16-bit compositing, editing and transforms are native; the canvas presentation is 8-bit
+  (GDI BGRA framebuffer) and the egui Navigator textures are RGBA8. That display boundary is a
+  tracked architecture item, not a closed decision — see
+  [high-bit-depth-viewport.md](high-bit-depth-viewport.md). PNG export is also still 8-bit; the
+  native RGBA16 export path is queued.

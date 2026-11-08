@@ -655,7 +655,8 @@ What the editor can and cannot do with a 16-bit document today:
 | Merge down | yes (native; writes into the lower layer's format) |
 | Free transform (affine, quad, mesh, TPS) | yes (native) |
 | Selection fill / stroke, scratchpad | yes (native) as of this change |
-| Viewport | shows an 8-bit presentation; egui textures are 8-bit |
+| PNG export | no: 8-bit only; native RGBA16 PNG export is queued in the interop batch |
+| Viewport | 8-bit presentation (GDI framebuffer, egui RGBA8); 10-bit presentation is a tracked architecture track, see [high-bit-depth-viewport.md](high-bit-depth-viewport.md) |
 
 There are no 8-bit-only editing paths left. `require_8bit` remains as a guard for any future
 operation that cannot work at 16 bits, so the loud-refusal behaviour from v3.3.0 is still

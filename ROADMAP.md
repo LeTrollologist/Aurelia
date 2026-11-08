@@ -48,7 +48,8 @@ the gap is what other applications put on and expect from the Windows clipboard.
    - `.abr` / `.gbr` stamp decoding through the existing `aurelia-core::assets` seam
      (source → decode boundary → RGBA stamp), with malformed-input tests.
    - Native RGBA16 PNG export using `composite_layers_srgb16`; PNG is the only format that can
-     carry the precision, so JPEG/WebP stay 8-bit with a documented reason.
+     carry the precision. Aurelia's current JPEG/WebP encoders are 8-bit, so those remain 8-bit
+     with a documented reason (baseline JPEG and mainstream WebP are 8-bit-per-channel).
 
 ---
 

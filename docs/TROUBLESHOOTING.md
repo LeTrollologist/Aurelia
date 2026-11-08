@@ -44,7 +44,9 @@ measured baseline.
 
 **Free transform on a 16-bit document.** Affine, perspective quad, mesh and TPS transforms edit
 16-bit documents natively; nothing is converted to 8 bits. The viewport still shows an 8-bit
-presentation, so export or reopen the file to inspect the full 16-bit data.
+presentation, and PNG export is also 8-bit for now, so reopen the `.aur` file to inspect the full
+16-bit data. High-bit-depth presentation is tracked in
+[high-bit-depth-viewport.md](high-bit-depth-viewport.md).
 
 **A hard transparent edge darkens under Bilinear interpolation.** Bilinear sampling averages
 colour and alpha independently, so a fully transparent border with non-black RGB can tint the
