@@ -258,8 +258,11 @@ fn blend_over(dst: &mut [f32; 4], src: [f32; 4]) {
     if out_a <= 0.0 {
         return;
     }
+    // One reciprocal, three multiplies: the three divisions here dominated the style pass on
+    // large canvases (millions of divisions per effect).
+    let inv_out_a = 1.0 / out_a;
     for channel in 0..3 {
-        dst[channel] = (src[channel] * sa + dst[channel] * da * (1.0 - sa)) / out_a;
+        dst[channel] = (src[channel] * sa + dst[channel] * da * (1.0 - sa)) * inv_out_a;
     }
     dst[3] = out_a;
 }
@@ -278,9 +281,16 @@ fn blur(mask: &mut [f32], width: u32, height: u32, radius: f32) {
     }
 }
 
+/// Boundary policy: **transparent extension**. Samples outside the mask contribute zero, and
+/// the divisor is always the full kernel width. A uniform field therefore loses intensity near
+/// the mask border, which is the expected result for a blur of a layer whose coverage ends
+/// there (the same model as an effect computed on a transparent-padded canvas). This is
+/// deliberate, not an artefact: interior pixels are unaffected, and both borders behave
+/// symmetrically. The policy is pinned by tests; changing it is a rendering change.
 fn blur_horizontal(src: &[f32], dst: &mut [f32], width: u32, height: u32, radius: u32) {
     let w = width as usize;
     let window = (radius as usize * 2 + 1) as f32;
+    let inv = 1.0 / window;
     for y in 0..height as usize {
         let row = y * w;
         let mut sum: f32 = 0.0;
@@ -288,12 +298,11 @@ fn blur_horizontal(src: &[f32], dst: &mut [f32], width: u32, height: u32, radius
             sum += src[row + x];
         }
         for x in 0..w {
-            dst[row + x] = sum / window;
-            let out_index = x.saturating_sub(radius as usize);
-            let in_index = x + radius as usize + 1;
+            dst[row + x] = sum * inv;
             if x >= radius as usize {
-                sum -= src[row + out_index];
+                sum -= src[row + (x - radius as usize)];
             }
+            let in_index = x + radius as usize + 1;
             if in_index < w {
                 sum += src[row + in_index];
             }
@@ -301,23 +310,38 @@ fn blur_horizontal(src: &[f32], dst: &mut [f32], width: u32, height: u32, radius
     }
 }
 
+/// Same transparent-extension policy as [`blur_horizontal`], but row-major: the per-column
+/// sums live in one small array and every pass walks rows sequentially. The column-major
+/// version it replaces missed the cache on essentially every sample at 1080p and above, which
+/// made a styled layer's shadow/glow pass the dominant viewport cost.
 fn blur_vertical(src: &[f32], dst: &mut [f32], width: u32, height: u32, radius: u32) {
     let w = width as usize;
     let h = height as usize;
-    let window = (radius as usize * 2 + 1) as f32;
-    for x in 0..w {
-        let mut sum: f32 = 0.0;
-        for y in 0..=(radius as usize).min(h.saturating_sub(1)) {
-            sum += src[y * w + x];
+    let radius = radius as usize;
+    let inv = 1.0 / ((radius * 2 + 1) as f32);
+    let mut sums = vec![0.0_f32; w];
+    for y in 0..=radius.min(h.saturating_sub(1)) {
+        let row = y * w;
+        for x in 0..w {
+            sums[x] += src[row + x];
         }
-        for y in 0..h {
-            dst[y * w + x] = sum / window;
-            if y >= radius as usize {
-                sum -= src[(y - radius as usize) * w + x];
+    }
+    for y in 0..h {
+        let row = y * w;
+        for x in 0..w {
+            dst[row + x] = sums[x] * inv;
+        }
+        if y >= radius {
+            let out = (y - radius) * w;
+            for x in 0..w {
+                sums[x] -= src[out + x];
             }
-            let next = y + radius as usize + 1;
-            if next < h {
-                sum += src[next * w + x];
+        }
+        let next = y + radius + 1;
+        if next < h {
+            let input = next * w;
+            for x in 0..w {
+                sums[x] += src[input + x];
             }
         }
     }
@@ -495,5 +519,47 @@ mod tests {
         };
         // The shadow falls entirely outside a 12x12 buffer; nothing may panic or wrap.
         assert!(out.chunks_exact(4).all(|px| px[3] == 0 || px[0] == 255));
+    }
+}
+
+#[cfg(test)]
+mod blur_policy {
+    use super::blur;
+
+    /// Transparent extension: a uniform field stays uniform everywhere the kernel fits inside
+    /// the mask, and only the border bands fade. This pins the boundary policy, not a
+    /// uniformity guarantee at the edges.
+    #[test]
+    fn interior_is_unaffected_and_edges_fade_symmetrically() {
+        let (w, h) = (64u32, 64u32);
+        let mut mask = vec![1.0f32; (w * h) as usize];
+        blur(&mut mask, w, h, 6.0);
+        let at = |x: u32, y: u32| mask[(y * w + x) as usize];
+        for y in 18..46 {
+            for x in 18..46 {
+                assert!((at(x, y) - 1.0).abs() < 0.002, "interior ({x},{y}) = {}", at(x, y));
+            }
+        }
+        let mid = h / 2;
+        let left = at(0, mid);
+        let right = at(w - 1, mid);
+        assert!((left - right).abs() < 0.002, "left {left} and right {right} must mirror");
+        assert!(left < 0.9, "the border must fade under transparent extension, got {left}");
+        assert!(at(w / 2, mid) > 0.99, "the centre must not fade");
+        assert!(at(0, 0) <= left + 0.002, "corners fade at least as much as edges");
+    }
+
+    /// A dimension smaller than the kernel is legal (thin strips, 1-pixel masks) and must not
+    /// panic or produce values outside 0..=1.
+    #[test]
+    fn thin_masks_are_defined() {
+        for (w, h) in [(1u32, 1u32), (1, 32), (32, 1), (3, 9)] {
+            let mut mask = vec![1.0f32; (w * h) as usize];
+            blur(&mut mask, w, h, 8.0);
+            assert!(
+                mask.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)),
+                "{w}x{h} produced an out-of-range value"
+            );
+        }
     }
 }
