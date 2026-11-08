@@ -34,7 +34,7 @@ fn styles() -> LayerStyles {
 }
 
 /// One art pattern, independent of the layer index and of how many layers exist.
-fn styled_doc(width: u32, height: u32, layers: usize) -> Document {
+fn styled_doc(width: u32, height: u32, layers: usize, small: bool) -> Document {
     let mut doc = Document::new(width, height);
     for index in 0..layers {
         let id = if index == 0 {
@@ -46,10 +46,14 @@ fn styled_doc(width: u32, height: u32, layers: usize) -> Document {
             for (i, px) in layer.as_srgb8_mut().expect("8-bit").chunks_exact_mut(4).enumerate() {
                 let x = (i as u32) % width;
                 let y = (i as u32) / width;
-                let inside = x > width / 8
-                    && x < width * 7 / 8
-                    && y > height / 8
-                    && y < height * 7 / 8
+                // `small` puts a 10%-wide object in the centre; support is still inside the
+                // canvas, so a content-bounds renderer should touch far fewer pixels.
+                let inset_x = if small { width * 9 / 20 } else { width / 8 };
+                let inset_y = if small { height * 9 / 20 } else { height / 8 };
+                let inside = x > inset_x
+                    && x < width - inset_x
+                    && y > inset_y
+                    && y < height - inset_y
                     && ((x + y) % 97) < 70;
                 px[3] = if inside { 255 } else { 0 };
                 px[0] = (x % 256) as u8;
@@ -119,13 +123,13 @@ fn json_numbers(values: &[f64]) -> String {
     out
 }
 
-fn measure(width: u32, height: u32, layers: usize) -> Samples {
-    let doc = styled_doc(width, height, layers);
+fn measure(width: u32, height: u32, layers: usize, small: bool) -> Samples {
+    let doc = styled_doc(width, height, layers, small);
     let mut renderer = SoftwareRenderer::new();
     let mut buffer = vec![0u32; (width * height) as usize];
     let viewport = [0, 0, width as usize, height as usize];
     let mut samples = Samples {
-        label: format!("{width}x{height}-{layers}layer"),
+        label: format!("{width}x{height}-{layers}layer{}", if small { "-small" } else { "" }),
         style: Vec::new(),
         composite: Vec::new(),
         viewport: Vec::new(),
@@ -185,8 +189,9 @@ fn main() {
     let mut all = Vec::new();
     for (width, height) in [(1920, 1080), (3840, 2160)] {
         for layers in LAYER_COUNTS {
-            all.push(measure(width, height, layers));
+            all.push(measure(width, height, layers, false));
         }
+        all.push(measure(width, height, 1, true));
     }
 
     let json = format!(
