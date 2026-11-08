@@ -104,7 +104,8 @@ Semantics:
 - Optional and additive: a file without the section loads with empty styles, and a file saved by
   an older build simply ends earlier. The container version is unchanged.
 - The section is ignored when it is absent, truncated, longer than 1 MiB, has an unknown version,
-  a count above 100 000, or non-finite floats. A damaged optional section never fails the load.
+  a count above 100 000 or larger than the payload can hold (9 bytes per entry), or non-finite
+  floats. A damaged optional section never fails the load.
 - Opacity is clamped to `0..=1` and width/radius/blur to `>= 0` on read; unknown flag bits are
   skipped by their field layout only through known versions, so a future bit requires a version
   bump.
@@ -113,7 +114,17 @@ Semantics:
 ## Round-trip policy
 
 `load → save → load` must preserve layer order, names, masks, blend modes, offsets, adjustment
-settings, layer styles and 8/16-bit channel data. Tests under `crates/aurelia-io/src/tests.rs`
-and `crates/aurelia-io/tests/layer_styles_roundtrip.rs` enforce this for the supported versions; a
-permanent fixture corpus for historical files is listed as follow-up work in
+settings, layer styles and 8/16-bit channel data. Tests under `crates/aurelia-io/src/tests.rs`,
+`crates/aurelia-io/tests/layer_styles_roundtrip.rs` and
+`crates/aurelia-io/tests/persistence_hardening.rs` enforce this for the supported versions; the
+hardening suite also proves every truncation and optional-section mutation loads without panicking.
+A permanent fixture corpus for historical files remains follow-up work in
 [RELEASE_PROCESS.md](../RELEASE_PROCESS.md).
+
+## Recovery snapshots (autosave, not part of AUR)
+
+Crash-recovery files live under `%LOCALAPPDATA%\Aurelia\autosave` and are ordinary AUR v3 files.
+Their names are `<stem>-<path-hash>-autosave.aur`, where the hash is FNV-1a over the lowercased
+full document path; this keeps two projects with the same stem from sharing a snapshot. Startup
+offers snapshots newest-first, consumes the restored file, and deletes declined ones. Saving a
+document also removes the legacy `<stem>-autosave.aur` name written by v3.9 and earlier.

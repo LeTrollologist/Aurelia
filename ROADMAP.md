@@ -1,9 +1,9 @@
 # Aurelia · Roadmap
 
-**Status:** v3.9.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
+**Status:** v3.10.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
 permanent policy.
 
-**Baseline:** 305 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
+**Baseline:** 312 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
 Sparse 16-bit composite **0.75** against the **0.60** budget. The viewport is an **8-bit
 presentation** of 16-bit documents — a recorded decision, not an open item
 ([docs/RGBA16_PRESENTATION.md](docs/RGBA16_PRESENTATION.md)). Styled layers now render inside their
@@ -15,30 +15,28 @@ with a short proposal in `docs/` before code.
 
 ---
 
-## Now — v3.10.0: AUR persistence and recovery hardening
+## Now — v3.11.0: Viewport correctness and invalidation
 
-**Goal:** the remaining data-integrity surface. Optional sections and crash recovery must fail
-closed, never misparse and never lose bytes.
+**Goal:** after content-bounds rendering and recovery changes, make sure nothing draws stale pixels
+and that every redraw has a deterministic reason.
 
 | | |
 | :--- | :--- |
-| **Feature** | Fuzz `AED1`/`ASTY` (lengths, counts, truncation, bit flips); recovery with multiple sections; save/load idempotency; multi-tab-independent session restore. |
-| **Hardening** | A crafted corpus that must never panic; damaged optional sections ignored with the document still loading; recovery restores the same bytes; save/load/save stable. |
-| **Gates** | No panic or allocation blow-up on the corpus; byte-equal round-trip for valid files; corrupted-section tests stay ignored-not-fatal. |
+| **Feature** | Audit style/transform/mask invalidation, pan/zoom edge cases, DPI changes and Navigator refresh; add a "what was redrawn" test seam. |
+| **Hardening** | Stale-cache regressions covered by tests that change pixels/styles/masks and assert the next frame reflects them; document revisions and texture keys stay coherent. |
+| **Gates** | Every invalidation path has a test that fails if the old frame is reused; no visual change for valid sequences. |
 
-**Out of scope:** new file formats (PSD), encryption, and cloud sync.
+**Out of scope:** new rendering features and GPU work.
 
 ---
 
 ## Next — queued in order
 
-1. **Viewport correctness and invalidation.** Audit style/transform/mask invalidation, pan/zoom
-   edge cases and DPI changes after v3.8/v3.9; add a deterministic "what was redrawn" test seam.
-2. **Clipboard and external interoperability.** Complete DIB coverage (paletted inputs), add a
+1. **Clipboard and external interoperability.** Complete DIB coverage (paletted inputs), add a
    PNG clipboard format where supported, and test against real producer fixtures.
-3. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
+2. **Deferred style semantics, when their workflows matter:** clipping to a styled base, a "Scale
    Styles" option, and Merge Down compositing styles before it is exposed.
-4. **Interop batch — brush imports and native 16-bit PNG export.**
+3. **Interop batch — brush imports and native 16-bit PNG export.**
    - `.abr` / `.gbr` stamp decoding through the existing `aurelia-core::assets` seam
      (source → decode boundary → RGBA stamp), with malformed-input tests.
    - Native RGBA16 PNG export using `composite_layers_srgb16`; PNG is the only format that can
@@ -96,6 +94,7 @@ closed, never misparse and never lose bytes.
 | Editing workflows | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
 | Clipboard & smart layers | Cut/Copy/Copy Merged/Paste (lossless RGBA16 internal, DIBV5 interop), Adaptive auto-contrast blend mode |
 | Viewport & stability | DPI-preserving framing, DPI-sized Navigator, premultiplied bilinear edges, perf/soak/eviction records |
+| Persistence & recovery (v3.10.0) | Path-hashed autosave names, whole-directory recovery scan, payload-bound section counts, truncation/bit-flip corpus, atomic-save failure test |
 | Style performance (v3.9.0) | Content-bounds effect rendering: 3 ms small-art style pass at 1080p (was 129 ms); bit-identical to the full-canvas reference |
 | Style reliability (v3.8.1) | Style edits mark the document dirty and commit on keyboard/wheel/leave/save; pinned blur boundary policy; metadata-only styled copy; DIB mask/alpha fixes |
 | Layer styles | Stroke, drop shadow, outer glow at composite time; `ASTY` persistence; gesture-level undo |
