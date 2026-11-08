@@ -334,7 +334,165 @@ pub(crate) fn write_project_version<W: Write>(
     writer.write_all(thumb_ref)?;
 
     write_editor_state(&doc.editor, &mut writer)?;
+    write_layer_styles(doc, &mut writer)?;
     Ok(())
+}
+
+/// Optional trailing section for per-layer styles (v3.8.0).
+///
+/// It is a separate, length-prefixed section after the editor block rather than a new field in
+/// the layer record, so the v3 layer format does not change and older files (which simply end
+/// earlier) keep loading. Unknown trailing sections are ignored by older readers.
+const STYLE_MAGIC: &[u8; 4] = b"ASTY";
+const STYLE_MAX_BYTES: u32 = 1024 * 1024;
+
+fn write_layer_styles<W: Write>(doc: &Document, writer: &mut W) -> Result<(), ProjectError> {
+    let styled: Vec<&aurelia_core::layer::Layer> = doc
+        .layers
+        .iter()
+        .filter(|layer| !layer.styles.is_empty())
+        .collect();
+    if styled.is_empty() {
+        return Ok(());
+    }
+    let mut payload = Vec::new();
+    payload.push(1u8); // styles payload version
+    payload.extend_from_slice(&(styled.len() as u32).to_le_bytes());
+    for layer in styled {
+        payload.extend_from_slice(&layer.id.to_le_bytes());
+        let styles = &layer.styles;
+        let mut flags = 0u8;
+        if styles.stroke.is_some() {
+            flags |= 1;
+        }
+        if styles.drop_shadow.is_some() {
+            flags |= 2;
+        }
+        if styles.outer_glow.is_some() {
+            flags |= 4;
+        }
+        payload.push(flags);
+        if let Some(stroke) = &styles.stroke {
+            payload.extend_from_slice(&stroke.width.to_le_bytes());
+            payload.extend_from_slice(&stroke.opacity.to_le_bytes());
+            payload.extend_from_slice(&stroke.color.to_rgba8());
+        }
+        if let Some(shadow) = &styles.drop_shadow {
+            payload.extend_from_slice(&shadow.offset_x.to_le_bytes());
+            payload.extend_from_slice(&shadow.offset_y.to_le_bytes());
+            payload.extend_from_slice(&shadow.blur.to_le_bytes());
+            payload.extend_from_slice(&shadow.opacity.to_le_bytes());
+            payload.extend_from_slice(&shadow.color.to_rgba8());
+        }
+        if let Some(glow) = &styles.outer_glow {
+            payload.extend_from_slice(&glow.radius.to_le_bytes());
+            payload.extend_from_slice(&glow.opacity.to_le_bytes());
+            payload.extend_from_slice(&glow.color.to_rgba8());
+        }
+    }
+    if payload.len() > STYLE_MAX_BYTES as usize {
+        // A style stack this large is a bug, not user data; refuse the save rather than write
+        // a section no reader will accept.
+        return Err(ProjectError::CorruptData);
+    }
+    writer.write_all(STYLE_MAGIC)?;
+    writer.write_all(&(payload.len() as u32).to_le_bytes())?;
+    writer.write_all(&payload)?;
+    Ok(())
+}
+
+fn read_layer_styles<R: Read>(reader: &mut R) -> Option<Vec<(u64, aurelia_core::layer_style::LayerStyles)>> {
+    let mut magic = [0u8; 4];
+    if reader.read_exact(&mut magic).is_err() || &magic != STYLE_MAGIC {
+        return None;
+    }
+    let mut length = [0u8; 4];
+    reader.read_exact(&mut length).ok()?;
+    let length = u32::from_le_bytes(length);
+    if length == 0 || length > STYLE_MAX_BYTES {
+        return None;
+    }
+    let mut payload = vec![0u8; length as usize];
+    reader.read_exact(&mut payload).ok()?;
+    parse_layer_styles(&payload)
+}
+
+fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_style::LayerStyles)>> {
+    use aurelia_core::color::Color;
+    use aurelia_core::layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
+
+    struct Cursor<'a> {
+        data: &'a [u8],
+        at: usize,
+    }
+    impl<'a> Cursor<'a> {
+        fn bytes(&mut self, n: usize) -> Option<&'a [u8]> {
+            let slice = self.data.get(self.at..self.at + n)?;
+            self.at += n;
+            Some(slice)
+        }
+        fn u8(&mut self) -> Option<u8> {
+            Some(*self.bytes(1)?.first()?)
+        }
+        fn u32(&mut self) -> Option<u32> {
+            Some(u32::from_le_bytes(self.bytes(4)?.try_into().ok()?))
+        }
+        fn u64(&mut self) -> Option<u64> {
+            Some(u64::from_le_bytes(self.bytes(8)?.try_into().ok()?))
+        }
+        fn f32(&mut self) -> Option<f32> {
+            let value = f32::from_le_bytes(self.bytes(4)?.try_into().ok()?);
+            value.is_finite().then_some(value)
+        }
+        fn color(&mut self) -> Option<Color> {
+            let rgba = self.bytes(4)?;
+            Some(Color::from_rgba8(rgba[0], rgba[1], rgba[2], rgba[3]))
+        }
+    }
+
+    let mut cursor = Cursor { data: payload, at: 0 };
+    let version = cursor.u8()?;
+    if version != 1 {
+        return None;
+    }
+    let count = cursor.u32()? as usize;
+    if count > 100_000 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count {
+        let id = cursor.u64()?;
+        let flags = cursor.u8()?;
+        let mut styles = LayerStyles::default();
+        if flags & 1 != 0 {
+            let width = cursor.f32()?.max(0.0);
+            let opacity = cursor.f32()?.clamp(0.0, 1.0);
+            let color = cursor.color()?;
+            styles.stroke = Some(StrokeStyle { width, color, opacity });
+        }
+        if flags & 2 != 0 {
+            let offset_x = cursor.f32()?;
+            let offset_y = cursor.f32()?;
+            let blur = cursor.f32()?.max(0.0);
+            let opacity = cursor.f32()?.clamp(0.0, 1.0);
+            let color = cursor.color()?;
+            styles.drop_shadow = Some(DropShadowStyle {
+                offset_x,
+                offset_y,
+                blur,
+                color,
+                opacity,
+            });
+        }
+        if flags & 4 != 0 {
+            let radius = cursor.f32()?.max(0.0);
+            let opacity = cursor.f32()?.clamp(0.0, 1.0);
+            let color = cursor.color()?;
+            styles.outer_glow = Some(OuterGlowStyle { radius, color, opacity });
+        }
+        out.push((id, styles));
+    }
+    Some(out)
 }
 
 fn write_editor_state<W: Write>(editor: &EditorState, writer: &mut W) -> Result<(), ProjectError> {
@@ -937,6 +1095,15 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
     }
 
     let editor = read_editor_state(&mut reader).unwrap_or_default();
+    // Optional v3.8.0 section. Files written before it end here, and a malformed section is
+    // ignored rather than failing the whole load, matching the editor-state policy.
+    if let Some(styles) = read_layer_styles(&mut reader) {
+        for (id, layer_styles) in styles {
+            if let Some(layer) = layers.iter_mut().find(|layer| layer.id == id) {
+                layer.styles = layer_styles;
+            }
+        }
+    }
 
     Ok(Document {
         width,
