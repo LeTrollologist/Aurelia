@@ -17,9 +17,10 @@ with a short proposal in `docs/` before code.
 
 ## Now — v3.13.0: Colour management
 
-**Status:** proposal accepted; engine seam implemented in `main`. `aurelia-core::color_management`
-parses and validates ICC profiles, keeps their bytes for round-trip, and converts RGBA8/RGBA16 via
-`moxcms` (pure Rust). Persistence (`AICC`), PNG `iCCP`, UI assign/convert and soft proofing remain.
+**Status:** engine, document state and PNG embedding implemented in `main`. `IccProfile` parses
+and validates profiles (8/16-bit RGBA `moxcms` transforms, sRGB identity no-op); `Document` can
+attach/clear/convert; AUR v3 has an optional `AICC` section and PNG export embeds `iCCP`.
+Remaining: JPEG/WebP embedding, UI assign/convert, soft proofing.
 
 **Goal:** make colour meaning explicit. Untagged documents keep the current sRGB behaviour exactly;
 tagged documents can carry an ICC profile, be converted into a chosen working space, and be soft

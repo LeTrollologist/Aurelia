@@ -111,6 +111,22 @@ Semantics:
   bump.
 - Styles never change layer pixels or the layer record; they are a composite-time property.
 
+## Colour profile section (`AICC`, v3.13)
+
+After the style section an AUR v3 file may append the document's ICC profile:
+
+```
+magic           4 bytes   "AICC"
+length          u32 LE    ICC bytes (1 .. 4 MiB)
+payload         length bytes, an ICC profile
+```
+
+The trailing sections are a sequence of length-prefixed records (`ASTY`, `AICC`, future ones).
+Readers walk the tail by magic+length, ignore unknown records, and stop cleanly on truncation; a
+missing profile means the document is untagged sRGB. A profile that fails validation is ignored
+rather than failing the document. The container version is unchanged: files without these sections
+load exactly as before.
+
 ## Round-trip policy
 
 `load → save → load` must preserve layer order, names, masks, blend modes, offsets, adjustment

@@ -172,3 +172,47 @@ mod tests {
         assert_eq!(rgba[7], 0);
     }
 }
+
+#[cfg(test)]
+mod document_profile_tests {
+    use super::*;
+    use crate::document::Document;
+    use crate::layer::LayerBuffer;
+
+    fn srgb_icc() -> Vec<u8> {
+        moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB")
+    }
+
+    #[test]
+    fn document_attaches_and_assigns_without_moving_pixels() {
+        let icc = srgb_icc();
+        let mut doc = Document::new(2, 2);
+        doc.layers[0].as_srgb8_mut().expect("8-bit")[0] = 42;
+        let before = doc.layers[0].as_srgb8_exact().to_vec();
+        doc.set_icc_profile(icc.clone()).expect("attach");
+        assert_eq!(doc.icc_profile(), Some(icc.as_slice()));
+        assert_eq!(doc.layers[0].as_srgb8_exact(), before);
+
+        doc.convert_to_profile(&IccProfile::from_icc(icc).expect("parse")).expect("convert");
+        assert_eq!(doc.layers[0].as_srgb8_exact(), before, "same-profile conversion is a no-op");
+    }
+
+    #[test]
+    fn untagged_conversion_to_srgb_is_a_no_op() {
+        let mut doc = Document::new(2, 2);
+        let before = doc.layers[0].as_srgb8_exact().to_vec();
+        doc.convert_to_profile(&IccProfile::srgb()).expect("convert");
+        assert_eq!(doc.layers[0].as_srgb8_exact(), before);
+        assert!(doc.icc_profile().is_none());
+    }
+
+    #[test]
+    fn invalid_profiles_are_refused_and_clearing_restores_untagged() {
+        let mut doc = Document::new(1, 1);
+        assert!(doc.set_icc_profile(vec![0u8; 128]).is_err());
+        doc.set_icc_profile(srgb_icc()).expect("attach");
+        doc.clear_icc_profile();
+        assert!(doc.icc_profile().is_none());
+        assert!(matches!(doc.layers[0].buffer(), LayerBuffer::Srgb8(_)));
+    }
+}

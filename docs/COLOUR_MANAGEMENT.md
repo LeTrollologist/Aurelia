@@ -1,7 +1,15 @@
 # Colour management — proposal
 
-Status: **proposal accepted, engine seam implemented**. This document records the library decision
-and the staged plan; persistence, UI and soft proofing are future phases.
+Status: **proposal accepted; engine, document state and PNG embedding implemented**. Persistence,
+UI and soft proofing are the remaining phases.
+
+## Implemented so far
+
+- `IccProfile` parse/validate/convert (8/16-bit RGBA, sRGB identity no-op).
+- `Document::set_icc_profile` / `clear_icc_profile` / `convert_to_profile`, with the raw bytes kept
+  for round-trip and untagged documents never converted implicitly.
+- AUR v3 optional `AICC` section (sequence-based trailing reader; damaged/unknown sections ignored).
+- PNG `iCCP` embedding on export, including 16-bit PNG.
 
 ## Decision: `moxcms`, not `lcms2`, not a hand-rolled parser
 

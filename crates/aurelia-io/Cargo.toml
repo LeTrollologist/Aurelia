@@ -12,3 +12,4 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 glam = { workspace = true }
+moxcms = { workspace = true }

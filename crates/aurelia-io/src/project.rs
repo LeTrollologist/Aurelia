@@ -335,6 +335,7 @@ pub(crate) fn write_project_version<W: Write>(
 
     write_editor_state(&doc.editor, &mut writer)?;
     write_layer_styles(doc, &mut writer)?;
+    write_icc_profile(doc, &mut writer)?;
     Ok(())
 }
 
@@ -401,20 +402,52 @@ fn write_layer_styles<W: Write>(doc: &Document, writer: &mut W) -> Result<(), Pr
     Ok(())
 }
 
-fn read_layer_styles<R: Read>(reader: &mut R) -> Option<Vec<(u64, aurelia_core::layer_style::LayerStyles)>> {
-    let mut magic = [0u8; 4];
-    if reader.read_exact(&mut magic).is_err() || &magic != STYLE_MAGIC {
-        return None;
+/// Reads the optional trailing sections as a length-prefixed sequence.
+///
+/// Returns `(styles, icc_profile)`. Unknown sections are skipped; a malformed/truncated section
+/// stops parsing and leaves the already-decoded data in place. These sections are optional
+/// metadata, never required for the document itself.
+type LayerStyleEntries = Vec<(u64, aurelia_core::layer_style::LayerStyles)>;
+
+fn read_trailing_sections<R: Read>(reader: &mut R) -> (Option<LayerStyleEntries>, Option<Vec<u8>>) {
+    const TRAILING_CAP: u64 = 8 * 1024 * 1024;
+    let mut rest = Vec::new();
+    if reader.by_ref().take(TRAILING_CAP).read_to_end(&mut rest).is_err() {
+        return (None, None);
     }
-    let mut length = [0u8; 4];
-    reader.read_exact(&mut length).ok()?;
-    let length = u32::from_le_bytes(length);
-    if length == 0 || length > STYLE_MAX_BYTES {
-        return None;
+
+    let mut styles = None;
+    let mut icc_profile = None;
+    let mut at = 0usize;
+    while at + 8 <= rest.len() {
+        let magic = &rest[at..at + 4];
+        let length = u32::from_le_bytes([
+            rest[at + 4],
+            rest[at + 5],
+            rest[at + 6],
+            rest[at + 7],
+        ]) as usize;
+        let payload_start = at + 8;
+        let Some(payload_end) = payload_start.checked_add(length) else {
+            break;
+        };
+        if payload_end > rest.len() {
+            break;
+        }
+        let payload = &rest[payload_start..payload_end];
+        if magic == STYLE_MAGIC && length <= STYLE_MAX_BYTES as usize {
+            if let Some(parsed) = parse_layer_styles(payload) {
+                styles = Some(parsed);
+            }
+        } else if magic == ICC_MAGIC
+            && length <= ICC_MAX_BYTES as usize
+            && aurelia_core::IccProfile::from_icc(payload.to_vec()).is_ok()
+        {
+            icc_profile = Some(payload.to_vec());
+        }
+        at = payload_end;
     }
-    let mut payload = vec![0u8; length as usize];
-    reader.read_exact(&mut payload).ok()?;
-    parse_layer_styles(&payload)
+    (styles, icc_profile)
 }
 
 fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_style::LayerStyles)>> {
@@ -496,6 +529,24 @@ fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_st
         out.push((id, styles));
     }
     Some(out)
+}
+
+const ICC_MAGIC: &[u8; 4] = b"AICC";
+const ICC_MAX_BYTES: u32 = 4 * 1024 * 1024;
+
+/// Writes the optional colour-profile section after styles. Absent for untagged documents.
+fn write_icc_profile<W: Write>(doc: &Document, writer: &mut W) -> Result<(), ProjectError> {
+    let Some(bytes) = doc.icc_profile() else {
+        return Ok(());
+    };
+    if bytes.is_empty() || bytes.len() > ICC_MAX_BYTES as usize {
+        // An empty/oversized profile is a bug, not a reason to write a section no reader accepts.
+        return Err(ProjectError::CorruptData);
+    }
+    writer.write_all(ICC_MAGIC)?;
+    writer.write_all(&(bytes.len() as u32).to_le_bytes())?;
+    writer.write_all(bytes)?;
+    Ok(())
 }
 
 fn write_editor_state<W: Write>(editor: &EditorState, writer: &mut W) -> Result<(), ProjectError> {
@@ -1099,9 +1150,12 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
     }
 
     let editor = read_editor_state(&mut reader).unwrap_or_default();
-    // Optional v3.8.0 section. Files written before it end here, and a malformed section is
-    // ignored rather than failing the whole load, matching the editor-state policy.
-    if let Some(styles) = read_layer_styles(&mut reader) {
+    // Optional trailing sections are read as a sequence: AUR v3 files may end after the preview,
+    // carry styles, carry an ICC profile, or both in either order. Reading each "magic" naively
+    // would consume the next section's magic when one is absent, so parse the remaining bytes as
+    // length-prefixed sections and ignore unknown ones.
+    let (styles, icc_profile) = read_trailing_sections(&mut reader);
+    if let Some(styles) = styles {
         for (id, layer_styles) in styles {
             if let Some(layer) = layers.iter_mut().find(|layer| layer.id == id) {
                 layer.styles = layer_styles;
@@ -1122,6 +1176,7 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
         // formats, so a mixed file still loads exactly as it was saved.
         pixel_format: document_format,
         editor,
+        icc_profile,
     })
 }
 

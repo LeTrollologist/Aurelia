@@ -309,6 +309,7 @@ dependencies = [
  "flate2",
  "glam",
  "image",
+ "moxcms",
  "thiserror 1.0.69",
 ]
 

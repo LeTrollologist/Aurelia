@@ -17,7 +17,8 @@
 //! never leaves a truncated image behind.
 
 use aurelia_core::document::Document;
-use image::{ImageBuffer, ImageFormat, Rgba};
+use image::codecs::png::PngEncoder;
+use image::{ExtendedColorType, ImageBuffer, ImageEncoder, ImageFormat, Rgba};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -309,7 +310,7 @@ pub fn export_flat_image_with_limits(
             .and_then(|pixels| pixels.checked_mul(4))
             .ok_or(ExportError::UnsupportedFormat)?;
         check_frame_len_16(&pixels, 0, pixel_count)?;
-        return write_rgba16_to_path(&pixels, doc.width, doc.height, path.as_ref());
+        return write_rgba16_to_path(&pixels, doc.width, doc.height, doc.icc_profile(), path.as_ref());
     }
 
     let pixels = doc.composite_layers(include_background);
@@ -322,26 +323,32 @@ pub fn export_flat_image_with_limits(
         path.as_ref(),
         format,
         jpeg_quality,
+        doc.icc_profile(),
     )
 }
 
-/// Writes one RGBA16 buffer as a 16-bit PNG. Geometry must already have been validated.
+/// Writes one RGBA16 buffer as a 16-bit PNG with the document's ICC profile when present.
 fn write_rgba16_to_path(
     pixels: &[u16],
     width: u32,
     height: u32,
+    icc_profile: Option<&[u8]>,
     path: &Path,
 ) -> Result<(), ExportError> {
     write_atomically(path, |target| {
-        let img: ImageBuffer<Rgba<u16>, &[u16]> =
-            ImageBuffer::from_raw(width, height, pixels).ok_or(ExportError::UnsupportedFormat)?;
-        let mut file = File::create(target)?;
-        img.write_to(&mut file, ImageFormat::Png)?;
+        let file = File::create(target)?;
+        let mut encoder = PngEncoder::new(file);
+        if let Some(icc) = icc_profile {
+            let _ = encoder.set_icc_profile(icc.to_vec());
+        }
+        let bytes: Vec<u8> = pixels.iter().flat_map(|value| value.to_ne_bytes()).collect();
+        encoder.write_image(&bytes, width, height, ExtendedColorType::Rgba16)?;
         Ok(())
     })
 }
 
 /// Writes one RGBA8 buffer to `path`. Geometry must already have been validated.
+#[allow(clippy::too_many_arguments)]
 fn write_rgba_to_path(
     pixels: &[u8],
     width: u32,
@@ -350,6 +357,7 @@ fn write_rgba_to_path(
     path: &Path,
     format: ExportFormat,
     jpeg_quality: Option<u8>,
+    icc_profile: Option<&[u8]>,
 ) -> Result<(), ExportError> {
     let expected = (width as u64)
         .checked_mul(height as u64)
@@ -374,6 +382,14 @@ fn write_rgba_to_path(
                 let file = File::create(target)?;
                 let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(file, quality);
                 encoder.encode(&rgb, width, height, image::ExtendedColorType::Rgb8)?;
+            }
+            ExportFormat::Png => {
+                let file = File::create(target)?;
+                let mut encoder = PngEncoder::new(file);
+                if let Some(icc) = icc_profile {
+                    let _ = encoder.set_icc_profile(icc.to_vec());
+                }
+                encoder.write_image(pixels, width, height, ExtendedColorType::Rgba8)?;
             }
             _ => {
                 let img: ImageBuffer<Rgba<u8>, &[u8]> = ImageBuffer::from_raw(width, height, pixels)
@@ -539,6 +555,7 @@ where
             index,
             &full_path,
             format,
+            None,
             None,
         )?;
         saved_paths.push(full_path);

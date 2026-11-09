@@ -113,3 +113,21 @@ fn jpeg_stays_8bit_and_wide_png_respects_the_budget() {
     .expect_err("budget must reject");
     assert!(matches!(error, ExportError::AggregateTooLarge { .. }));
 }
+
+#[test]
+fn png_export_embeds_the_document_profile() {
+    use image::ImageDecoder;
+
+    let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
+    let mut doc = sixteen_bit_doc();
+    doc.set_icc_profile(icc.clone()).expect("attach");
+    let path = temp_path("profiled.png");
+    export_flat_image(&doc, &path, ExportFormat::Png, false).expect("export");
+
+    let file = std::fs::File::open(&path).expect("open png");
+    let mut decoder =
+        image::codecs::png::PngDecoder::new(std::io::BufReader::new(file)).expect("decoder");
+    let embedded = decoder.icc_profile().expect("read icc").expect("icc present");
+    assert_eq!(embedded, icc);
+    let _ = std::fs::remove_file(&path);
+}

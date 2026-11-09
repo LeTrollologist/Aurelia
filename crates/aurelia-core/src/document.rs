@@ -1,5 +1,6 @@
 use crate::blend::BlendMode;
 use crate::color::{Color, ThemeMode};
+use crate::color_management::{ColorProfileError, IccProfile};
 use crate::layer::{Layer, LayerId, LayerBuffer, LayerMask, PixelFormat};
 use crate::pixel::Channel;
 use crate::selection::SelectionMask;
@@ -58,6 +59,10 @@ pub struct Document {
     pub pixel_format: PixelFormat,
     #[serde(default)]
     pub editor: EditorState,
+    /// Optional ICC profile bytes. `None` means the document is untagged and treated as sRGB;
+    /// the editor never converts untagged pixels implicitly. Prefer [`Document::set_icc_profile`].
+    #[serde(default)]
+    pub icc_profile: Option<Vec<u8>>,
 }
 
 impl Document {
@@ -81,7 +86,55 @@ impl Document {
             next_layer_id: 2,
             pixel_format: format,
             editor: EditorState::default(),
+            icc_profile: None,
         }
+    }
+
+    /// Raw ICC profile bytes, or `None` for an untagged (assumed sRGB) document.
+    pub fn icc_profile(&self) -> Option<&[u8]> {
+        self.icc_profile.as_deref()
+    }
+
+    /// Attaches (assigns) a profile without converting pixels. Invalid bytes are refused.
+    pub fn set_icc_profile(&mut self, bytes: Vec<u8>) -> Result<(), ColorProfileError> {
+        IccProfile::from_icc(bytes.clone())?;
+        self.icc_profile = Some(bytes);
+        Ok(())
+    }
+
+    /// Removes the profile; the document becomes untagged sRGB without touching pixels.
+    pub fn clear_icc_profile(&mut self) {
+        self.icc_profile = None;
+    }
+
+    /// Converts every raster/text layer from the current profile (or sRGB when untagged) into
+    /// `destination`, then records the destination profile. Assigning never calls this.
+    pub fn convert_to_profile(
+        &mut self,
+        destination: &IccProfile,
+    ) -> Result<(), ColorProfileError> {
+        let source = match self.icc_profile.as_ref() {
+            Some(bytes) => IccProfile::from_icc(bytes.clone())?,
+            None => IccProfile::srgb(),
+        };
+        if source.same_as(destination) {
+            return Ok(());
+        }
+        for layer in &mut self.layers {
+            if !(layer.is_raster() || layer.is_text()) {
+                continue;
+            }
+            match layer.buffer_mut() {
+                LayerBuffer::Srgb8(pixels) => source.convert_rgba8(destination, pixels)?,
+                LayerBuffer::Srgb16(pixels) => source.convert_rgba16(destination, pixels)?,
+            }
+        }
+        self.icc_profile = if destination.is_synthetic() {
+            None
+        } else {
+            Some(destination.bytes().to_vec())
+        };
+        Ok(())
     }
 
     pub fn background_color(&self) -> Color {
