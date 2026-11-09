@@ -151,13 +151,39 @@ fn jpeg_export_embeds_the_document_profile() {
 }
 
 #[test]
-fn webp_refuses_to_silently_drop_a_profile() {
+fn webp_embeds_the_profile_in_an_extended_container() {
     let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
     let mut doc = Document::new(8, 8);
-    doc.set_icc_profile(icc).expect("attach");
+    doc.set_icc_profile(icc.clone()).expect("attach");
     let path = temp_path("profiled.webp");
-    let error = export_flat_image(&doc, &path, ExportFormat::WebP, false)
-        .expect_err("tagged WebP must be refused");
-    assert!(matches!(error, aurelia_io::export::ExportError::ProfileNotSupported));
-    assert!(!path.exists(), "a refused export leaves no file");
+    export_flat_image(&doc, &path, ExportFormat::WebP, false).expect("export");
+    let data = std::fs::read(&path).expect("read webp");
+    assert_eq!(&data[..4], b"RIFF");
+    assert_eq!(&data[8..12], b"WEBP");
+    assert_eq!(
+        u32::from_le_bytes(data[4..8].try_into().expect("size")) as usize,
+        data.len() - 8,
+        "RIFF size must cover the inserted chunks"
+    );
+
+    let mut at = 12usize;
+    let mut saw_vp8x = false;
+    let mut iccp = None;
+    while at + 8 <= data.len() {
+        let size = u32::from_le_bytes(data[at + 4..at + 8].try_into().expect("chunk size")) as usize;
+        match &data[at..at + 4] {
+            b"VP8X" => {
+                saw_vp8x = true;
+                assert_eq!(data[at + 8] & 0x20, 0x20, "ICC flag set");
+            }
+            b"ICCP" => iccp = Some(data[at + 8..at + 8 + size].to_vec()),
+            _ => {}
+        }
+        at += 8 + size + (size & 1);
+    }
+    assert!(saw_vp8x, "ICCP requires a VP8X header");
+    assert_eq!(iccp.as_deref(), Some(icc.as_slice()));
+    let decoded = image::open(&path).expect("extended WebP still decodes");
+    assert_eq!((decoded.width(), decoded.height()), (8, 8));
+    let _ = std::fs::remove_file(&path);
 }

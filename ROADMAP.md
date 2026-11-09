@@ -22,8 +22,8 @@ with a short proposal in `docs/` before code.
 no-op); `Document` can attach/clear/convert; AUR v3 has an optional `AICC` section; PNG `iCCP` and
 JPEG APP2 embed the profile, and tagged WebP export is refused explicitly instead of dropping it.
 The right dock has Assign/Clear, Convert (sRGB or ICC) with one undo step, and an RGB soft-proof
-preview with a persistent approximate-8-bit badge. Remaining: WebP `ICCP`, profile *input* from
-JPEG/WebP, and CMYK proofing.
+preview with a persistent approximate-8-bit badge. PNG/JPEG/WebP export embed the profile (WebP via
+`VP8X` + `ICCP`). Remaining: profile *input* from JPEG/WebP and CMYK proofing.
 
 **Goal:** make colour meaning explicit. Untagged documents keep the current sRGB behaviour exactly;
 tagged documents can carry an ICC profile, be converted into a chosen working space, and be soft

@@ -9,9 +9,9 @@ UI and soft proofing are the remaining phases.
 - `Document::set_icc_profile` / `clear_icc_profile` / `convert_to_profile`, with the raw bytes kept
   for round-trip and untagged documents never converted implicitly.
 - AUR v3 optional `AICC` section (sequence-based trailing reader; damaged/unknown sections ignored).
-- PNG `iCCP` and JPEG APP2 embedding on export, including 16-bit PNG.
-- WebP refuses a tagged export explicitly (`ProfileNotSupported`) rather than silently dropping the
-  profile; the same rule is what JPEG/WebP will keep if their encoders change.
+- PNG `iCCP`, JPEG APP2 and WebP `ICCP` embedding on export, including 16-bit PNG. Tagged WebP is
+  upgraded to the extended `VP8X` container with the ICC flag and canvas dimensions, so the
+  profile does not change the image bitstream.
 - **Assign profile** UI: right dock → Document Color → Attach ICC (or Clear). This assigns only;
   pixels are never converted by attaching.
 - **Convert** UI: Convert to sRGB / Convert to ICC. One `ProfileConversionCommand` wraps the

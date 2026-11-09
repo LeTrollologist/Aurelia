@@ -50,9 +50,6 @@ pub enum ExportError {
     /// The combined sprite-sheet dimensions do not fit the image container.
     #[error("a {width}x{height} sprite sheet cannot be encoded")]
     SheetTooLarge { width: u64, height: u64 },
-    /// The selected encoder cannot carry the document's ICC profile.
-    #[error("WebP cannot embed the document ICC profile; clear it or export PNG/JPEG")]
-    ProfileNotSupported,
 }
 
 /// Resource bounds applied to one export.
@@ -297,11 +294,6 @@ pub fn export_flat_image_with_limits(
     jpeg_quality: Option<u8>,
     limits: &ExportLimits,
 ) -> Result<(), ExportError> {
-    // "No silent profile drop": an untagged file is fine, but a tagged WebP would lose the
-    // profile, so refuse explicitly rather than writing a file whose colour meaning changed.
-    if doc.icc_profile().is_some() && format == ExportFormat::WebP {
-        return Err(ExportError::ProfileNotSupported);
-    }
     // Validate before compositing: a rejected size must not cost a canvas-sized allocation.
     let wide_png = format == ExportFormat::Png && document_needs_16bit(doc);
     let expected = if wide_png {
@@ -402,15 +394,117 @@ fn write_rgba_to_path(
                 }
                 encoder.write_image(pixels, width, height, ExtendedColorType::Rgba8)?;
             }
-            _ => {
-                let img: ImageBuffer<Rgba<u8>, &[u8]> = ImageBuffer::from_raw(width, height, pixels)
-                    .ok_or(ExportError::UnsupportedFormat)?;
-                let mut file = File::create(target)?;
-                img.write_to(&mut file, format.image_format())?;
+            ExportFormat::WebP => {
+                let image: ImageBuffer<Rgba<u8>, &[u8]> =
+                    ImageBuffer::from_raw(width, height, pixels)
+                        .ok_or(ExportError::UnsupportedFormat)?;
+                let mut encoded = Vec::new();
+                image.write_to(&mut std::io::Cursor::new(&mut encoded), ImageFormat::WebP)?;
+                if let Some(icc) = icc_profile {
+                    let has_alpha = pixels.chunks_exact(4).any(|pixel| pixel[3] != 255);
+                    encoded = inject_webp_icc(&encoded, icc, width, height, has_alpha)?;
+                }
+                std::fs::write(target, encoded)?;
             }
         }
         Ok(())
     })
+}
+
+/// Adds an `ICCP` chunk to a WebP file, upgrading a simple still image to the extended (`VP8X`)
+/// container. The image bitstream itself is untouched.
+fn inject_webp_icc(
+    raw: &[u8],
+    icc: &[u8],
+    width: u32,
+    height: u32,
+    has_alpha: bool,
+) -> Result<Vec<u8>, ExportError> {
+    if raw.len() < 12 || &raw[..4] != b"RIFF" || &raw[8..12] != b"WEBP" {
+        return Err(ExportError::UnsupportedFormat);
+    }
+    let mut chunks: Vec<&[u8]> = Vec::new();
+    let mut at = 12usize;
+    while at < raw.len() {
+        if at + 8 > raw.len() {
+            break;
+        }
+        let size = u32::from_le_bytes([raw[at + 4], raw[at + 5], raw[at + 6], raw[at + 7]]) as usize;
+        let end = at
+            .checked_add(8)
+            .and_then(|value| value.checked_add(size))
+            .ok_or(ExportError::UnsupportedFormat)?;
+        if end > raw.len() {
+            return Err(ExportError::UnsupportedFormat);
+        }
+        let padded_end = (end + (size & 1)).min(raw.len());
+        chunks.push(&raw[at..padded_end]);
+        at = padded_end;
+    }
+    if chunks.is_empty() {
+        return Err(ExportError::UnsupportedFormat);
+    }
+
+    let mut vp8x_payload: Option<Vec<u8>> = None;
+    let mut rest: Vec<&[u8]> = Vec::new();
+    for chunk in chunks {
+        let fourcc = &chunk[..4];
+        if fourcc == b"VP8X" {
+            let size = u32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]) as usize;
+            if size != 10 || chunk.len() < 18 {
+                return Err(ExportError::UnsupportedFormat);
+            }
+            let mut payload = chunk[8..18].to_vec();
+            payload[0] |= 0x20; // ICC profile present
+            if has_alpha {
+                payload[0] |= 0x10;
+            }
+            vp8x_payload = Some(payload);
+        } else if fourcc != b"ICCP" {
+            rest.push(chunk);
+        }
+    }
+
+    let payload = match vp8x_payload {
+        Some(payload) => payload,
+        None => {
+            if width == 0 || height == 0 || width > 16_777_216 || height > 16_777_216 {
+                return Err(ExportError::UnsupportedFormat);
+            }
+            let mut payload = Vec::with_capacity(10);
+            payload.push(0x20 | if has_alpha { 0x10 } else { 0 });
+            payload.extend_from_slice(&[0, 0, 0]); // reserved
+            let w = (width - 1).to_le_bytes();
+            let h = (height - 1).to_le_bytes();
+            payload.extend_from_slice(&w[..3]);
+            payload.extend_from_slice(&h[..3]);
+            payload
+        }
+    };
+
+    let mut out = Vec::with_capacity(raw.len() + icc.len() + 32);
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(b"WEBP");
+    push_webp_chunk(&mut out, b"VP8X", &payload)?;
+    push_webp_chunk(&mut out, b"ICCP", icc)?;
+    for chunk in rest {
+        out.extend_from_slice(chunk);
+    }
+    let riff_size = u32::try_from(out.len() - 8).map_err(|_| ExportError::UnsupportedFormat)?;
+    out[4..8].copy_from_slice(&riff_size.to_le_bytes());
+    Ok(out)
+}
+
+fn push_webp_chunk(out: &mut Vec<u8>, fourcc: &[u8; 4], payload: &[u8]) -> Result<(), ExportError> {
+    let size = u32::try_from(payload.len()).map_err(|_| ExportError::UnsupportedFormat)?;
+    out.extend_from_slice(fourcc);
+    out.extend_from_slice(&size.to_le_bytes());
+    out.extend_from_slice(payload);
+    if payload.len() & 1 == 1 {
+        out.push(0);
+    }
+    Ok(())
 }
 
 // ── Animated GIF ─────────────────────────────────────────────────────────────────────────────
