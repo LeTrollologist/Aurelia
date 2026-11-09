@@ -193,9 +193,12 @@ Authoritative details: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`do
 Aurelia ships as a **per-user Windows installer**, a portable zip, or a pure-Rust source build.
 Full details, silent-install switches and verification steps live in [`INSTALL.md`](INSTALL.md).
 
+> **v3.13.0-beta is a prerelease.** GitHub's "latest" link still points at stable v3.12.0; use the
+> explicit beta links below.
+
 ### Option 1: Installer (Recommended)
 
-1. Download [`Aurelia-Setup-3.13.0-beta.exe`](https://github.com/LeTrollologist/Aurelia/releases/latest) from the latest release.
+1. Download [`Aurelia-Setup-3.13.0-beta.exe`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta) from the beta release.
 2. Run it — it installs per user to `%LOCALAPPDATA%\Programs\Aurelia` (no administrator rights, no UAC prompt).
 3. Optionally keep *"Open Aurelia projects with Aurelia (.aur, .hcv)"* checked for double-click opening, and tick *Create a desktop shortcut*.
 4. Launch **Aurelia** from the Start menu.
@@ -212,7 +215,7 @@ Aurelia-Setup-3.13.0-beta.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 
 No installer and no registry writes of its own:
 
-1. Download [`Aurelia-v3.13.0-beta-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/latest) from the latest release.
+1. Download [`Aurelia-v3.13.0-beta-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta) from the beta release.
 2. Extract it with PowerShell or Windows Explorer:
    ```powershell
    Expand-Archive -Path .\Aurelia-v3.13.0-beta-win64.zip -DestinationPath .\Aurelia

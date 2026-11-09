@@ -1,9 +1,10 @@
 # Aurelia · Roadmap
 
-**Status:** v3.12.0 shipped 2026-11-08 · Windows 10/11 x86-64 · Win32 + GDI, unsigned installer by
-permanent policy.
+**Status:** v3.13.0-beta prerelease shipped 2026-11-09 · Windows 10/11 x86-64 · Win32 + GDI,
+unsigned installer by permanent policy. The beta is not the production channel; v3.12.0 remains
+the stable release.
 
-**Baseline:** 338 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
+**Baseline:** 355 tests passing, 2 ignored (soak and the 60-second sparse gate); clippy clean.
 Sparse 16-bit composite **0.68** against the **0.60** budget on the last quality run. The viewport
 is an **8-bit presentation** of 16-bit documents — a current limitation, not a closed decision:
 high-bit-depth presentation is a tracked architecture track
@@ -15,17 +16,17 @@ with a short proposal in `docs/` before code.
 
 ---
 
-## Now — v3.13.0: Colour management
+## Now — v3.13.0-beta: Colour management (prerelease)
 
-**Status:** engine, document state, persistence and export embedding implemented in `main`.
-`IccProfile` parses and validates profiles (8/16-bit RGBA `moxcms` transforms, sRGB identity
-no-op); `Document` can attach/clear/convert; AUR v3 has an optional `AICC` section; PNG `iCCP` and
-JPEG APP2 embed the profile, and tagged WebP export is refused explicitly instead of dropping it.
-The right dock has Assign/Clear, Convert (sRGB or ICC) with one undo step, and an RGB soft-proof
-preview with a persistent approximate-8-bit badge. The proof buffer is cached by document revision
-and both profile hashes, so pan/zoom does not re-run the transform. PNG/JPEG/WebP both embed and
-read back profiles; imported documents keep theirs and references convert to the document space.
-Remaining: CMYK proofing.
+**Status:** shipped as **v3.13.0-beta** (prerelease, not production). `IccProfile` parses and
+validates profiles (8/16-bit RGBA `moxcms` transforms, sRGB identity no-op); `Document` can
+attach/clear/convert; AUR v3 has an optional `AICC` section; PNG `iCCP`, JPEG APP2 and WebP
+`VP8X`/`ICCP` embed the profile. The right dock has Assign/Clear, Convert (sRGB or ICC) with one
+undo step, and an RGB soft-proof preview with a persistent approximate-8-bit badge. The proof
+buffer is cached by document revision and both profile hashes, so pan/zoom does not re-run the
+transform. PNG/JPEG/WebP both embed and read back profiles; imported documents keep theirs and
+references convert to the document space. Remaining before stable: CMYK proofing and broader
+real-world profile validation.
 
 **Goal:** make colour meaning explicit. Untagged documents keep the current sRGB behaviour exactly;
 tagged documents can carry an ICC profile, be converted into a chosen working space, and be soft
@@ -106,6 +107,7 @@ subset. The choice and the untagged-oracle gate belong in the proposal before co
 | Editing workflows | Mask painting, selection combine modes, Preferences, History panel, tool/brush reset, persistent ruler/guide snapping |
 | Clipboard & smart layers | Cut/Copy/Copy Merged/Paste (lossless RGBA16 internal, DIBV5 interop), Adaptive auto-contrast blend mode |
 | Viewport & stability | DPI-preserving framing, DPI-sized Navigator, premultiplied bilinear edges, perf/soak/eviction records |
+| Colour management beta (v3.13.0-beta) | ICC attach/assign/convert with one undo step, AUR `AICC`, PNG/JPEG/WebP profile embed+input, cached approximate soft proof; prerelease |
 | Clipboard, output & brushes (v3.12.0) | Paletted DIB and PNG clipboard, RGBA16 PNG export, styled clipping/Scale Styles/style-safe Merge Down, `.abr`/`.gbr` stamp import, presence-log privacy fix, full in-house quality gate |
 | 16-bit integration (v3.11.0) | Copy Merged composites at 16 bits for 16-bit/mixed documents; sub-lattice round-trip tests for copy/paste and merged copy |
 | Persistence & recovery (v3.10.0) | Path-hashed autosave names, whole-directory recovery scan, payload-bound section counts, truncation/bit-flip corpus, atomic-save failure test |

@@ -5,7 +5,9 @@ administrator rights. Pick either distribution:
 
 ## Option 1 — Installer (recommended)
 
-1. Download **`Aurelia-Setup-<version>.exe`** from the [latest release](https://github.com/LeTrollologist/Aurelia/releases/latest).
+1. Download **`Aurelia-Setup-<version>.exe`** from the [releases page](https://github.com/LeTrollologist/Aurelia/releases).
+   Prereleases (`-beta`, `-rc`) are not returned by GitHub's `/releases/latest` link, so use the
+   explicit tag link from the release notes.
 2. Run it. It installs **per user** into `%LOCALAPPDATA%\Programs\Aurelia`, so no UAC prompt appears.
 3. Leave *"Open Aurelia projects with Aurelia (.aur, .hcv)"* checked if you want double-click
    opening and thumbnails/icon wiring for project files (optional).
