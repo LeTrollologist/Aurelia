@@ -26,7 +26,7 @@ pub use brush_import::{decode_brush_file, BrushImportError, BrushStamp};
 pub use color::{Color, ThemeMode, DEFAULT_PALETTE};
 pub use color_management::{ColorProfileError, IccProfile};
 pub use document::{CompositeError, Document};
-pub use history::{Command, HistoryStack, LayerPixelsDeltaCommand};
+pub use history::{Command, HistoryStack, LayerPixelsDeltaCommand, ProfileConversionCommand};
 pub use layer::{AdjustmentConfig, AdjustmentType, Layer, LayerId, LayerKind};
 pub use layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
 pub use perspective::{PerspectiveConfig, PerspectiveType};

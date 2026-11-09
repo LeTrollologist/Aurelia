@@ -2898,6 +2898,29 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             state.set_status("Cleared colour profile (untagged sRGB)");
                         }
                     });
+                    ui.horizontal(|ui| {
+                        if icc_len.is_some()
+                            && ui
+                                .small_button("Convert to sRGB")
+                                .on_hover_text("Convert pixels into sRGB and clear the profile")
+                                .clicked()
+                        {
+                            let destination = aurelia_core::IccProfile::srgb();
+                            if let Err(error) =
+                                state.convert_document_profile(&destination, "Convert to sRGB")
+                            {
+                                state.set_status(format!("Conversion failed: {error}"));
+                            }
+                        }
+                        if ui
+                            .small_button("Convert to ICC…")
+                            .on_hover_text("Convert pixels from the current profile into another ICC profile")
+                            .clicked()
+                        {
+                            state.pending_file_action =
+                                Some(PendingFileAction::ConvertToIccProfile);
+                        }
+                    });
                 });
             });
     }

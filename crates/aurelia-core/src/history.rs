@@ -258,9 +258,70 @@ impl Command for LayerPixelsDeltaCommand {
     }
 }
 
+/// One undo step for an explicit colour-profile conversion.
+///
+/// A conversion touches every raster/text layer and the document's profile. Wrapping the
+/// per-layer deltas plus both profile values keeps Ctrl+Z exact: pixels and `AICC` metadata are
+/// restored together, and redo reapplies the same conversion.
 #[derive(Debug)]
-pub struct AddLayerCommand {
-    pub layer: Layer,
+pub struct ProfileConversionCommand {
+    pub description: &'static str,
+    layer_deltas: Vec<LayerPixelsDeltaCommand>,
+    before_profile: Option<Vec<u8>>,
+    after_profile: Option<Vec<u8>>,
+}
+
+impl ProfileConversionCommand {
+    pub fn new(
+        description: &'static str,
+        before_profile: Option<Vec<u8>>,
+        after_profile: Option<Vec<u8>>,
+        layer_deltas: Vec<LayerPixelsDeltaCommand>,
+    ) -> Self {
+        Self {
+            description,
+            layer_deltas: layer_deltas
+                .into_iter()
+                .filter(|delta| !delta.is_empty())
+                .collect(),
+            before_profile,
+            after_profile,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.layer_deltas.is_empty() && self.before_profile == self.after_profile
+    }
+}
+
+impl Command for ProfileConversionCommand {
+    fn name(&self) -> &'static str {
+        self.description
+    }
+
+    fn cost(&self) -> usize {
+        self.layer_deltas.iter().map(Command::cost).sum::<usize>()
+            + self.before_profile.as_ref().map_or(0, Vec::len)
+            + self.after_profile.as_ref().map_or(0, Vec::len)
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        for delta in &mut self.layer_deltas {
+            delta.undo(doc);
+        }
+        doc.icc_profile = self.before_profile.clone();
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        for delta in &mut self.layer_deltas {
+            delta.redo(doc);
+        }
+        doc.icc_profile = self.after_profile.clone();
+    }
+}
+
+#[derive(Debug)]
+pub struct AddLayerCommand {    pub layer: Layer,
     pub insert_index: usize,
 }
 

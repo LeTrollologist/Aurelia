@@ -245,6 +245,7 @@ pub enum PendingFileAction {
     ExportPng,
     OpenReferenceImage,
     AttachIccProfile,
+    ConvertToIccProfile,
     ImportBrush,
     NewCanvas(NewCanvasSpec),
 }
@@ -1284,6 +1285,59 @@ impl AppState {
             self.active_preset_idx = Some(idx);
             self.set_status(format!("Loaded brush preset: {}", p.name));
         }
+    }
+
+    /// Converts every raster/text layer to `destination` and records one undo step that restores
+    /// both the pixels and the document's profile. Assigning never goes through this path.
+    pub fn convert_document_profile(
+        &mut self,
+        destination: &aurelia_core::IccProfile,
+        description: &'static str,
+    ) -> Result<(), String> {
+        let before_profile = self.document.icc_profile().map(<[u8]>::to_vec);
+        let before: Vec<(u64, Vec<u8>)> = self
+            .document
+            .layers
+            .iter()
+            .filter(|layer| layer.is_raster() || layer.is_text())
+            .map(|layer| (layer.id, layer.storage_bytes()))
+            .collect();
+        self.document
+            .convert_to_profile(destination)
+            .map_err(|error| error.to_string())?;
+        let after: std::collections::HashMap<u64, Vec<u8>> = self
+            .document
+            .layers
+            .iter()
+            .filter(|layer| layer.is_raster() || layer.is_text())
+            .map(|layer| (layer.id, layer.storage_bytes()))
+            .collect();
+        let deltas: Vec<_> = before
+            .into_iter()
+            .filter_map(|(id, pixels)| {
+                let after = after.get(&id)?.clone();
+                Some(aurelia_core::history::LayerPixelsDeltaCommand::new(
+                    id,
+                    description,
+                    pixels,
+                    after,
+                ))
+            })
+            .collect();
+        let after_profile = self.document.icc_profile().map(<[u8]>::to_vec);
+        let command = aurelia_core::history::ProfileConversionCommand::new(
+            description,
+            before_profile,
+            after_profile,
+            deltas,
+        );
+        if command.is_empty() {
+            self.set_status("Document is already in that colour space");
+            return Ok(());
+        }
+        self.history.push(Box::new(command));
+        self.set_status(format!("{description} (undo available)"));
+        Ok(())
     }
 
     /// Assigns an ICC profile to the document without moving pixels.

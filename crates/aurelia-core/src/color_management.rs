@@ -216,3 +216,44 @@ mod document_profile_tests {
         assert!(matches!(doc.layers[0].buffer(), LayerBuffer::Srgb8(_)));
     }
 }
+
+#[cfg(test)]
+mod profile_undo_tests {
+    use super::*;
+    use crate::document::Document;
+    use crate::history::{Command, LayerPixelsDeltaCommand, ProfileConversionCommand};
+
+    #[test]
+    fn conversion_undo_restores_pixels_and_the_stored_profile() {
+        let srgb_bytes = moxcms::ColorProfile::new_srgb().encode().expect("sRGB");
+        let p3_bytes = moxcms::ColorProfile::new_display_p3().encode().expect("P3");
+        let mut doc = Document::new(4, 4);
+        doc.layers[0].as_srgb8_mut().expect("8-bit")[..4].copy_from_slice(&[255, 0, 0, 255]);
+        doc.set_icc_profile(srgb_bytes.clone()).expect("attach");
+        let layer_id = doc.layers[0].id;
+        let before_pixels = doc.layers[0].storage_bytes();
+        let before_profile = doc.icc_profile().map(<[u8]>::to_vec);
+
+        doc.convert_to_profile(&IccProfile::from_icc(p3_bytes.clone()).expect("p3"))
+            .expect("convert");
+        let after_pixels = doc.layers[0].storage_bytes();
+        assert_ne!(before_pixels, after_pixels, "P3 conversion must move red");
+        assert_eq!(doc.icc_profile(), Some(p3_bytes.as_slice()));
+
+        let delta =
+            LayerPixelsDeltaCommand::new(layer_id, "Convert", before_pixels.clone(), after_pixels.clone());
+        let mut cmd = ProfileConversionCommand::new(
+            "Convert to ICC",
+            before_profile.clone(),
+            Some(p3_bytes.clone()),
+            vec![delta],
+        );
+        cmd.undo(&mut doc);
+        assert_eq!(doc.layers[0].storage_bytes(), before_pixels);
+        assert_eq!(doc.icc_profile(), before_profile.as_deref());
+
+        cmd.redo(&mut doc);
+        assert_eq!(doc.layers[0].storage_bytes(), after_pixels);
+        assert_eq!(doc.icc_profile(), Some(p3_bytes.as_slice()));
+    }
+}

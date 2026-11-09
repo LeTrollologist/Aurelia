@@ -14,6 +14,9 @@ UI and soft proofing are the remaining phases.
   profile; the same rule is what JPEG/WebP will keep if their encoders change.
 - **Assign profile** UI: right dock → Document Color → Attach ICC (or Clear). This assigns only;
   pixels are never converted by attaching.
+- **Convert** UI: Convert to sRGB / Convert to ICC. One `ProfileConversionCommand` wraps the
+  per-layer pixel deltas plus both profile values, so Ctrl+Z restores pixels and `AICC` metadata
+  together and redo reapplies the same conversion.
 
 ## Decision: `moxcms`, not `lcms2`, not a hand-rolled parser
 
