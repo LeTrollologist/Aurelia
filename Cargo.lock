@@ -295,6 +295,7 @@ dependencies = [
  "ab_glyph",
  "glam",
  "image",
+ "moxcms",
  "rayon",
  "serde",
  "thiserror 1.0.69",

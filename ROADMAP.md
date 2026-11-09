@@ -17,11 +17,14 @@ with a short proposal in `docs/` before code.
 
 ## Now — v3.13.0: Colour management
 
-**Status:** proposal stage. No code yet; the first task is the written design and oracle plan.
+**Status:** proposal accepted; engine seam implemented in `main`. `aurelia-core::color_management`
+parses and validates ICC profiles, keeps their bytes for round-trip, and converts RGBA8/RGBA16 via
+`moxcms` (pure Rust). Persistence (`AICC`), PNG `iCCP`, UI assign/convert and soft proofing remain.
 
 **Goal:** make colour meaning explicit. Untagged documents keep the current sRGB behaviour exactly;
 tagged documents can carry an ICC profile, be converted into a chosen working space, and be soft
-proofed in the viewport.
+proofed in the viewport. Full proposal and gates:
+[docs/COLOUR_MANAGEMENT.md](docs/COLOUR_MANAGEMENT.md).
 
 | | |
 | :--- | :--- |

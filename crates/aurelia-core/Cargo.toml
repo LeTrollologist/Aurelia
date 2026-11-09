@@ -11,3 +11,4 @@ rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 ab_glyph = { workspace = true }
+moxcms = { workspace = true }
