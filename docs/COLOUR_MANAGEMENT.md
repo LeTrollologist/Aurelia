@@ -21,6 +21,21 @@ UI and soft proofing are the remaining phases.
   profile and back to sRGB, then shows a persistent `SOFT PROOF · approximate 8-bit` badge. RGB
   proof profiles are supported; CMYK proofing needs a richer layout path and is out of scope for
   this approximation. A failed transform leaves the normal composite visible rather than blank.
+- **ICC input**: PNG/JPEG/WebP decoders return embedded profiles on import. Dropped/opened images
+  keep their profile on the new document; reference images are converted into the document's
+  working space (or sRGB when untagged) instead of being silently treated as sRGB.
+
+## Soft-proof performance budget
+
+The proof transform is the expensive part of the preview, so it is cached, not run per frame:
+
+- Cache key: document revision, canvas dimensions, proof-profile hash and document-profile hash.
+- A cold key runs one `source → proof → sRGB` transform over the composite.
+- Pan, zoom and repaint at the same revision reuse the proofed buffer; no colour transform runs.
+- Attach, clear, convert and every ordinary edit advance the document revision, invalidating it.
+- Budget: at 4K the cold proof transform should stay under 50 ms on the development machine; a warm
+  frame should be indistinguishable from unproofed rendering. The regression test asserts cache
+  hits and revision invalidation; the wall-clock figure is only meaningful on real hardware.
 
 ## Decision: `moxcms`, not `lcms2`, not a hand-rolled parser
 

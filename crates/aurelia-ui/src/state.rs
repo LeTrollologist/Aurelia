@@ -1340,6 +1340,7 @@ impl AppState {
             return Ok(());
         }
         self.history.push(Box::new(command));
+        self.mark_canvas_dirty();
         self.set_status(format!("{description} (undo available)"));
         Ok(())
     }
@@ -1353,6 +1354,7 @@ impl AppState {
         self.document
             .set_icc_profile(bytes.to_vec())
             .map_err(|error| error.to_string())?;
+        self.mark_canvas_dirty();
         let name = path
             .file_name()
             .and_then(|name| name.to_str())
@@ -2325,7 +2327,11 @@ impl AppState {
         {
             return self.undo_selection_edit();
         }
-        self.history.undo(&mut self.document)
+        let action = self.history.undo(&mut self.document);
+        if action.is_some() {
+            self.mark_canvas_dirty();
+        }
+        action
     }
 
     pub fn redo_action(&mut self) -> Option<&'static str> {
@@ -2335,7 +2341,11 @@ impl AppState {
         {
             return self.redo_selection_edit();
         }
-        self.history.redo(&mut self.document)
+        let action = self.history.redo(&mut self.document);
+        if action.is_some() {
+            self.mark_canvas_dirty();
+        }
+        action
     }
 
     // ── Clipboard (#v3.7.1) ──

@@ -25,11 +25,35 @@ pub struct OnionSkinFrame<'a> {
     pub is_prev: bool,
 }
 
+fn hash_bytes(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for &byte in bytes {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+
 pub struct SoftwareRenderer {
     textures: HashMap<TextureId, (u32, u32, Vec<u8>)>,
     composite_buffer: Vec<u8>,
     /// Optional RGB proof profile for the 8-bit viewport approximation. `None` renders normally.
     pub soft_proof: Option<aurelia_core::IccProfile>,
+    /// The caller's document revision; the proof cache is rebuilt only when this changes.
+    pub proof_revision: u64,
+    proof_cache: Vec<u8>,
+    proof_cache_key: Option<ProofCacheKey>,
+    /// Number of proof transforms actually run; tests use this to prove cache hits.
+    pub proof_cache_generation: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ProofCacheKey {
+    revision: u64,
+    width: u32,
+    height: u32,
+    proof_hash: u64,
+    document_profile_hash: u64,
 }
 
 impl SoftwareRenderer {
@@ -38,6 +62,10 @@ impl SoftwareRenderer {
             textures: HashMap::new(),
             composite_buffer: Vec::new(),
             soft_proof: None,
+            proof_revision: 0,
+            proof_cache: Vec::new(),
+            proof_cache_key: None,
+            proof_cache_generation: 0,
         }
     }
 
@@ -199,17 +227,42 @@ impl SoftwareRenderer {
             self.composite_buffer.resize(req_size, 0);
         }
         doc.composite_layers_into(&mut self.composite_buffer, false);
+        let mut proofed = false;
         if let Some(proof) = self.soft_proof.as_ref() {
-            let source = doc
-                .icc_profile()
-                .and_then(|bytes| aurelia_core::IccProfile::from_icc(bytes.to_vec()).ok())
-                .unwrap_or_else(aurelia_core::IccProfile::srgb);
-            let display = aurelia_core::IccProfile::srgb();
-            // A failed proof conversion leaves the normal composite visible rather than a blank
-            // canvas; the UI still badges the mode.
-            let _ = source.simulate_proof_rgba8(proof, &display, &mut self.composite_buffer);
+            let key = ProofCacheKey {
+                revision: self.proof_revision,
+                width: doc.width,
+                height: doc.height,
+                proof_hash: hash_bytes(proof.bytes()),
+                document_profile_hash: hash_bytes(doc.icc_profile().unwrap_or(&[])),
+            };
+            if self.proof_cache_key != Some(key) || self.proof_cache.len() != self.composite_buffer.len() {
+                self.proof_cache.clear();
+                self.proof_cache.extend_from_slice(&self.composite_buffer);
+                let source = doc
+                    .icc_profile()
+                    .and_then(|bytes| aurelia_core::IccProfile::from_icc(bytes.to_vec()).ok())
+                    .unwrap_or_else(aurelia_core::IccProfile::srgb);
+                let display = aurelia_core::IccProfile::srgb();
+                // A failed proof conversion leaves the normal composite visible rather than a
+                // blank canvas; the UI still badges the mode.
+                let _ = source.simulate_proof_rgba8(
+                    proof,
+                    &display,
+                    &mut self.proof_cache,
+                );
+                self.proof_cache_key = Some(key);
+                self.proof_cache_generation = self.proof_cache_generation.wrapping_add(1);
+            }
+            proofed = true;
+        } else {
+            self.proof_cache_key = None;
         }
-        let flat_pixels = &self.composite_buffer;
+        let flat_pixels: &[u8] = if proofed {
+            &self.proof_cache
+        } else {
+            &self.composite_buffer
+        };
         let inv_zoom = 1.0 / zoom;
         let is_exact_1to1 = (zoom - 1.0).abs() < 0.001 && center_x.fract().abs() < 0.01 && center_y.fract().abs() < 0.01;
         let use_bilinear = !is_exact_1to1 && zoom < 2.5;
@@ -1564,5 +1617,19 @@ mod soft_proof_viewport_tests {
         renderer.soft_proof = Some(aurelia_core::IccProfile::srgb());
         let proofed = render(&mut renderer);
         assert_ne!(normal, proofed, "soft proof must alter the preview");
+
+        let generation = renderer.proof_cache_generation;
+        let _ = render(&mut renderer);
+        assert_eq!(
+            renderer.proof_cache_generation, generation,
+            "panning/zooming at the same revision must reuse the proof cache"
+        );
+        renderer.proof_revision = renderer.proof_revision.wrapping_add(1);
+        let _ = render(&mut renderer);
+        assert_eq!(
+            renderer.proof_cache_generation,
+            generation + 1,
+            "a document revision must invalidate the proof cache"
+        );
     }
 }

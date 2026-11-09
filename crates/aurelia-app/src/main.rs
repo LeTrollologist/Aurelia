@@ -3020,6 +3020,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                 let center_offset = app.state.viewport_center_offset();
                 let viewport_clip = app.state.viewport_rect(app.win_w, app.win_h);
                 app.renderer.soft_proof = app.state.soft_proof.clone();
+                app.renderer.proof_revision = app.state.document_revision;
 
                 app.renderer.render_canvas(
                     &mut app.buffer,
@@ -3445,13 +3446,21 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                     }
                     PendingFileAction::OpenReferenceImage => {
                         if let Some(path) = aurelia_ui::open_image_dialog() {
-                            if let Ok(img) = image::open(&path) {
-                                let rgba = img.to_rgba8();
-                                let (w, h) = rgba.dimensions();
-                                app.state.reference_image = Some((w, h, rgba.into_raw()));
-                                app.state.ref_texture = None;
-                                app.state.show_ref_window = true;
-                                app.state.set_status(format!("Loaded reference: {}", path.display()));
+                            match load_reference_image(&path, app.state.document.icc_profile()) {
+                                Ok((w, h, rgba, note)) => {
+                                    app.state.reference_image = Some((w, h, rgba));
+                                    app.state.ref_texture = None;
+                                    app.state.show_ref_window = true;
+                                    let mut status =
+                                        format!("Loaded reference: {}", path.display());
+                                    if let Some(note) = note {
+                                        status.push_str(&format!(" ({note})"));
+                                    }
+                                    app.state.set_status(status);
+                                }
+                                Err(error) => {
+                                    app.state.set_status(format!("Reference import failed: {error}"))
+                                }
                             }
                         }
                     }
@@ -3484,23 +3493,42 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                         }
                         Err(e) => app.state.set_status(format!("Failed to load project: {}", e)),
                     }
-                } else if let Ok(img) = image::open(&path) {
-                    let rgba = img.to_rgba8();
-                    let (w, h) = rgba.dimensions();
-                    let mut doc = aurelia_core::document::Document::new(w, h);
-                    doc.is_transparent = true;
-                    if let Some(layer) = doc.active_layer_mut() {
-                        layer.name = path.file_name().and_then(|n| n.to_str()).unwrap_or("Layer 1").to_string();
-                        layer.set_pixels(rgba.into_raw());
+                } else {
+                    match load_image_with_profile(&path) {
+                        Ok((w, h, rgba, embedded)) => {
+                            let mut doc = aurelia_core::document::Document::new(w, h);
+                            doc.is_transparent = true;
+                            if let Some(icc) = embedded {
+                                if doc.set_icc_profile(icc).is_err() {
+                                    app.state.set_status("Embedded colour profile was unreadable");
+                                }
+                            }
+                            if let Some(layer) = doc.active_layer_mut() {
+                                layer.name = path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("Layer 1")
+                                    .to_string();
+                                layer.set_pixels(rgba);
+                            }
+                            app.state.document = doc;
+                            app.state.sync_editor_from_document();
+                            app.state.mark_canvas_dirty();
+                            app.state.history.clear();
+                            app.state.document_path = None;
+                            app.state.mark_saved();
+                            app.state.reset_view_centered(app.win_w as f32, app.win_h as f32);
+                            app.state.set_status(format!(
+                                "Opened image: {} ({} x {} px)",
+                                path.display(),
+                                w,
+                                h
+                            ));
+                        }
+                        Err(error) => {
+                            app.state.set_status(format!("Image open failed: {error}"))
+                        }
                     }
-                    app.state.document = doc;
-                    app.state.sync_editor_from_document();
-                    app.state.mark_canvas_dirty();
-                    app.state.history.clear();
-                    app.state.document_path = None;
-                    app.state.mark_saved();
-                    app.state.reset_view_centered(app.win_w as f32, app.win_h as f32);
-                    app.state.set_status(format!("Opened image: {} ({} x {} px)", path.display(), w, h));
                 }
             }
             DragFinish(hdrop);
@@ -3579,6 +3607,54 @@ unsafe fn apply_window_theme(hwnd: HWND) {
         bottom: 1,
     };
     let _ = DwmExtendFrameIntoClientArea(hwnd, &margins);
+}
+
+/// Decodes a PNG/JPEG/WebP and returns RGBA8 plus any embedded ICC profile.
+fn load_image_with_profile(
+    path: &std::path::Path,
+) -> Result<(u32, u32, Vec<u8>, Option<Vec<u8>>), String> {
+    use image::ImageDecoder as _;
+
+    let reader = image::ImageReader::open(path)
+        .map_err(|error| format!("{}: {error}", path.display()))?
+        .with_guessed_format()
+        .map_err(|error| format!("{}: {error}", path.display()))?;
+    let mut decoder = reader
+        .into_decoder()
+        .map_err(|error| format!("{}: {error}", path.display()))?;
+    let embedded = decoder.icc_profile().ok().flatten();
+    let image = image::DynamicImage::from_decoder(decoder)
+        .map_err(|error| format!("{}: {error}", path.display()))?;
+    let rgba = image.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    Ok((width, height, rgba.into_raw(), embedded))
+}
+
+/// Loads a reference image in the document's working space.
+///
+/// An embedded profile is converted to the document profile (or sRGB for an untagged document);
+/// a reference without a profile is left alone, which is the existing sRGB assumption.
+fn load_reference_image(
+    path: &std::path::Path,
+    document_profile: Option<&[u8]>,
+) -> Result<(u32, u32, Vec<u8>, Option<&'static str>), String> {
+    let (width, height, mut rgba, embedded) = load_image_with_profile(path)?;
+    let mut note = None;
+    if let Some(icc) = embedded {
+        match aurelia_core::IccProfile::from_icc(icc) {
+            Ok(source) => {
+                let destination = document_profile
+                    .and_then(|bytes| aurelia_core::IccProfile::from_icc(bytes.to_vec()).ok())
+                    .unwrap_or_else(aurelia_core::IccProfile::srgb);
+                match source.convert_rgba8(&destination, &mut rgba) {
+                    Ok(()) => note = Some("embedded ICC converted to document space"),
+                    Err(_) => note = Some("embedded ICC could not be applied"),
+                }
+            }
+            Err(_) => note = Some("embedded ICC was unreadable"),
+        }
+    }
+    Ok((width, height, rgba, note))
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -3701,18 +3777,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         } else {
             // Try loading as standard image file
-            match image::open(&initial_file) {
-                Ok(img) => {
-                    let rgba = img.to_rgba8();
-                    let (w, h) = rgba.dimensions();
+            match load_image_with_profile(&initial_file) {
+                Ok((w, h, rgba, embedded)) => {
                     let mut doc = aurelia_core::document::Document::new(w, h);
                     doc.is_transparent = true;
+                    if let Some(icc) = embedded {
+                        let _ = doc.set_icc_profile(icc);
+                    }
                     if let Some(layer) = doc.active_layer_mut() {
-                        layer.name = initial_file.file_name().and_then(|n| n.to_str()).unwrap_or("Layer 1").to_string();
-                        layer.set_pixels(rgba.into_raw());
+                        layer.name = initial_file
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("Layer 1")
+                            .to_string();
+                        layer.set_pixels(rgba);
                     }
                     let mut s = AppState::from_document(doc);
-                    s.set_status(format!("Opened image: {} ({} x {} px)", initial_file.display(), w, h));
+                    s.set_status(format!(
+                        "Opened image: {} ({} x {} px)",
+                        initial_file.display(),
+                        w,
+                        h
+                    ));
                     s
                 }
                 Err(img_err) => {

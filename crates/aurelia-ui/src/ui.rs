@@ -2895,6 +2895,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         }
                         if icc_len.is_some() && ui.small_button("Clear").clicked() {
                             state.document.clear_icc_profile();
+                            state.mark_canvas_dirty();
                             state.set_status("Cleared colour profile (untagged sRGB)");
                         }
                     });
