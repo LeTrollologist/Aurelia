@@ -9,7 +9,11 @@ UI and soft proofing are the remaining phases.
 - `Document::set_icc_profile` / `clear_icc_profile` / `convert_to_profile`, with the raw bytes kept
   for round-trip and untagged documents never converted implicitly.
 - AUR v3 optional `AICC` section (sequence-based trailing reader; damaged/unknown sections ignored).
-- PNG `iCCP` embedding on export, including 16-bit PNG.
+- PNG `iCCP` and JPEG APP2 embedding on export, including 16-bit PNG.
+- WebP refuses a tagged export explicitly (`ProfileNotSupported`) rather than silently dropping the
+  profile; the same rule is what JPEG/WebP will keep if their encoders change.
+- **Assign profile** UI: right dock → Document Color → Attach ICC (or Clear). This assigns only;
+  pixels are never converted by attaching.
 
 ## Decision: `moxcms`, not `lcms2`, not a hand-rolled parser
 

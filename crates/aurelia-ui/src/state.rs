@@ -244,6 +244,7 @@ pub enum PendingFileAction {
     OpenProject,
     ExportPng,
     OpenReferenceImage,
+    AttachIccProfile,
     ImportBrush,
     NewCanvas(NewCanvasSpec),
 }
@@ -1283,6 +1284,23 @@ impl AppState {
             self.active_preset_idx = Some(idx);
             self.set_status(format!("Loaded brush preset: {}", p.name));
         }
+    }
+
+    /// Assigns an ICC profile to the document without moving pixels.
+    pub fn attach_icc_profile(
+        &mut self,
+        bytes: &[u8],
+        path: &std::path::Path,
+    ) -> Result<(), String> {
+        self.document
+            .set_icc_profile(bytes.to_vec())
+            .map_err(|error| error.to_string())?;
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("profile");
+        self.set_status(format!("Assigned colour profile: {name}"));
+        Ok(())
     }
 
     /// Decodes `.abr`/`.gbr` bytes and appends one preset per sampled stamp.

@@ -50,6 +50,9 @@ pub enum ExportError {
     /// The combined sprite-sheet dimensions do not fit the image container.
     #[error("a {width}x{height} sprite sheet cannot be encoded")]
     SheetTooLarge { width: u64, height: u64 },
+    /// The selected encoder cannot carry the document's ICC profile.
+    #[error("WebP cannot embed the document ICC profile; clear it or export PNG/JPEG")]
+    ProfileNotSupported,
 }
 
 /// Resource bounds applied to one export.
@@ -294,6 +297,11 @@ pub fn export_flat_image_with_limits(
     jpeg_quality: Option<u8>,
     limits: &ExportLimits,
 ) -> Result<(), ExportError> {
+    // "No silent profile drop": an untagged file is fine, but a tagged WebP would lose the
+    // profile, so refuse explicitly rather than writing a file whose colour meaning changed.
+    if doc.icc_profile().is_some() && format == ExportFormat::WebP {
+        return Err(ExportError::ProfileNotSupported);
+    }
     // Validate before compositing: a rejected size must not cost a canvas-sized allocation.
     let wide_png = format == ExportFormat::Png && document_needs_16bit(doc);
     let expected = if wide_png {
@@ -381,6 +389,9 @@ fn write_rgba_to_path(
                 let quality = jpeg_quality.unwrap_or(90).clamp(1, 100);
                 let file = File::create(target)?;
                 let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(file, quality);
+                if let Some(icc) = icc_profile {
+                    let _ = encoder.set_icc_profile(icc.to_vec());
+                }
                 encoder.encode(&rgb, width, height, image::ExtendedColorType::Rgb8)?;
             }
             ExportFormat::Png => {

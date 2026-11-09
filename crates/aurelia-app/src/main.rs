@@ -3357,6 +3357,25 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                             }
                         }
                     }
+                    PendingFileAction::AttachIccProfile => {
+                        if let Some(path) = aurelia_ui::open_icc_dialog() {
+                            match std::fs::read(&path) {
+                                Ok(bytes) => {
+                                    if let Err(error) =
+                                        app.state.attach_icc_profile(&bytes, &path)
+                                    {
+                                        app.state.set_status(format!(
+                                            "Colour profile rejected: {error}"
+                                        ));
+                                    }
+                                }
+                                Err(error) => app.state.set_status(format!(
+                                    "Could not read {}: {error}",
+                                    path.display()
+                                )),
+                            }
+                        }
+                    }
                     PendingFileAction::ImportBrush => {
                         if let Some(path) = aurelia_ui::open_brush_dialog() {
                             match std::fs::read(&path) {

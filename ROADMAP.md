@@ -17,10 +17,11 @@ with a short proposal in `docs/` before code.
 
 ## Now — v3.13.0: Colour management
 
-**Status:** engine, document state and PNG embedding implemented in `main`. `IccProfile` parses
-and validates profiles (8/16-bit RGBA `moxcms` transforms, sRGB identity no-op); `Document` can
-attach/clear/convert; AUR v3 has an optional `AICC` section and PNG export embeds `iCCP`.
-Remaining: JPEG/WebP embedding, UI assign/convert, soft proofing.
+**Status:** engine, document state, persistence and export embedding implemented in `main`.
+`IccProfile` parses and validates profiles (8/16-bit RGBA `moxcms` transforms, sRGB identity
+no-op); `Document` can attach/clear/convert; AUR v3 has an optional `AICC` section; PNG `iCCP` and
+JPEG APP2 embed the profile, and tagged WebP export is refused explicitly instead of dropping it.
+The right dock has Assign/Clear. Remaining: UI convert action, soft proofing, WebP `ICCP`.
 
 **Goal:** make colour meaning explicit. Untagged documents keep the current sRGB behaviour exactly;
 tagged documents can carry an ICC profile, be converted into a chosen working space, and be soft

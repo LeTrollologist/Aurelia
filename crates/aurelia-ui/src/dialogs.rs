@@ -42,3 +42,10 @@ pub fn open_brush_dialog() -> Option<PathBuf> {
         .add_filter("Brush Files (*.abr, *.gbr)", &["abr", "gbr"])
         .pick_file()
 }
+
+pub fn open_icc_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Assign ICC Profile")
+        .add_filter("ICC Profiles (*.icc, *.icm)", &["icc", "icm"])
+        .pick_file()
+}

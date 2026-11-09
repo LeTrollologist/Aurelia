@@ -2876,6 +2876,28 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             ctx.request_repaint();
                         }
                     }
+
+                    design::section(ui, "DOCUMENT COLOR");
+                    let icc_len = state.document.icc_profile().map(|bytes| bytes.len());
+                    let status = match icc_len {
+                        Some(len) => format!("Tagged ICC ({len} bytes); pixels unchanged by attach"),
+                        None => "Untagged (treated as sRGB)".to_string(),
+                    };
+                    ui.label(RichText::new(status).size(10.0).color(design::TEXT_MUTED));
+                    ui.horizontal(|ui| {
+                        if ui
+                            .small_button("Attach ICC…")
+                            .on_hover_text("Assign a profile without converting pixels")
+                            .clicked()
+                        {
+                            state.pending_file_action =
+                                Some(PendingFileAction::AttachIccProfile);
+                        }
+                        if icc_len.is_some() && ui.small_button("Clear").clicked() {
+                            state.document.clear_icc_profile();
+                            state.set_status("Cleared colour profile (untagged sRGB)");
+                        }
+                    });
                 });
             });
     }

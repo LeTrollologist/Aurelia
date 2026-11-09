@@ -131,3 +131,33 @@ fn png_export_embeds_the_document_profile() {
     assert_eq!(embedded, icc);
     let _ = std::fs::remove_file(&path);
 }
+
+#[test]
+fn jpeg_export_embeds_the_document_profile() {
+    use image::ImageDecoder;
+
+    let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
+    let mut doc = Document::new(8, 8);
+    doc.set_icc_profile(icc.clone()).expect("attach");
+    let path = temp_path("profiled.jpg");
+    export_flat_image(&doc, &path, ExportFormat::Jpeg, false).expect("export");
+
+    let file = std::fs::File::open(&path).expect("open jpeg");
+    let mut decoder =
+        image::codecs::jpeg::JpegDecoder::new(std::io::BufReader::new(file)).expect("decoder");
+    let embedded = decoder.icc_profile().expect("read icc").expect("icc present");
+    assert_eq!(embedded, icc);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn webp_refuses_to_silently_drop_a_profile() {
+    let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
+    let mut doc = Document::new(8, 8);
+    doc.set_icc_profile(icc).expect("attach");
+    let path = temp_path("profiled.webp");
+    let error = export_flat_image(&doc, &path, ExportFormat::WebP, false)
+        .expect_err("tagged WebP must be refused");
+    assert!(matches!(error, aurelia_io::export::ExportError::ProfileNotSupported));
+    assert!(!path.exists(), "a refused export leaves no file");
+}
