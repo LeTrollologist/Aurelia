@@ -120,6 +120,21 @@ impl IccProfile {
         Ok(())
     }
 
+    /// Approximate soft proof for the 8-bit viewport: source -> proof -> sRGB display.
+    ///
+    /// This is a simulation preview, not a display claim. It intentionally routes through the
+    /// proof profile in both directions so out-of-gamut colours pass through the proof gamut and
+    /// clip, then are shown in the current 8-bit sRGB viewport.
+    pub fn simulate_proof_rgba8(
+        &self,
+        proof: &IccProfile,
+        display: &IccProfile,
+        pixels: &mut [u8],
+    ) -> Result<(), ColorProfileError> {
+        self.convert_rgba8(proof, pixels)?;
+        proof.convert_rgba8(display, pixels)
+    }
+
     /// Whether this profile describes the same colour space as `other`, by ICC bytes.
     pub fn same_as(&self, other: &IccProfile) -> bool {
         self.bytes == other.bytes
@@ -255,5 +270,26 @@ mod profile_undo_tests {
         cmd.redo(&mut doc);
         assert_eq!(doc.layers[0].storage_bytes(), after_pixels);
         assert_eq!(doc.icc_profile(), Some(p3_bytes.as_slice()));
+    }
+}
+
+#[cfg(test)]
+mod soft_proof_tests {
+    use super::*;
+
+    #[test]
+    fn soft_proof_routes_through_the_proof_profile_and_back() {
+        let srgb = IccProfile::srgb();
+        let p3 = IccProfile::from_icc(
+            moxcms::ColorProfile::new_display_p3().encode().expect("P3"),
+        )
+        .expect("parse P3");
+        let mut pixels = vec![255u8, 0, 0, 255, 0, 255, 0, 128];
+        let original = pixels.clone();
+        srgb.simulate_proof_rgba8(&p3, &srgb, &mut pixels)
+            .expect("simulate");
+        assert_ne!(pixels, original, "the proof round trip must be visible");
+        assert_eq!(pixels[3], 255);
+        assert_eq!(pixels[7], 128, "alpha is untouched by soft proof");
     }
 }

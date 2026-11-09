@@ -2921,6 +2921,26 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 Some(PendingFileAction::ConvertToIccProfile);
                         }
                     });
+                    let proof_on = state.soft_proof.is_some();
+                    ui.horizontal(|ui| {
+                        if proof_on {
+                            ui.label(
+                                RichText::new("SOFT PROOF · 8-bit approx.")
+                                    .size(9.5)
+                                    .color(Color32::from_rgb(236, 196, 110)),
+                            );
+                            if ui.small_button("Stop").clicked() {
+                                state.soft_proof = None;
+                                state.set_status("Soft proof off");
+                            }
+                        } else if ui
+                            .small_button("Soft proof…")
+                            .on_hover_text("Preview through an RGB proof profile (approximate; not a wide-gamut display claim)")
+                            .clicked()
+                        {
+                            state.pending_file_action = Some(PendingFileAction::LoadProofProfile);
+                        }
+                    });
                 });
             });
     }
@@ -5442,8 +5462,36 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
             });
     }
+    paint_soft_proof_badge(ctx, state);
     paint_guides(ctx, state);
     paint_ruler_numbers(ctx, state);
+}
+
+/// A deliberately loud badge: soft proofing here is an 8-bit approximation, not a gamut claim.
+fn paint_soft_proof_badge(ctx: &egui::Context, state: &AppState) {
+    if state.soft_proof.is_none() {
+        return;
+    }
+    let ppp = ctx.pixels_per_point().max(0.01);
+    let screen = ctx.screen_rect();
+    let [vx0, vy0, _, _] = state.viewport_rect(
+        (screen.width() * ppp) as usize,
+        (screen.height() * ppp) as usize,
+    );
+    let pos = egui::pos2(vx0 as f32 / ppp + 14.0, vy0 as f32 / ppp + 12.0);
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Foreground,
+        egui::Id::new("soft_proof_badge"),
+    ));
+    let text = "SOFT PROOF · approximate 8-bit";
+    let galley = painter.layout_no_wrap(
+        text.to_owned(),
+        egui::FontId::proportional(10.5),
+        Color32::from_rgb(35, 28, 12),
+    );
+    let background = egui::Rect::from_min_size(pos, galley.size() + egui::vec2(14.0, 8.0));
+    painter.rect_filled(background, 4.0, Color32::from_rgb(236, 196, 110));
+    painter.galley(pos + egui::vec2(7.0, 4.0), galley, Color32::BLACK);
 }
 
 /// Session measurement guides and the draggable grid-origin handle.

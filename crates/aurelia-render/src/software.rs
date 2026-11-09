@@ -28,6 +28,8 @@ pub struct OnionSkinFrame<'a> {
 pub struct SoftwareRenderer {
     textures: HashMap<TextureId, (u32, u32, Vec<u8>)>,
     composite_buffer: Vec<u8>,
+    /// Optional RGB proof profile for the 8-bit viewport approximation. `None` renders normally.
+    pub soft_proof: Option<aurelia_core::IccProfile>,
 }
 
 impl SoftwareRenderer {
@@ -35,6 +37,7 @@ impl SoftwareRenderer {
         Self {
             textures: HashMap::new(),
             composite_buffer: Vec::new(),
+            soft_proof: None,
         }
     }
 
@@ -196,6 +199,16 @@ impl SoftwareRenderer {
             self.composite_buffer.resize(req_size, 0);
         }
         doc.composite_layers_into(&mut self.composite_buffer, false);
+        if let Some(proof) = self.soft_proof.as_ref() {
+            let source = doc
+                .icc_profile()
+                .and_then(|bytes| aurelia_core::IccProfile::from_icc(bytes.to_vec()).ok())
+                .unwrap_or_else(aurelia_core::IccProfile::srgb);
+            let display = aurelia_core::IccProfile::srgb();
+            // A failed proof conversion leaves the normal composite visible rather than a blank
+            // canvas; the UI still badges the mode.
+            let _ = source.simulate_proof_rgba8(proof, &display, &mut self.composite_buffer);
+        }
         let flat_pixels = &self.composite_buffer;
         let inv_zoom = 1.0 / zoom;
         let is_exact_1to1 = (zoom - 1.0).abs() < 0.001 && center_x.fract().abs() < 0.01 && center_y.fract().abs() < 0.01;
@@ -1513,3 +1526,43 @@ mod viewport_tests {
     }
 }
 
+
+#[cfg(test)]
+mod soft_proof_viewport_tests {
+    use super::*;
+
+    #[test]
+    fn soft_proof_changes_the_viewport_preview() {
+        let mut doc = Document::new(16, 16);
+        let p3 = moxcms::ColorProfile::new_display_p3().encode().expect("P3");
+        doc.set_icc_profile(p3).expect("attach P3");
+        let pixels = doc.layers[0].as_srgb8_mut().expect("8-bit");
+        for pixel in pixels.chunks_exact_mut(4) {
+            pixel.copy_from_slice(&[200, 100, 50, 255]);
+        }
+        let render = |renderer: &mut SoftwareRenderer| {
+            let mut buffer = vec![0u32; 32 * 32];
+            renderer.render_canvas(
+                &mut buffer,
+                32,
+                32,
+                &doc,
+                Vec2::ZERO,
+                1.0,
+                Vec2::ZERO,
+                [0, 0, 32, 32],
+                None,
+                &[],
+                None,
+            );
+            buffer
+        };
+        let normal = render(&mut SoftwareRenderer::new());
+
+        let mut renderer = SoftwareRenderer::new();
+        // A P3-tagged document proofed to the narrower sRGB gamut must visibly clip.
+        renderer.soft_proof = Some(aurelia_core::IccProfile::srgb());
+        let proofed = render(&mut renderer);
+        assert_ne!(normal, proofed, "soft proof must alter the preview");
+    }
+}

@@ -3019,6 +3019,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
 
                 let center_offset = app.state.viewport_center_offset();
                 let viewport_clip = app.state.viewport_rect(app.win_w, app.win_h);
+                app.renderer.soft_proof = app.state.soft_proof.clone();
 
                 app.renderer.render_canvas(
                     &mut app.buffer,
@@ -3392,6 +3393,27 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
                                     }
                                     Err(error) => app.state.set_status(format!(
                                         "Colour profile rejected: {error}"
+                                    )),
+                                },
+                                Err(error) => app.state.set_status(format!(
+                                    "Could not read {}: {error}",
+                                    path.display()
+                                )),
+                            }
+                        }
+                    }
+                    PendingFileAction::LoadProofProfile => {
+                        if let Some(path) = aurelia_ui::open_icc_dialog() {
+                            match std::fs::read(&path) {
+                                Ok(bytes) => match aurelia_core::IccProfile::from_icc(bytes) {
+                                    Ok(proof) => {
+                                        app.state.soft_proof = Some(proof);
+                                        app.state.set_status(
+                                            "Soft proof on (8-bit approximation; not a gamut claim)",
+                                        );
+                                    }
+                                    Err(error) => app.state.set_status(format!(
+                                        "Proof profile rejected: {error}"
                                     )),
                                 },
                                 Err(error) => app.state.set_status(format!(

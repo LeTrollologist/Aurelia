@@ -17,6 +17,10 @@ UI and soft proofing are the remaining phases.
 - **Convert** UI: Convert to sRGB / Convert to ICC. One `ProfileConversionCommand` wraps the
   per-layer pixel deltas plus both profile values, so Ctrl+Z restores pixels and `AICC` metadata
   together and redo reapplies the same conversion.
+- **Soft proofing (8-bit approximation)**: the viewport routes the composite through the proof
+  profile and back to sRGB, then shows a persistent `SOFT PROOF · approximate 8-bit` badge. RGB
+  proof profiles are supported; CMYK proofing needs a richer layout path and is out of scope for
+  this approximation. A failed transform leaves the normal composite visible rather than blank.
 
 ## Decision: `moxcms`, not `lcms2`, not a hand-rolled parser
 

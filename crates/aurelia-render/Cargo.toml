@@ -11,3 +11,6 @@ glam = { workspace = true }
 log = { workspace = true }
 thiserror = { workspace = true }
 image = { workspace = true }
+
+[dev-dependencies]
+moxcms = { workspace = true }

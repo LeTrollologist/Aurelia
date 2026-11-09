@@ -246,6 +246,7 @@ pub enum PendingFileAction {
     OpenReferenceImage,
     AttachIccProfile,
     ConvertToIccProfile,
+    LoadProofProfile,
     ImportBrush,
     NewCanvas(NewCanvasSpec),
 }
@@ -683,6 +684,8 @@ pub struct AppState {
 
     // ── Brush Preset Shelf ──
     pub presets: Vec<aurelia_core::brush::BrushPreset>,
+    /// Optional RGB proof profile; the viewport then shows an approximate 8-bit simulation.
+    pub soft_proof: Option<aurelia_core::IccProfile>,
     pub active_preset_idx: Option<usize>,
     pub show_save_preset_dialog: bool,
     pub new_preset_name: String,
@@ -974,6 +977,7 @@ impl AppState {
             stroke_position: 0, // Center
 
             presets: aurelia_core::brush::BrushPreset::default_library(),
+            soft_proof: None,
             active_preset_idx: Some(0),
             show_save_preset_dialog: false,
             new_preset_name: String::new(),
