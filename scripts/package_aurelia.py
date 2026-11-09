@@ -37,7 +37,9 @@ def main() -> int:
         for path in sorted(staging.iterdir()):
             archive.write(path, path.name)
 
-    numeric = ".".join((args.version.split(".") + ["0"])[:4])
+    # Inno's numeric file version cannot carry -beta/-rc; the display version can.
+    base_version = args.version.split("-", 1)[0]
+    numeric = ".".join((base_version.split(".") + ["0"])[:4])
     subprocess.run(
         [
             args.iscc,

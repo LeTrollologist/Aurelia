@@ -36,7 +36,13 @@ def test_create_release_posts_the_expected_payload():
     assert release["id"] == 7
     assert seen["method"] == "POST"
     assert seen["url"].endswith("/repos/o/r/releases")
-    assert seen["payload"] == {"tag_name": "v1.0.0", "name": "v1.0.0", "body": "", "draft": True}
+    assert seen["payload"] == {
+        "tag_name": "v1.0.0",
+        "name": "v1.0.0",
+        "body": "",
+        "draft": True,
+        "prerelease": False,
+    }
 
 
 def test_upload_lists_and_downloads_assets(tmp_path):

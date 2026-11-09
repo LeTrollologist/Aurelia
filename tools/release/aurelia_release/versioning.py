@@ -8,43 +8,40 @@ from typing import Iterable
 
 from .errors import PreflightError
 
-SEMVER = r"\d+\.\d+\.\d+"
+SEMVER = r"\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"
 
 # Rewrite only declarations that actually carry the product version. Applying all
 # rules to every configured file is intentional and idempotent: a pattern that
 # does not occur in a file simply does nothing.
 DECLARATION_RULES: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r'(?m)^version = "\d+\.\d+\.\d+"'), 'version = "{v}"'),
+    (re.compile(r'(?m)^version = "\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"'), 'version = "{v}"'),
     (
         re.compile(
             r'([A-Za-z0-9_-]+\s*=\s*\{\s*path\s*=\s*"[^"]*"\s*,\s*version\s*=\s*")'
-            r"\d+\.\d+\.\d+(\")"
+            r"\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(\")"
         ),
         r"\g<1>{v}\g<2>",
     ),
-    (re.compile(r"(Release-v)\d+\.\d+\.\d+"), r"\g<1>{v}"),
-    (re.compile(r"(releases/tag/v)\d+\.\d+\.\d+"), r"\g<1>{v}"),
-    (re.compile(r"(Aurelia-v)\d+\.\d+\.\d+(-win64)"), r"\g<1>{v}\g<2>"),
-    (re.compile(r"(Aurelia-Setup-)\d+\.\d+\.\d+"), r"\g<1>{v}"),
-    (re.compile(r"(TAG \?= v)\d+\.\d+\.\d+"), r"\g<1>{v}"),
+    (re.compile(r"(Release-v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
+    (re.compile(r"(releases/tag/v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
+    (re.compile(r"(Aurelia-v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(-win64)"), r"\g<1>{v}\g<2>"),
+    (re.compile(r"(Aurelia-Setup-)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
+    (re.compile(r"(TAG \?= v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
     (re.compile(r"(v)\d+\.\d+\.\d+( · PRODUCTION)"), r"\g<1>{v}\g<2>"),
-    (re.compile(r'(MyAppVersionNumeric ")\d+\.\d+\.\d+\.\d+(")'), r"\g<1>{v}.0\g<2>"),
-    (re.compile(r'(MyAppVersion ")\d+\.\d+\.\d+(")'), r"\g<1>{v}\g<2>"),
+    (re.compile(r'(MyAppVersionNumeric ")\d+\.\d+\.\d+\.\d+(")'), r"\g<1>{base}.0\g<2>"),
+    (re.compile(r'(MyAppVersion ")\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(")'), r"\g<1>{base}\g<2>"),
 ]
 
 DECLARATION_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r'(?m)^version = "(\d+\.\d+\.\d+)"'),
+    re.compile(r'(?m)^version = "(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)"'),
     re.compile(
-        r'path\s*=\s*"[^"]*"\s*,\s*version\s*=\s*"(\d+\.\d+\.\d+)"'
+        r'path\s*=\s*"[^"]*"\s*,\s*version\s*=\s*"(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)"'
     ),
-    re.compile(r"Release-v(\d+\.\d+\.\d+)"),
-    re.compile(r"releases/tag/v(\d+\.\d+\.\d+)"),
-    re.compile(r"Aurelia-v(\d+\.\d+\.\d+)-win64"),
-    re.compile(r"Aurelia-Setup-(\d+\.\d+\.\d+)"),
-    re.compile(r"TAG \?= v(\d+\.\d+\.\d+)"),
-    re.compile(r"v(\d+\.\d+\.\d+) · PRODUCTION"),
-    re.compile(r'MyAppVersion "(\d+\.\d+\.\d+)"'),
-    re.compile(r'MyAppVersionNumeric "(\d+\.\d+\.\d+)\.\d+"'),
+    re.compile(r"Release-v(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)"),
+    re.compile(r"releases/tag/v(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)"),
+    re.compile(r"Aurelia-v(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)-win64"),
+    re.compile(r"Aurelia-Setup-(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)"),
+    re.compile(r"TAG \?= v(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)"),
 ]
 
 
@@ -60,7 +57,7 @@ def _cargo_lock_versions(text: str, package_names: set[str]) -> set[str]:
     versions: set[str] = set()
     for block in text.split("[[package]]")[1:]:
         name = re.search(r'(?m)^name = "([^"]+)"', block)
-        version = re.search(r'(?m)^version = "(\d+\.\d+\.\d+)"', block)
+        version = re.search(r'(?m)^version = "(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?)"', block)
         if name and version and name.group(1) in package_names:
             versions.add(version.group(1))
     return versions
@@ -78,7 +75,7 @@ def _rewrite_cargo_lock(text: str, version: str, package_names: set[str]) -> tup
         name = re.search(r'(?m)^name = "([^"]+)"', block)
         if name and name.group(1) in package_names:
             block, count = re.subn(
-                r'(?m)^version = "\d+\.\d+\.\d+"',
+                r'(?m)^version = "\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"',
                 f'version = "{version}"',
                 block,
                 count=1,
@@ -93,7 +90,9 @@ def normalize_text(text: str, version: str) -> tuple[str, int]:
     changed = 0
     result = text
     for pattern, template in DECLARATION_RULES:
-        result, count = pattern.subn(template.format(v=version), result)
+        result, count = pattern.subn(
+            template.format(v=version, base=version.split("-", 1)[0]), result
+        )
         changed += count
     return result, changed
 

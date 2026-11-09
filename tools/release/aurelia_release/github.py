@@ -127,12 +127,26 @@ class GitHubClient:
                 time.sleep(0.5)
         return None
 
-    def create_release(self, tag: str, *, name: str, body: str, draft: bool) -> dict:
+    def create_release(
+        self,
+        tag: str,
+        *,
+        name: str,
+        body: str,
+        draft: bool,
+        prerelease: bool = False,
+    ) -> dict:
         try:
             release = self._json(
                 "POST",
                 f"{self.api_base}/repos/{self.repo}/releases",
-                {"tag_name": tag, "name": name, "body": body, "draft": draft},
+                {
+                    "tag_name": tag,
+                    "name": name,
+                    "body": body,
+                    "draft": draft,
+                    "prerelease": prerelease,
+                },
             )
         except GitHubError:
             existing = self.get_release(tag)

@@ -63,3 +63,26 @@ def test_files_without_a_version_declaration_are_tolerated(tmp_path):
     (tmp_path / "a.toml").write_text('[package]\nversion = "3.0.2"\n', encoding="utf-8")
     assert check_files(tmp_path, ["workspace.toml", "a.toml"], "3.0.2") == []
     assert bump_files(tmp_path, ["workspace.toml", "a.toml"], "3.0.3") == ["a.toml"]
+
+
+def test_prerelease_and_release_candidate_versions_are_supported():
+    text = """version = "3.13.0-beta"
+Release-v3.13.0-beta
+Aurelia-Setup-3.13.0-beta.exe
+MyAppVersion "3.13.0-beta"
+MyAppVersionNumeric "3.13.0.0"
+"""
+    assert declared_versions(text) == {"3.13.0-beta"}
+
+    updated, count = normalize_text(text, "3.13.0-rc.1")
+    assert count >= 3
+    assert 'version = "3.13.0-rc.1"' in updated
+    assert "Release-v3.13.0-rc.1" in updated
+    assert 'MyAppVersion "3.13.0"' in updated
+    assert 'MyAppVersionNumeric "3.13.0.0"' in updated
+
+
+def test_prerelease_files_must_agree(tmp_path):
+    (tmp_path / "a.toml").write_text('[package]\nversion = "3.13.0-rc.1"\n', encoding="utf-8")
+    assert check_files(tmp_path, ["a.toml"], "3.13.0-rc.1") == []
+    assert check_files(tmp_path, ["a.toml"], "3.13.0") != []

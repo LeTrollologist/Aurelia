@@ -32,10 +32,25 @@ class FakeGitHub:
     def get_release(self, tag: str) -> dict | None:
         return dict(self.release) if self.release else None
 
-    def create_release(self, tag: str, *, name: str, body: str, draft: bool) -> dict:
+    def create_release(
+        self,
+        tag: str,
+        *,
+        name: str,
+        body: str,
+        draft: bool,
+        prerelease: bool = False,
+    ) -> dict:
         if self.fail_create:
             raise RuntimeError("simulated GitHub release creation failure")
-        self.release = {"id": 1, "tag_name": tag, "name": name, "body": body, "draft": draft}
+        self.release = {
+            "id": 1,
+            "tag_name": tag,
+            "name": name,
+            "body": body,
+            "draft": draft,
+            "prerelease": prerelease,
+        }
         return dict(self.release)
 
     def update_release(self, release_id: int, **fields) -> dict:

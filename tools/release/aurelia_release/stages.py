@@ -636,7 +636,11 @@ def _release_draft(ctx: Context) -> dict[str, Any]:
             "created": False,
         }
     release = client.create_release(
-        ctx.tag, name=ctx.tag, body=body, draft=True
+        ctx.tag,
+        name=ctx.tag,
+        body=body,
+        draft=True,
+        prerelease=ctx.cfg.publish.prerelease,
     )
     return {
         "release_id": release["id"],

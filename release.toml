@@ -41,6 +41,7 @@ mode = "advisory"
 [publish]
 github = true
 draft = true
+prerelease = true
 repo = "LeTrollologist/Aurelia"
 token_env = "GITHUB_TOKEN"
 assets = [

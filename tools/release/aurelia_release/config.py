@@ -77,6 +77,7 @@ class ScanConfig:
 class PublishConfig:
     github: bool = True
     draft: bool = True
+    prerelease: bool = False
     repo: str = ""
     token_env: str = "GITHUB_TOKEN"
     assets: tuple[str, ...] = ("dist/{tag}/*",)
@@ -204,6 +205,7 @@ def _build(data: dict[str, Any], profile_override: str | None) -> ReleaseConfig:
         publish=PublishConfig(
             github=bool(raw_publish.get("github", True)),
             draft=bool(raw_publish.get("draft", True)),
+            prerelease=bool(raw_publish.get("prerelease", False)),
             repo=str(raw_publish.get("repo", "")),
             token_env=str(raw_publish.get("token_env", "GITHUB_TOKEN")),
             assets=_tuple(raw_publish.get("assets", ["dist/{tag}/*"])),
