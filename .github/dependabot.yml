@@ -15,6 +15,10 @@ updates:
       - dependency-name: "aurelia-ui"
       - dependency-name: "aurelia-presence"
       - dependency-name: "aurelia-app"
+      # Dependabot's Cargo lockfile validator aborts on these patch updates in this
+      # workspace; they are reviewed and pinned manually instead of failing every job.
+      - dependency-name: "log"
+      - dependency-name: "flate2"
       # Cargo lockfile validation currently aborts on several 0.x major jumps
       # (rfd/egui/glam/thiserror are the observed ones). Take those manually.
       - dependency-name: "*"
