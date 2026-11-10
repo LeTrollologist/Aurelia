@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::project::{load_project_from_reader, save_project_to_writer};
-    use aurelia_core::document::Document;
+    use crate::ProjectError;
+    use aurelia_core::document::{Document, MAX_LAYER_HIERARCHY_DEPTH};
     use std::io::Cursor;
 
     #[test]
@@ -357,6 +358,134 @@ mod tests {
     }
 
     /// Every channel, not just the ones an 8-bit conversion would keep.
+    fn hierarchy_fixture(case: &str) -> Document {
+        let mut doc = Document::new(4, 4);
+        match case {
+            "self" => {
+                let id = doc.active_layer_id;
+                doc.get_layer_mut(id).unwrap().parent_id = Some(id);
+            }
+            "missing" => {
+                let id = doc.active_layer_id;
+                doc.get_layer_mut(id).unwrap().parent_id = Some(9_999);
+            }
+            "non_group" => {
+                let raster = doc.active_layer_id;
+                let child = doc.add_layer(Some("Child".into()));
+                doc.get_layer_mut(child).unwrap().parent_id = Some(raster);
+            }
+            "two_cycle" => {
+                let a = doc.add_group(Some("A".into()));
+                let b = doc.add_group(Some("B".into()));
+                doc.get_layer_mut(a).unwrap().parent_id = Some(b);
+                doc.get_layer_mut(b).unwrap().parent_id = Some(a);
+            }
+            "three_cycle" => {
+                let a = doc.add_group(Some("A".into()));
+                let b = doc.add_group(Some("B".into()));
+                let c = doc.add_group(Some("C".into()));
+                doc.get_layer_mut(a).unwrap().parent_id = Some(b);
+                doc.get_layer_mut(b).unwrap().parent_id = Some(c);
+                doc.get_layer_mut(c).unwrap().parent_id = Some(a);
+            }
+            "deep" => {
+                let mut parent = doc.add_group(Some("Root".into()));
+                for index in 0..=MAX_LAYER_HIERARCHY_DEPTH {
+                    let group = doc.add_group(Some(format!("Group {index}")));
+                    doc.get_layer_mut(group).unwrap().parent_id = Some(parent);
+                    parent = group;
+                }
+            }
+            _ => panic!("unknown fixture {case}"),
+        }
+        doc
+    }
+
+    fn write_fixture_version(case: &str, version: u8) -> Vec<u8> {
+        let doc = hierarchy_fixture(case);
+        let mut bytes = Vec::new();
+        write_project_version(&doc, &mut bytes, version).expect("write fixture");
+        bytes
+    }
+
+    #[test]
+    fn invalid_layer_hierarchies_are_rejected_for_every_project_version() {
+        for version in [1u8, 2, 3] {
+            for case in [
+                "self",
+                "missing",
+                "non_group",
+                "two_cycle",
+                "three_cycle",
+                "deep",
+            ] {
+                let bytes = write_fixture_version(case, version);
+                assert!(
+                    matches!(
+                        load_project_from_reader(&bytes[..]),
+                        Err(ProjectError::CorruptData)
+                    ),
+                    "{case} in v{version} must be rejected as corrupt"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn valid_nested_groups_load_and_composite_for_every_project_version() {
+        for version in [1u8, 2, 3] {
+            let mut doc = Document::new(8, 8);
+            let group = doc.add_group(Some("Group".into()));
+            let sub_group = doc.add_group(Some("Sub".into()));
+            let child = doc.add_layer(Some("Child".into()));
+            assert!(doc.get_layer_mut(child).is_some());
+            doc.get_layer_mut(child).unwrap().set_pixel(2, 2, [10, 20, 30, 255]);
+            assert!(doc.set_layer_parent(sub_group, Some(group)));
+            assert!(doc.set_layer_parent(child, Some(sub_group)));
+
+            let mut bytes = Vec::new();
+            write_project_version(&doc, &mut bytes, version).expect("write valid fixture");
+            let loaded =
+                load_project_from_reader(&bytes[..]).expect("valid nested groups must load");
+
+            assert_eq!(loaded.get_layer(child).unwrap().parent_id, Some(sub_group));
+            assert_eq!(loaded.get_layer(sub_group).unwrap().parent_id, Some(group));
+            assert!(loaded.is_layer_effective_visible(child));
+            assert_eq!(loaded.effective_opacity(child), 1.0);
+            // The compositor must terminate and see the child's pixel through the groups.
+            let flat = loaded.composite_layers(true);
+            let offset = (2 * 8 + 2) * 4;
+            assert_eq!(&flat[offset..offset + 4], &[10, 20, 30, 255]);
+        }
+    }
+
+    #[test]
+    fn legacy_hcv_hierarchies_are_validated_too() {
+        // HCV v3/v4/v5 use the same body layout as AUR v1 for raster/group-only documents.
+        for magic in [b"HCV\x03", b"HCV\x04", b"HCV\x05"] {
+            let mut corrupt = write_fixture_version("two_cycle", 1);
+            corrupt[0..4].copy_from_slice(magic);
+            assert!(
+                matches!(
+                    load_project_from_reader(&corrupt[..]),
+                    Err(ProjectError::CorruptData)
+                ),
+                "{magic:?} cycle must be rejected"
+            );
+
+            let mut clean = Document::new(4, 4);
+            let group = clean.add_group(Some("Group".into()));
+            let child = clean.add_layer(Some("Child".into()));
+            clean.set_layer_parent(child, Some(group));
+            let mut bytes = Vec::new();
+            write_project_version(&clean, &mut bytes, 1).expect("write");
+            bytes[0..4].copy_from_slice(magic);
+            let loaded = load_project_from_reader(&bytes[..])
+                .unwrap_or_else(|error| panic!("valid {magic:?} must load: {error}"));
+            assert_eq!(loaded.get_layer(child).unwrap().parent_id, Some(group));
+        }
+    }
+
     #[test]
     fn sixteen_bit_layers_round_trip_every_channel() {
         let mut doc = Document::new(5, 4);

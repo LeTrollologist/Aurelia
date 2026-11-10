@@ -45,8 +45,16 @@ what the layers happen to hold:
 ## Limits and validation
 
 - `width * height * 8` must be ≤ 2 GiB; zero dimensions are rejected.
+- Across the whole document, the loader accepts at most **4096 layers**, **512 Mi pixels**, and
+  **2 GiB of decoded layer storage** (pixels, masks, text and layer metadata). These are aggregate
+  limits, not per-layer limits; a project that exceeds any of them is rejected with `CorruptData`
+  before the offending buffer is allocated.
 - A layer's deflate output is bounded to the exact expected payload (+1 byte probe); a
   high-ratio stream is rejected before it can allocate the expansion.
+- Layer ids must be unique. `parent_id` values must form a forest: every parent must exist and
+  be a group, no layer may parent itself, cycles are rejected, and a chain may be at most
+  **1024 parent links** deep. Violations return `CorruptData` before a `Document` is handed to
+  the editor.
 - Truncated or malformed files return `CorruptData`; the reader does not guess a format.
 - 16-bit layers round-trip byte-exactly, and native 16-bit compositing output is available
   through `Document::composite_layers_srgb16` (#15).

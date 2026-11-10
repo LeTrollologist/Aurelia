@@ -3,7 +3,7 @@ mod tests {
     use crate::blend::BlendMode;
     use crate::brush::{BrushPoint, BrushSettings, ToolType};
     use crate::color::Color;
-    use crate::document::Document;
+    use crate::document::{Document, HierarchyError, MAX_LAYER_HIERARCHY_DEPTH};
     use crate::rasterizer::StrokeRasterizer;
     use crate::selection::SelectionMask;
     use crate::symmetry::{SymmetryConfig, SymmetryMode};
@@ -749,6 +749,126 @@ mod tests {
         assert!(doc.get_layer(l1).is_none());
         assert!(doc.get_layer(l2).is_none());
         assert!(doc.get_layer(l3).is_none());
+    }
+
+    #[test]
+    fn hierarchy_validation_accepts_a_nested_forest() {
+        let mut doc = Document::new(8, 8);
+        let group = doc.add_group(Some("Group".into()));
+        let sub_group = doc.add_group(Some("Sub".into()));
+        let child = doc.add_layer(Some("Child".into()));
+        assert!(doc.set_layer_parent(sub_group, Some(group)));
+        assert!(doc.set_layer_parent(child, Some(sub_group)));
+
+        assert_eq!(doc.validate_layer_hierarchy(), Ok(()));
+        assert_eq!(doc.all_descendants(group).len(), 2);
+        assert!(doc.is_layer_effective_visible(child));
+        assert_eq!(doc.effective_opacity(child), 1.0);
+    }
+
+    #[test]
+    fn hierarchy_validation_rejects_invalid_graphs() {
+        let mut self_parent = Document::new(4, 4);
+        let id = self_parent.active_layer_id;
+        self_parent.get_layer_mut(id).unwrap().parent_id = Some(id);
+        assert_eq!(
+            self_parent.validate_layer_hierarchy(),
+            Err(HierarchyError::SelfParent(id))
+        );
+
+        let mut missing = Document::new(4, 4);
+        let id = missing.active_layer_id;
+        missing.get_layer_mut(id).unwrap().parent_id = Some(9_999);
+        assert_eq!(
+            missing.validate_layer_hierarchy(),
+            Err(HierarchyError::MissingParent {
+                layer: id,
+                parent: 9_999
+            })
+        );
+
+        let mut non_group = Document::new(4, 4);
+        let raster = non_group.active_layer_id;
+        let child = non_group.add_layer(Some("Child".into()));
+        non_group.get_layer_mut(child).unwrap().parent_id = Some(raster);
+        assert_eq!(
+            non_group.validate_layer_hierarchy(),
+            Err(HierarchyError::NonGroupParent {
+                layer: child,
+                parent: raster
+            })
+        );
+
+        let mut duplicate = Document::new(2, 2);
+        let copy = duplicate.layers[0].clone();
+        duplicate.layers.push(copy);
+        assert_eq!(
+            duplicate.validate_layer_hierarchy(),
+            Err(HierarchyError::DuplicateId(1))
+        );
+    }
+
+    #[test]
+    fn hierarchy_validation_rejects_cycles_and_excessive_depth() {
+        let mut two_cycle = Document::new(4, 4);
+        let a = two_cycle.add_group(Some("A".into()));
+        let b = two_cycle.add_group(Some("B".into()));
+        two_cycle.get_layer_mut(a).unwrap().parent_id = Some(b);
+        two_cycle.get_layer_mut(b).unwrap().parent_id = Some(a);
+        assert!(matches!(
+            two_cycle.validate_layer_hierarchy(),
+            Err(HierarchyError::Cycle(_))
+        ));
+
+        // A cycle that does not include the starting layer must be found too.
+        let mut three_cycle = Document::new(4, 4);
+        let a = three_cycle.add_group(Some("A".into()));
+        let b = three_cycle.add_group(Some("B".into()));
+        let c = three_cycle.add_group(Some("C".into()));
+        three_cycle.get_layer_mut(a).unwrap().parent_id = Some(b);
+        three_cycle.get_layer_mut(b).unwrap().parent_id = Some(c);
+        three_cycle.get_layer_mut(c).unwrap().parent_id = Some(a);
+        assert!(matches!(
+            three_cycle.validate_layer_hierarchy(),
+            Err(HierarchyError::Cycle(_))
+        ));
+
+        let mut deep = Document::new(2, 2);
+        let mut parent = deep.add_group(Some("Root".into()));
+        for index in 0..=MAX_LAYER_HIERARCHY_DEPTH {
+            let group = deep.add_group(Some(format!("Group {index}")));
+            deep.get_layer_mut(group).unwrap().parent_id = Some(parent);
+            parent = group;
+        }
+        assert!(matches!(
+            deep.validate_layer_hierarchy(),
+            Err(HierarchyError::TooDeep { .. })
+        ));
+    }
+
+    #[test]
+    fn hierarchy_at_the_maximum_depth_is_accepted() {
+        let mut doc = Document::new(2, 2);
+        let mut parent = doc.add_group(Some("Root".into()));
+        for index in 0..MAX_LAYER_HIERARCHY_DEPTH {
+            let group = doc.add_group(Some(format!("Group {index}")));
+            doc.get_layer_mut(group).unwrap().parent_id = Some(parent);
+            parent = group;
+        }
+        assert_eq!(doc.validate_layer_hierarchy(), Ok(()));
+    }
+
+    #[test]
+    fn traversal_helpers_are_bounded_on_a_corrupt_cycle() {
+        let mut doc = Document::new(4, 4);
+        let a = doc.active_layer_id;
+        let b = doc.add_layer(Some("B".into()));
+        doc.get_layer_mut(a).unwrap().parent_id = Some(b);
+        doc.get_layer_mut(b).unwrap().parent_id = Some(a);
+
+        assert!(!doc.is_layer_effective_visible(a));
+        assert_eq!(doc.effective_opacity(a), 0.0);
+        assert_eq!(doc.all_descendants(a), vec![b]);
     }
 
     #[test]

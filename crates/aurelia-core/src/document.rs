@@ -5,6 +5,7 @@ use crate::layer::{Layer, LayerId, LayerBuffer, LayerMask, PixelFormat};
 use crate::pixel::Channel;
 use crate::selection::SelectionMask;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 /// Why a composite could not be written into a caller-provided buffer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -36,6 +37,35 @@ pub struct EditorState {
     pub guides: Vec<GuideLine>,
     pub grid_origin: [f32; 2],
     pub straight_ruler: Option<StraightRulerState>,
+}
+
+/// Maximum number of parent links from a layer to its root.
+///
+/// A root layer is depth 0; a direct child of a root is depth 1. Projects with a deeper
+/// hierarchy are rejected at load time rather than risking unbounded traversal. The same
+/// bound is applied defensively by [`Document::is_layer_effective_visible`] and
+/// [`Document::effective_opacity`].
+pub const MAX_LAYER_HIERARCHY_DEPTH: usize = 1024;
+
+/// Why a loaded layer hierarchy is not a valid forest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum HierarchyError {
+    #[error("layer id {0} appears more than once")]
+    DuplicateId(LayerId),
+    #[error("layer {0} is its own parent")]
+    SelfParent(LayerId),
+    #[error("layer {layer} references missing parent {parent}")]
+    MissingParent { layer: LayerId, parent: LayerId },
+    #[error("layer {layer} has non-group parent {parent}")]
+    NonGroupParent { layer: LayerId, parent: LayerId },
+    #[error("layer hierarchy contains a cycle through layer {0}")]
+    Cycle(LayerId),
+    #[error("layer {layer} is {depth} levels deep; the maximum is {max}")]
+    TooDeep {
+        layer: LayerId,
+        depth: usize,
+        max: usize,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,6 +290,88 @@ impl Document {
         false
     }
 
+    /// Validates that the layer hierarchy is a forest with group-only parents.
+    ///
+    /// The editor only creates forests through [`Document::set_layer_parent`], but a project
+    /// file is an untrusted input: it can name any `parent_id`. This check rejects duplicate
+    /// ids, self-parenting, missing parents, non-group parents, cycles and chains deeper than
+    /// [`MAX_LAYER_HIERARCHY_DEPTH`].
+    pub fn validate_layer_hierarchy(&self) -> Result<(), HierarchyError> {
+        let count = self.layers.len();
+        let mut index_by_id: HashMap<LayerId, usize> = HashMap::with_capacity(count);
+        for (position, layer) in self.layers.iter().enumerate() {
+            if index_by_id.insert(layer.id, position).is_some() {
+                return Err(HierarchyError::DuplicateId(layer.id));
+            }
+        }
+
+        // 0 = unvisited, 1 = on the current parent path, 2 = validated.
+        let mut state = vec![0u8; count];
+        let mut depth = vec![0usize; count];
+
+        for start in 0..count {
+            if state[start] == 2 {
+                continue;
+            }
+
+            let mut path = Vec::new();
+            let mut current = start;
+            let attached_depth = loop {
+                match state[current] {
+                    2 => break Some(depth[current]),
+                    1 => return Err(HierarchyError::Cycle(self.layers[current].id)),
+                    _ => {}
+                }
+
+                state[current] = 1;
+                path.push(current);
+
+                let Some(parent_id) = self.layers[current].parent_id else {
+                    break None;
+                };
+                if parent_id == self.layers[current].id {
+                    return Err(HierarchyError::SelfParent(self.layers[current].id));
+                }
+                let Some(&parent) = index_by_id.get(&parent_id) else {
+                    return Err(HierarchyError::MissingParent {
+                        layer: self.layers[current].id,
+                        parent: parent_id,
+                    });
+                };
+                if !self.layers[parent].is_group() {
+                    return Err(HierarchyError::NonGroupParent {
+                        layer: self.layers[current].id,
+                        parent: parent_id,
+                    });
+                }
+                current = parent;
+            };
+
+            // A path that reached a root starts at depth 0. A path that joined an already
+            // validated chain starts one level below that chain's node.
+            let mut next_depth = match attached_depth {
+                Some(parent_depth) => parent_depth + 1,
+                None => 0,
+            };
+            for &node in path.iter().rev() {
+                if next_depth > MAX_LAYER_HIERARCHY_DEPTH {
+                    return Err(HierarchyError::TooDeep {
+                        layer: self.layers[node].id,
+                        depth: next_depth,
+                        max: MAX_LAYER_HIERARCHY_DEPTH,
+                    });
+                }
+                depth[node] = next_depth;
+                next_depth += 1;
+            }
+            for &node in &path {
+                state[node] = 2;
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn group_children(&self, parent_id: LayerId) -> Vec<LayerId> {
         self.layers
             .iter()
@@ -271,7 +383,14 @@ impl Document {
     pub fn all_descendants(&self, parent_id: LayerId) -> Vec<LayerId> {
         let mut result = Vec::new();
         let mut queue = self.group_children(parent_id);
+        let mut seen = HashSet::new();
+        seen.insert(parent_id);
         while let Some(child_id) = queue.pop() {
+            // A corrupt in-memory graph must not make descendant enumeration spin. The
+            // loader rejects cycles, but editor code and tests can still build one directly.
+            if !seen.insert(child_id) {
+                continue;
+            }
             result.push(child_id);
             let sub_children = self.group_children(child_id);
             queue.extend(sub_children);
@@ -281,11 +400,16 @@ impl Document {
 
     pub fn is_layer_effective_visible(&self, id: LayerId) -> bool {
         let mut curr_id = id;
+        let mut hops = 0usize;
         while let Some(layer) = self.get_layer(curr_id) {
             if !layer.visible {
                 return false;
             }
             if let Some(parent_id) = layer.parent_id {
+                hops += 1;
+                if hops > MAX_LAYER_HIERARCHY_DEPTH {
+                    return false;
+                }
                 curr_id = parent_id;
             } else {
                 break;
@@ -297,9 +421,16 @@ impl Document {
     pub fn effective_opacity(&self, id: LayerId) -> f32 {
         let mut opacity = 1.0_f32;
         let mut curr_id = id;
+        let mut hops = 0usize;
         while let Some(layer) = self.get_layer(curr_id) {
             opacity *= layer.opacity.clamp(0.0, 1.0);
             if let Some(parent_id) = layer.parent_id {
+                hops += 1;
+                if hops > MAX_LAYER_HIERARCHY_DEPTH {
+                    // Invalid hierarchy: render nothing rather than choosing an arbitrary
+                    // point on a cycle.
+                    return 0.0;
+                }
                 curr_id = parent_id;
             } else {
                 break;

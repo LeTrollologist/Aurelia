@@ -30,6 +30,14 @@ every instruction executing in the process is memory-safe; the Win32/CRT/FFI lay
 
 - AUR parsing validates the magic, dimensions, compressed and decompressed lengths, format tags
   and masks. Payloads are bounded to the expected size; malformed files return an error.
+- Decoding is also bounded across the whole document: at most 4096 layers, 512 Mi pixels, and
+  2 GiB of decoded layer storage (pixels, masks, text and metadata). The budget is reserved before
+  each buffer is allocated, so a small file cannot request an unbounded total by multiplying many
+  layers.
+- Layer ids and `parent_id` values are validated after loading. Duplicate ids, missing or
+  non-group parents, self-parents, cycles and chains deeper than 1024 parent links are rejected
+  before a `Document` is returned, so visibility/opacity/descendant traversals always see a
+  forest.
 - Image imports use the `image` crate decoders.
 - There is no plugin system and no executed project content.
 

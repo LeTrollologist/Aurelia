@@ -40,6 +40,47 @@ const EDITOR_MAX_BYTES: u32 = 1024 * 1024;
 /// length before the allocation happens.
 const MAX_TEXT_CONTENT_BYTES: u32 = 8 * 1024 * 1024;
 
+// Aggregate decode limits, applied across the whole document rather than per layer. A
+// single deflate stream is already bounded to its layer's expected size, but a project can
+// contain many layers; without a total budget a small compressed file can request tens of
+// gigabytes. These limits are deliberately generous enough for large real documents while
+// keeping a corrupt project from driving the process into an abort.
+const MAX_PROJECT_LAYERS: u32 = 4096;
+const MAX_PROJECT_PIXELS: u64 = 512 * 1024 * 1024;
+const MAX_PROJECT_DECODED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+/// Tracks the decoded pixel, mask, text and metadata bytes retained by a project being loaded.
+#[derive(Debug, Default)]
+struct DecodeBudget {
+    pixels: u64,
+    bytes: u64,
+}
+
+impl DecodeBudget {
+    fn new(layer_count: u32) -> Result<Self, ProjectError> {
+        if layer_count > MAX_PROJECT_LAYERS {
+            return Err(ProjectError::CorruptData);
+        }
+        Ok(Self::default())
+    }
+
+    /// Reserves space before the loader allocates it. Masks reserve bytes with `pixels = 0`.
+    fn reserve(&mut self, pixels: u64, bytes: u64) -> Result<(), ProjectError> {
+        self.pixels = self
+            .pixels
+            .checked_add(pixels)
+            .ok_or(ProjectError::CorruptData)?;
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or(ProjectError::CorruptData)?;
+        if self.pixels > MAX_PROJECT_PIXELS || self.bytes > MAX_PROJECT_DECODED_BYTES {
+            return Err(ProjectError::CorruptData);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum ProjectError {
     #[error("IO error: {0}")]
@@ -758,11 +799,13 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
 
     reader.read_exact(&mut buf4)?;
     let layer_count = u32::from_le_bytes(buf4);
+    let mut budget = DecodeBudget::new(layer_count)?;
 
     // The count comes straight from the file. Reserving for all of it up front would let a
     // tiny header ask for terabytes before the first layer (and its EOF) is ever read.
     let mut layers = Vec::with_capacity((layer_count as usize).min(1024));
     let mut max_id = active_layer_id;
+    let layer_pixels = (width as u64) * (height as u64);
 
     for _ in 0..layer_count {
         reader.read_exact(&mut buf8)?;
@@ -777,6 +820,7 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
 
         let mut name_vec = vec![0u8; name_len];
         reader.read_exact(&mut name_vec)?;
+        budget.reserve(0, name_len as u64)?;
         let name = String::from_utf8(name_vec).unwrap_or_else(|_| format!("Layer {}", id));
 
         let mut adjustment = None;
@@ -837,11 +881,13 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                 }
                 3 => {
                     let content = read_text_content(&mut reader)?;
+                    budget.reserve(0, content.len() as u64)?;
 
                     reader.read_exact(&mut buf2)?;
                     let font_len = u16::from_le_bytes(buf2) as usize;
                     let mut font_vec = vec![0u8; font_len];
                     reader.read_exact(&mut font_vec)?;
+                    budget.reserve(0, font_vec.len() as u64)?;
                     let font_family = String::from_utf8(font_vec).unwrap_or_default();
 
                     reader.read_exact(&mut buf4)?;
@@ -1053,6 +1099,26 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             aurelia_core::layer::PixelFormat::Srgb8
         };
 
+        // Reserve the aggregate budget before reading or decompressing this layer's payload.
+        // Groups and adjustment layers have no pixel buffer; raster and text layers do.
+        let storage_bytes = if matches!(
+            kind,
+            aurelia_core::layer::LayerKind::Group | aurelia_core::layer::LayerKind::Adjustment
+        ) {
+            None
+        } else {
+            let bytes_per_pixel = if layer_format == aurelia_core::layer::PixelFormat::Srgb16 {
+                8u64
+            } else {
+                4u64
+            };
+            let expected = layer_pixels
+                .checked_mul(bytes_per_pixel)
+                .ok_or(ProjectError::CorruptData)?;
+            budget.reserve(layer_pixels, expected)?;
+            Some(expected)
+        };
+
         reader.read_exact(&mut buf4)?;
         let comp_len = u32::from_le_bytes(buf4) as usize;
 
@@ -1074,14 +1140,7 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             // before a single compressed byte is decoded. Bound the decoder to it: a small
             // high-ratio deflate stream must not be able to allocate gigabytes before the
             // length check below gets a chance to reject it.
-            let expected = match layer_format {
-                aurelia_core::layer::PixelFormat::Srgb8 => {
-                    (width as usize) * (height as usize) * 4
-                }
-                aurelia_core::layer::PixelFormat::Srgb16 => {
-                    (width as usize) * (height as usize) * 8
-                }
-            };
+            let expected = storage_bytes.ok_or(ProjectError::CorruptData)? as usize;
 
             let mut compressed = reader.by_ref().take(comp_len as u64);
             let mut raw = Vec::new();
@@ -1134,7 +1193,10 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             if buf1[0] == 1 {
                 reader.read_exact(&mut buf1)?;
                 let enabled = buf1[0] != 0;
-                let mask_len = (width as usize) * (height as usize);
+                // A mask is another width*height buffer; charge it to the same document budget
+                // before allocating it.
+                budget.reserve(0, layer_pixels)?;
+                let mask_len = layer_pixels as usize;
                 let mut mask_pixels = vec![0u8; mask_len];
                 reader.read_exact(&mut mask_pixels)?;
                 layer.mask = Some(aurelia_core::layer::LayerMask {
@@ -1163,7 +1225,7 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
         }
     }
 
-    Ok(Document {
+    let document = Document {
         width,
         height,
         layers,
@@ -1177,7 +1239,16 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
         pixel_format: document_format,
         editor,
         icc_profile,
-    })
+    };
+
+    // The file is untrusted input: `parent_id` values are read verbatim and can describe
+    // missing parents, non-group parents, self-parenting or a cycle. Reject the whole project
+    // instead of handing a graph to traversals that assume a forest.
+    document
+        .validate_layer_hierarchy()
+        .map_err(|_| ProjectError::CorruptData)?;
+
+    Ok(document)
 }
 
 pub fn load_project_file(path: impl AsRef<Path>) -> Result<Document, ProjectError> {
@@ -1240,5 +1311,36 @@ mod tests {
             save_project_to_writer(&doc, &mut out),
             Err(ProjectError::TextTooLarge { .. })
         ));
+    }
+
+    #[test]
+    fn too_many_layers_are_rejected_before_reading_them() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(AUR_MAGIC_V3);
+        bytes.extend_from_slice(&2u32.to_le_bytes());
+        bytes.extend_from_slice(&2u32.to_le_bytes());
+        bytes.extend_from_slice(&1u64.to_le_bytes());
+        bytes.push(255); // background
+        bytes.push(0); // transparent
+        bytes.push(0); // theme
+        bytes.push(0); // sRGB8
+        bytes.extend_from_slice(&(MAX_PROJECT_LAYERS + 1).to_le_bytes());
+
+        assert!(matches!(
+            load_project_from_reader(Cursor::new(&bytes)),
+            Err(ProjectError::CorruptData)
+        ));
+        assert!(DecodeBudget::new(MAX_PROJECT_LAYERS).is_ok());
+    }
+
+    #[test]
+    fn aggregate_decode_budget_rejects_excess_pixels_and_bytes() {
+        let mut pixels = DecodeBudget::new(0).expect("budget");
+        assert!(pixels.reserve(MAX_PROJECT_PIXELS, 0).is_ok());
+        assert!(pixels.reserve(1, 0).is_err());
+
+        let mut bytes = DecodeBudget::new(0).expect("budget");
+        assert!(bytes.reserve(0, MAX_PROJECT_DECODED_BYTES).is_ok());
+        assert!(bytes.reserve(0, 1).is_err());
     }
 }

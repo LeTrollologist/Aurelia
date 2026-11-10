@@ -11,7 +11,7 @@
 <!-- Tier 1: Project Metadata & Quality Assurance Badges -->
 <p align="center">
   <a href="https://github.com/LeTrollologist/Aurelia/releases">
-    <img src="https://img.shields.io/badge/Release-v3.13.0_beta-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
+    <img src="https://img.shields.io/badge/Release-3.13.0_beta.2-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
   </a>
   <a href="crates/">
     <img src="https://img.shields.io/badge/Engine-Rust_%2B_Win32_FFI-E8963F?style=for-the-badge&logo=rust&logoColor=1A120B&labelColor=1A120B" alt="Engine: Rust with Win32 FFI" />
@@ -193,7 +193,7 @@ Authoritative details: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`do
 Aurelia ships as a **per-user Windows installer**, a portable zip, or a pure-Rust source build.
 Full details, silent-install switches and verification steps live in [`INSTALL.md`](INSTALL.md).
 
-> **v3.13.0-beta is a prerelease.** GitHub's "latest" link still points at stable v3.12.0; use the
+> **v3.13.0-beta.2 is a prerelease.** GitHub's "latest" link still points at stable v3.12.0; use the
 > explicit beta links below.
 
 ### Option 1: Installer (Recommended)
