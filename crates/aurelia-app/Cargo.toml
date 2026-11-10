@@ -8,7 +8,7 @@ description = "Aurelia - local-first raster illustration, animation and painting
 [[bin]]
 name = "aurelia-app"
 path = "src/main.rs"
-test = false
+test = true
 
 [dependencies]
 aurelia-core = { path = "../aurelia-core", version = "3.13.0" }

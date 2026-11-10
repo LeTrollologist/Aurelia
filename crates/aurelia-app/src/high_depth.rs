@@ -13,10 +13,11 @@ use windows::Win32::Graphics::Direct3D11::{
     D3D11_MAP_WRITE_DISCARD, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC, D3D11_USAGE_DYNAMIC,
 };
 use windows::Win32::Graphics::Dxgi::Common::{
-    DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_SAMPLE_DESC,
+    DXGI_ALPHA_MODE_IGNORE, DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709, DXGI_FORMAT_R10G10B10A2_UNORM,
+    DXGI_SAMPLE_DESC,
 };
 use windows::Win32::Graphics::Dxgi::{
-    CreateDXGIFactory2, IDXGIFactory2, IDXGIOutput, IDXGIOutput6, IDXGISwapChain1,
+    CreateDXGIFactory2, IDXGIFactory2, IDXGIOutput, IDXGIOutput6, IDXGISwapChain1, IDXGISwapChain3,
     DXGI_CREATE_FACTORY_FLAGS, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_CHAIN_FLAG,
     DXGI_SWAP_EFFECT_FLIP_DISCARD, DXGI_USAGE_RENDER_TARGET_OUTPUT,
 };
@@ -57,6 +58,31 @@ pub fn px10_to_rgba8(pixel: u32) -> u32 {
     let g = q((pixel >> 10) & 1023);
     let b = q((pixel >> 20) & 1023);
     0xFF00_0000 | (r << 16) | (g << 8) | b
+}
+
+/// Combine the 10-bit canvas with the 8-bit overlay frame.
+///
+/// A pixel is kept at 10 bits when the overlay left it equal to the downconverted canvas;
+/// otherwise the overlay value is expanded into the 10-bit container. Returns false on a
+/// length mismatch so callers can fall back rather than panicking.
+pub fn compose_present(canvas: &[u32], overlay: &[u32], out: &mut [u32]) -> bool {
+    if canvas.len() != overlay.len() || out.len() < canvas.len() {
+        return false;
+    }
+    for index in 0..canvas.len() {
+        let canvas8 = px10_to_rgba8(canvas[index]);
+        out[index] = if overlay[index] == canvas8 {
+            canvas[index]
+        } else {
+            rgba8_to_px10(overlay[index])
+        };
+    }
+    true
+}
+
+/// Whether a 10-bit presenter may be attempted for an output.
+pub fn presenter_allowed(bits_per_color: u32, force: bool) -> bool {
+    force || bits_per_color >= 10
 }
 
 /// A D3D11 flip-model swapchain presenting packed 10-bit frames to an existing HWND.
@@ -123,9 +149,12 @@ impl TenBitPresenter {
                 let output = swapchain.GetContainingOutput().ok()?;
                 let output = output.cast::<IDXGIOutput6>().ok()?;
                 let desc = output.GetDesc1().ok()?;
-                if desc.BitsPerColor < 10 {
+                if !presenter_allowed(desc.BitsPerColor, force) {
                     return None;
                 }
+            }
+            if let Ok(swapchain3) = swapchain.cast::<IDXGISwapChain3>() {
+                let _ = swapchain3.SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709);
             }
 
             let mut presenter = Self {
@@ -265,5 +294,26 @@ mod tests {
             assert_eq!((back >> 16) & 0xFF, value as u32);
             assert_eq!(back >> 24, 0xFF);
         }
+    }
+
+    #[test]
+    fn present_composition_keeps_canvas_10_bit_and_expands_overlays() {
+        let canvas = [
+            rgba16_to_px10(128, 0, 0, 65_535),
+            rgba16_to_px10(0, 0, 0, 65_535),
+        ];
+        let overlay = [px10_to_rgba8(canvas[0]), 0xFF00_FFFF];
+        let mut out = [0u32; 2];
+        assert!(compose_present(&canvas, &overlay, &mut out));
+        assert_eq!(out[0], canvas[0]);
+        assert_eq!(out[1], rgba8_to_px10(0xFF00_FFFF));
+        assert!(!compose_present(&canvas, &overlay, &mut out[..1]));
+    }
+
+    #[test]
+    fn presenter_depth_gate_requires_a_ten_bit_output_or_force() {
+        assert!(!presenter_allowed(8, false));
+        assert!(presenter_allowed(10, false));
+        assert!(presenter_allowed(8, true));
     }
 }

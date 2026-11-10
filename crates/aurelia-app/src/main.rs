@@ -3145,7 +3145,10 @@ unsafe extern "system" fn window_proc(
                 app.renderer.soft_proof = app.state.soft_proof.clone();
                 app.renderer.proof_revision = app.state.document_revision;
 
-                let mut high_depth = app.tenbit.is_some();
+                let is_16bit_doc = app.state.document.pixel_format
+                    == aurelia_core::layer::PixelFormat::Srgb16;
+                let mut high_depth =
+                    app.tenbit.is_some() && (is_16bit_doc || app.tenbit_force);
                 if high_depth {
                     app.tenbit_canvas.resize(app.win_w * app.win_h, 0);
                     high_depth = app.renderer.render_canvas_srgb16(
@@ -3349,14 +3352,11 @@ unsafe extern "system" fn window_proc(
                 let mut presented = false;
                 if high_depth {
                     app.tenbit_present.resize(app.win_w * app.win_h, 0);
-                    for (index, dst) in app.tenbit_present.iter_mut().enumerate() {
-                        let canvas8 = high_depth::px10_to_rgba8(app.tenbit_canvas[index]);
-                        *dst = if app.buffer[index] == canvas8 {
-                            app.tenbit_canvas[index]
-                        } else {
-                            high_depth::rgba8_to_px10(app.buffer[index])
-                        };
-                    }
+                    high_depth::compose_present(
+                        &app.tenbit_canvas,
+                        &app.buffer,
+                        &mut app.tenbit_present,
+                    );
                     let present_ok = app
                         .tenbit
                         .as_mut()

@@ -164,6 +164,20 @@ composite costs, on the same machine, median of 7 rounds x 200 iterations:
 At 4K this is ~16% of a 16.7 ms frame, so the app caps live rebuilds at **~30 Hz while a stroke is
 in progress**; the final refresh after mouse-up is immediate. Idle frames still do no work.
 
+## 10-bit canvas present benchmark
+
+`bench_canvas_present` compares the existing RGBA8 canvas path with the native RGBA16 -> packed
+10-bit path on a three-layer 16-bit document. Best of five runs on the reference machine:
+
+| Document | RGBA8 path | RGBA16 -> 10-bit | Overhead |
+| :--- | ---: | ---: | ---: |
+| 1920x1080 | 47.5 ms (43.6 MPix/s) | 51.0 ms (40.6 MPix/s) | **1.07x** |
+| 3840x2160 | 257.1 ms (32.3 MPix/s) | 270.5 ms (30.7 MPix/s) | **1.05x** |
+
+The 10-bit path is only selected for **16-bit documents on a 10-bit output**; 8-bit documents
+stay on the byte-compatible GDI path. The measurement covers canvas rendering, not the DXGI
+upload/present, which the forced-path smoke test exercises separately.
+
 ## Reproduce
 
 ```powershell
@@ -173,6 +187,8 @@ cargo run --release -p aurelia-render --example bench_composite -- --filter lumi
 cargo run --release -p aurelia-render --example bench_composite -- srgb16 --filter luminosity
 cargo run --release -p aurelia-render --example bench_brush
 cargo run --release -p aurelia-render --example bench_navigator
+cargo run --release -p aurelia-render --example bench_canvas_present -- 1920 1080
+cargo run --release -p aurelia-render --example bench_canvas_present -- 3840 2160
 cargo test -p aurelia-core gate_2 --release -- --ignored --nocapture
 cargo test -p aurelia-io --test soak --release -- --ignored --nocapture
 ```

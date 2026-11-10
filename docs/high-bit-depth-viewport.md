@@ -36,6 +36,8 @@ the final present step, not in editing.
 - `TenBitPresenter` creates a D3D11 device, an HWND flip-model swapchain and a dynamic 10-bit
   texture, then uploads/copies/presents each frame. It is enabled only when the containing output
   reports at least 10 bits per colour; `AURELIA_FORCE_10BIT=1` is a hardware-diagnostics override.
+- The 10-bit path is selected only for **16-bit documents** on a 10-bit output; 8-bit documents
+  stay on the byte-compatible GDI path. `AURELIA_FORCE_10BIT=1` bypasses both gates for diagnostics.
 - Selection tint, tracing reference, onion skins and soft proof are now blended in 10-bit space;
   the 16-bit proof path uses `simulate_proof_rgba16` and a separate cached proof buffer.
 - The canvas and studio backdrop are 10-bit. UI, grid, rulers and guides remain 8-bit and are
@@ -132,7 +134,7 @@ high-precision studio" claim.
 | :--- | :--- | :--- |
 | **Visible improvement** | **Pending** | On a 10-bit display chain, a vertical 16-bit gradient shows no 8-bit banding; a measured step test distinguishes 8-bit and 10-bit presentation. |
 | **Fallback is unchanged** | **Pass (code path)** | With DXGI unavailable, output is byte-identical to the current GDI path and all viewport digest tests pass. |
-| **No startup/perf regression** | **Pending** | Device creation is lazy or bounded; first-frame and resize timings stay within the recorded viewport budget. |
+| **No startup/perf regression** | **Measured (render)** | 16-bit 1080p: 51.0 ms vs 47.5 ms (1.07x); 4K: 270.5 ms vs 257.1 ms (1.05x). DXGI upload/present is not included; 8-bit documents stay on GDI. |
 | **Mixed monitors** | **Partial** | DPI/display changes recreate the presenter; mixed 10-bit/8-bit hardware verification is still open. |
 | **Remote/VM safety** | **Pending hardware** | Remote Desktop and WARP-only environments fall back without dialogs, crashes or repeated retries. |
 | **Selection/tracing/onion/proof** | **Pass (unit)** | The 10-bit canvas blends all four overlay families; selection tint and the 16-bit proof path have tests. |
