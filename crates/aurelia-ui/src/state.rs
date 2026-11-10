@@ -4149,6 +4149,7 @@ mod preferences_dialog {
         source.undo_budget_mb = 64;
         source.jpeg_quality = 77;
         source.document.theme = ThemeMode::Ember;
+        source.tenbit_enabled = true;
         source.left_panel_locked = true;
         source.recent_files = vec![std::path::PathBuf::from("C:/work/a.aur")];
         let text = source.preferences_text();
@@ -4160,6 +4161,7 @@ mod preferences_dialog {
         assert_eq!(loaded.undo_budget_mb, 64);
         assert_eq!(loaded.jpeg_quality, 77);
         assert_eq!(loaded.document.theme, ThemeMode::Ember);
+        assert!(loaded.tenbit_enabled);
         assert!(loaded.left_panel_locked);
         assert_eq!(loaded.recent_files.len(), 1);
         assert_eq!(
@@ -4183,6 +4185,10 @@ mod preferences_dialog {
         assert_eq!(loaded.undo_budget_mb, UNDO_BUDGET_MB_RANGE.1);
         assert_eq!(loaded.jpeg_quality, 1);
         assert_eq!(loaded.document.theme, ThemeMode::Dawn);
+        assert!(
+            !loaded.tenbit_enabled,
+            "10-bit presentation must default off"
+        );
         assert_eq!(
             loaded.autosave_enabled, defaults.autosave_enabled,
             "a missing key must not flip an unrelated setting"
