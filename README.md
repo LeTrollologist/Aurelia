@@ -378,9 +378,9 @@ Contributions are welcome! Please feel free to submit issues, feature requests, 
 
 ### Verification and releases
 
-CI runs formatting, Clippy correctness and the workspace tests on every push and pull request.
-Releases remain local and are cut with the journal-backed orchestrator in
-[`tools/release`](tools/release), not `scripts/pipeline.py`:
+Everything runs locally; there is no GitHub Actions workflow and no cloud build. Releases are cut
+with the journal-backed orchestrator in [`tools/release`](tools/release), not
+`scripts/pipeline.py`:
 
 ```powershell
 python scripts/quality.py

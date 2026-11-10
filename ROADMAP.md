@@ -93,8 +93,8 @@ claim.
 1. **Performance:** sparse 16-bit ratio ≥ 0.60 (record paired runs); Luminosity rollback reference
    68.3 MPix/s full pass / 92.2 isolated. No optimization without a paired win.
 2. **Quality:** `python scripts/quality.py` runs formatting, Clippy correctness, the release-tool
-   pytest suite, the soak and the sparse gate. CI runs formatting, Clippy correctness and the
-   workspace tests on every push and pull request; releases remain local.
+   pytest suite, the soak and the sparse gate. Everything runs locally; there is no GitHub
+   Actions workflow and no cloud build. Releases remain local.
 3. **Correctness:** the compositor oracle and the 8/16-bit digest suites gate every compositor,
    style or blend change. Project-file, clipboard, brush and IPC parsers keep explicit aggregate
    budgets and malformed-input tests.
