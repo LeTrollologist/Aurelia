@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .config import ReleaseConfig, load_config
 from .engine import Context, Engine
+from .envfile import load_env_file
 from .errors import CompensationError, ReleaseError
 from .github import client_for_context
 from .gitops import Git
@@ -43,6 +44,7 @@ def _context(args: argparse.Namespace) -> tuple[Context, ReleaseConfig]:
     repo = Path(args.repo).resolve()
     if not repo.is_dir():
         raise ReleaseError(f"repository path does not exist: {repo}")
+    load_env_file(repo / ".env")
     cfg = load_config(
         repo,
         path=Path(args.config).resolve() if args.config else None,

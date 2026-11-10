@@ -37,6 +37,12 @@ and commit `releases/ledger.json`.
 | `keys/aurelia-publisher-2026.pub` | public verification key (committed) |
 | `VIRUSTOTAL_API_KEY` | optional; `scan.mode = "threshold"` or `"strict"` |
 
+Local secrets belong in a gitignored `.env` at the repository root (copy
+[`.env.example`](.env.example)). The orchestrator loads `.env` before configuration and does not
+override variables already present in the process environment. `.env` is gitignored; never commit
+it, paste its contents into an issue, or put the key on a command line. A key that has been exposed
+must be revoked and replaced, not reused.
+
 `release.toml` selects the `full` profile, the version files, the Windows package command,
 signing key, scan policy and GitHub repository. The private key must **never** be committed;
 `keys/*.priv` is ignored and verified absent from git history before a release.
