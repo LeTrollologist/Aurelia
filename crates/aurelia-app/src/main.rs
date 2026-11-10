@@ -1,3 +1,5 @@
+mod high_depth;
+
 use aurelia_core::brush::{BrushPoint, ToolType};
 use aurelia_core::history::LayerPixelsDeltaCommand;
 use aurelia_core::rasterizer::StrokeRasterizer;
@@ -538,6 +540,12 @@ struct AureliaDesktopApp {
     start_time: Instant,
     events: Vec<egui::Event>,
     buffer: Vec<u32>,
+    /// Packed 10-bit canvas/backdrop frame used only when the output is 10-bit capable.
+    tenbit_canvas: Vec<u32>,
+    /// Final 10-bit frame (canvas + 8-bit UI overlays) uploaded to the swapchain.
+    tenbit_present: Vec<u32>,
+    tenbit: Option<high_depth::TenBitPresenter>,
+    tenbit_force: bool,
     win_w: usize,
     win_h: usize,
     dpi_scale: f32,
@@ -1351,6 +1359,21 @@ impl AureliaDesktopApp {
     }
 }
 
+fn refresh_tenbit(app: &mut AureliaDesktopApp, hwnd: HWND) {
+    let mut rc: RECT = unsafe { std::mem::zeroed() };
+    unsafe {
+        GetClientRect(hwnd, &mut rc);
+    }
+    let width = (rc.right - rc.left).max(1) as u32;
+    let height = (rc.bottom - rc.top).max(1) as u32;
+    app.tenbit = high_depth::TenBitPresenter::new(
+        windows::Win32::Foundation::HWND(hwnd),
+        width,
+        height,
+        app.tenbit_force,
+    );
+}
+
 unsafe extern "system" fn window_proc(
     hwnd: HWND,
     msg: UINT,
@@ -1364,6 +1387,7 @@ unsafe extern "system" fn window_proc(
     const WM_POINTERDOWN: UINT = 0x0246;
     const WM_POINTERUP: UINT = 0x0247;
     const WM_SIZE: UINT = 0x0005;
+    const WM_DISPLAYCHANGE: UINT = 0x007E;
     const WM_PAINT: UINT = 0x000F;
     const WM_MOUSEMOVE: UINT = 0x0200;
     const WM_LBUTTONDOWN: UINT = 0x0201;
@@ -1582,7 +1606,12 @@ unsafe extern "system" fn window_proc(
                 suggested.bottom - suggested.top,
                 0x0004 | 0x0010, // SWP_NOZORDER | SWP_NOACTIVATE
             );
+            refresh_tenbit(app, hwnd);
             InvalidateRect(hwnd, std::ptr::null(), 0);
+            0
+        }
+        WM_DISPLAYCHANGE => {
+            refresh_tenbit(app, hwnd);
             0
         }
         WM_SIZE => {
@@ -1594,6 +1623,14 @@ unsafe extern "system" fn window_proc(
             app.win_w = width;
             app.win_h = height;
             app.buffer.resize(width * height, 0);
+            let resize_ok = app
+                .tenbit
+                .as_mut()
+                .map(|presenter| presenter.resize(width as u32, height as u32))
+                .unwrap_or(true);
+            if !resize_ok {
+                app.tenbit = None;
+            }
 
             if !app.has_initialized_view && width > 400 && height > 300 {
                 app.state.reset_view_centered(width as f32, height as f32);
@@ -3108,19 +3145,48 @@ unsafe extern "system" fn window_proc(
                 app.renderer.soft_proof = app.state.soft_proof.clone();
                 app.renderer.proof_revision = app.state.document_revision;
 
-                app.renderer.render_canvas(
-                    &mut app.buffer,
-                    app.win_w,
-                    app.win_h,
-                    &app.state.document,
-                    app.state.pan,
-                    app.state.zoom,
-                    center_offset,
-                    viewport_clip,
-                    tracing_cfg,
-                    &onion_skins,
-                    app.state.selection.as_ref().map(|s| s.mask.as_slice()),
-                );
+                let mut high_depth = app.tenbit.is_some()
+                    && app.renderer.soft_proof.is_none()
+                    && tracing_cfg.is_none()
+                    && onion_skins.is_empty()
+                    && app.state.selection.is_none();
+                if high_depth {
+                    app.tenbit_canvas.resize(app.win_w * app.win_h, 0);
+                    high_depth = app.renderer.render_canvas_srgb16(
+                        &mut app.tenbit_canvas,
+                        app.win_w,
+                        app.win_h,
+                        &app.state.document,
+                        app.state.pan,
+                        app.state.zoom,
+                        center_offset,
+                        viewport_clip,
+                    );
+                    if high_depth {
+                        for (dst, src) in app
+                            .buffer
+                            .iter_mut()
+                            .zip(app.tenbit_canvas.iter())
+                        {
+                            *dst = high_depth::px10_to_rgba8(*src);
+                        }
+                    }
+                }
+                if !high_depth {
+                    app.renderer.render_canvas(
+                        &mut app.buffer,
+                        app.win_w,
+                        app.win_h,
+                        &app.state.document,
+                        app.state.pan,
+                        app.state.zoom,
+                        center_offset,
+                        viewport_clip,
+                        tracing_cfg,
+                        &onion_skins,
+                        app.state.selection.as_ref().map(|s| s.mask.as_slice()),
+                    );
+                }
 
                 // 2.5 Refresh the Navigator thumbnail, but only when the document changed.
                 // While a stroke is in progress, cap the rebuild at ~30 Hz: the 320 px
@@ -3278,38 +3344,65 @@ unsafe extern "system" fn window_proc(
                 let clipped_primitives = app.egui_ctx.tessellate(full_output.shapes, full_output.pixels_per_point);
                 app.renderer.render_egui_primitives(&mut app.buffer, app.win_w, app.win_h, &clipped_primitives);
 
-                // 7. Blit to Win32 window surface via GDI
-                let bmi = BITMAPINFO {
-                    bmi_header: BITMAPINFOHEADER {
-                        bi_size: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                        bi_width: app.win_w as i32,
-                        bi_height: -(app.win_h as i32), // top-down DIB
-                        bi_planes: 1,
-                        bi_bit_count: 32,
-                        bi_compression: 0, // BI_RGB
-                        bi_size_image: 0,
-                        bi_x_pels_per_meter: 0,
-                        bi_y_pels_per_meter: 0,
-                        bi_clr_used: 0,
-                        bi_clr_important: 0,
-                    },
-                    bmi_colors: [0],
-                };
+                // 7. Present through DXGI when the canvas has true 10-bit data; otherwise use
+                // the byte-compatible GDI blit. Overlay pixels (UI, guides, rulers) stay 8-bit
+                // and are expanded into the 10-bit frame.
+                let mut presented = false;
+                if high_depth {
+                    app.tenbit_present.resize(app.win_w * app.win_h, 0);
+                    for (index, dst) in app.tenbit_present.iter_mut().enumerate() {
+                        let canvas8 = high_depth::px10_to_rgba8(app.tenbit_canvas[index]);
+                        *dst = if app.buffer[index] == canvas8 {
+                            app.tenbit_canvas[index]
+                        } else {
+                            high_depth::rgba8_to_px10(app.buffer[index])
+                        };
+                    }
+                    let present_ok = app
+                        .tenbit
+                        .as_mut()
+                        .map(|presenter| presenter.present(&app.tenbit_present))
+                        .unwrap_or(false);
+                    if present_ok {
+                        presented = true;
+                    } else {
+                        app.tenbit = None;
+                    }
+                }
 
-                SetDIBitsToDevice(
-                    hdc,
-                    0,
-                    0,
-                    app.win_w as u32,
-                    app.win_h as u32,
-                    0,
-                    0,
-                    0,
-                    app.win_h as u32,
-                    app.buffer.as_ptr() as *const std::ffi::c_void,
-                    &bmi,
-                    0,
-                );
+                if !presented {
+                    let bmi = BITMAPINFO {
+                        bmi_header: BITMAPINFOHEADER {
+                            bi_size: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                            bi_width: app.win_w as i32,
+                            bi_height: -(app.win_h as i32), // top-down DIB
+                            bi_planes: 1,
+                            bi_bit_count: 32,
+                            bi_compression: 0, // BI_RGB
+                            bi_size_image: 0,
+                            bi_x_pels_per_meter: 0,
+                            bi_y_pels_per_meter: 0,
+                            bi_clr_used: 0,
+                            bi_clr_important: 0,
+                        },
+                        bmi_colors: [0],
+                    };
+
+                    SetDIBitsToDevice(
+                        hdc,
+                        0,
+                        0,
+                        app.win_w as u32,
+                        app.win_h as u32,
+                        0,
+                        0,
+                        0,
+                        app.win_h as u32,
+                        app.buffer.as_ptr() as *const std::ffi::c_void,
+                        &bmi,
+                        0,
+                    );
+                }
 
                 if needs_repaint {
                     InvalidateRect(hwnd, std::ptr::null(), 0);
@@ -3972,6 +4065,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         start_time: Instant::now(),
         events: Vec::new(),
         buffer: vec![0u32; initial_width * initial_height],
+        tenbit_canvas: Vec::new(),
+        tenbit_present: Vec::new(),
+        tenbit: None,
+        tenbit_force: std::env::var_os("AURELIA_FORCE_10BIT").is_some(),
         win_w: initial_width,
         win_h: initial_height,
         dpi_scale,
@@ -4063,6 +4160,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         apply_window_theme(hwnd);
         DragAcceptFiles(hwnd, 1);
+
+        let force_tenbit = (*app_ptr).tenbit_force;
+        (*app_ptr).tenbit = high_depth::TenBitPresenter::new(
+            windows::Win32::Foundation::HWND(hwnd),
+            initial_width as u32,
+            initial_height as u32,
+            force_tenbit,
+        );
 
         // Load and set custom Application & Taskbar Icon
         const APP_ICON_BYTES: &[u8] = include_bytes!("../../../assets/icon.png");

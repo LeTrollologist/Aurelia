@@ -37,6 +37,8 @@ fn hash_bytes(bytes: &[u8]) -> u64 {
 pub struct SoftwareRenderer {
     textures: HashMap<TextureId, (u32, u32, Vec<u8>)>,
     composite_buffer: Vec<u8>,
+    composite16: Vec<u16>,
+    srgb16_frame: bool,
     /// Optional RGB proof profile for the 8-bit viewport approximation. `None` renders normally.
     pub soft_proof: Option<aurelia_core::IccProfile>,
     /// The caller's document revision; the proof cache is rebuilt only when this changes.
@@ -61,6 +63,8 @@ impl SoftwareRenderer {
         Self {
             textures: HashMap::new(),
             composite_buffer: Vec::new(),
+            composite16: Vec::new(),
+            srgb16_frame: false,
             soft_proof: None,
             proof_revision: 0,
             proof_cache: Vec::new(),
@@ -129,6 +133,7 @@ impl SoftwareRenderer {
         onion_skins: &[OnionSkinFrame],
         selection_mask: Option<&[u8]>,
     ) {
+        self.srgb16_frame = false;
         if win_w == 0 || win_h == 0 || buffer.len() < win_w * win_h {
             return;
         }
@@ -491,6 +496,226 @@ impl SoftwareRenderer {
         }
     }
 
+    /// Render the canvas and studio backdrop into packed DXGI `R10G10B10A2_UNORM` pixels.
+    ///
+    /// This is the high-depth counterpart of [`Self::render_canvas`] for frames with no
+    /// tracing/onion/selection overlays. It composites from the native RGBA16 path so the
+    /// canvas keeps 10-bit precision; the caller renders the 8-bit UI/guides on top.
+    /// Returns `false` when the document cannot be composited, so the caller falls back.
+    pub fn render_canvas_srgb16(
+        &mut self,
+        buffer: &mut [u32],
+        win_w: usize,
+        win_h: usize,
+        doc: &Document,
+        pan: Vec2,
+        zoom: f32,
+        center_offset: Vec2,
+        viewport_clip: [usize; 4],
+    ) -> bool {
+        self.srgb16_frame = false;
+        if win_w == 0 || win_h == 0 || buffer.len() < win_w * win_h || zoom <= 0.0 {
+            return false;
+        }
+        let [vp_min_x, vp_min_y, vp_max_x, vp_max_y] = [
+            viewport_clip[0].min(win_w),
+            viewport_clip[1].min(win_h),
+            viewport_clip[2].min(win_w),
+            viewport_clip[3].min(win_h),
+        ];
+
+        for y in 0..win_h {
+            let t = y as f32 / (win_h.max(1) - 1) as f32;
+            let r = channel8_to_10((38.0 + (26.0 - 38.0) * t).round().clamp(0.0, 255.0) as u8);
+            let g = channel8_to_10((31.0 + (21.0 - 31.0) * t).round().clamp(0.0, 255.0) as u8);
+            let b = channel8_to_10((24.0 + (16.0 - 24.0) * t).round().clamp(0.0, 255.0) as u8);
+            let row_start = y * win_w;
+            if row_start + win_w <= buffer.len() {
+                buffer[row_start..row_start + win_w].fill(pack10(r, g, b));
+            }
+        }
+
+        let doc_w = doc.width as f32;
+        let doc_h = doc.height as f32;
+        let center_x = win_w as f32 * 0.5 + pan.x + center_offset.x;
+        let center_y = win_h as f32 * 0.5 + pan.y + center_offset.y;
+        let canvas_w = doc_w * zoom;
+        let canvas_h = doc_h * zoom;
+        let x0 = (center_x - canvas_w * 0.5).floor() as isize;
+        let y0 = (center_y - canvas_h * 0.5).floor() as isize;
+        let x1 = (center_x + canvas_w * 0.5).ceil() as isize;
+        let y1 = (center_y + canvas_h * 0.5).ceil() as isize;
+        let min_x = (x0.max(vp_min_x as isize).min(vp_max_x as isize)) as usize;
+        let max_x = (x1.max(vp_min_x as isize).min(vp_max_x as isize)) as usize;
+        let min_y = (y0.max(vp_min_y as isize).min(vp_max_y as isize)) as usize;
+        let max_y = (y1.max(vp_min_y as isize).min(vp_max_y as isize)) as usize;
+        if min_x >= max_x || min_y >= max_y {
+            return true;
+        }
+
+        // Drop shadow around the canvas, in 10-bit space.
+        let shadow_blur = 18isize;
+        let shadow_offset_y = 6isize;
+        let s_x0 = (x0 - shadow_blur)
+            .max(vp_min_x as isize)
+            .min(vp_max_x as isize) as usize;
+        let s_x1 = (x1 + shadow_blur)
+            .max(vp_min_x as isize)
+            .min(vp_max_x as isize) as usize;
+        let s_y0 = (y0 - shadow_blur + shadow_offset_y)
+            .max(vp_min_y as isize)
+            .min(vp_max_y as isize) as usize;
+        let s_y1 = (y1 + shadow_blur + shadow_offset_y)
+            .max(vp_min_y as isize)
+            .min(vp_max_y as isize) as usize;
+        let (cx0, cx1) = (x0 as f32, x1 as f32);
+        let (cy0, cy1) = (y0 as f32, y1 as f32);
+        for sy in s_y0..s_y1 {
+            let row = sy * win_w;
+            for sx in s_x0..s_x1 {
+                let sx_f = sx as f32;
+                let sy_f = sy as f32;
+                let dx = if sx_f < cx0 {
+                    cx0 - sx_f
+                } else if sx_f > cx1 {
+                    sx_f - cx1
+                } else {
+                    0.0
+                };
+                let dy = if sy_f < cy0 {
+                    cy0 - sy_f
+                } else if sy_f > cy1 {
+                    sy_f - cy1
+                } else {
+                    0.0
+                };
+                let dist = (dx * dx + dy * dy).sqrt();
+                if dist > 0.0 && dist <= shadow_blur as f32 {
+                    let factor = (1.0 - dist / shadow_blur as f32).powi(2);
+                    let alpha = (factor * 0.55 * 1023.0).clamp(0.0, 1023.0) as u32;
+                    let idx = row + sx;
+                    if idx < buffer.len() && alpha > 0 {
+                        buffer[idx] = blend10(buffer[idx], 0, alpha);
+                    }
+                }
+            }
+        }
+
+        let Some(len) = (doc.width as usize)
+            .checked_mul(doc.height as usize)
+            .and_then(|pixels| pixels.checked_mul(4))
+        else {
+            return false;
+        };
+        if self.composite16.len() != len {
+            self.composite16.resize(len, 0);
+        }
+        if doc
+            .composite_layers_into_srgb16(&mut self.composite16, false)
+            .is_err()
+        {
+            return false;
+        }
+        self.srgb16_frame = true;
+
+        let inv_zoom = 1.0 / zoom;
+        let is_exact_1to1 = (zoom - 1.0).abs() < 0.001
+            && center_x.fract().abs() < 0.01
+            && center_y.fract().abs() < 0.01;
+        let use_bilinear = !is_exact_1to1 && zoom < 2.5;
+        let paper = doc.paper_rgb8();
+
+        for screen_y in min_y..max_y {
+            let doc_yf = (screen_y as f32 - center_y) * inv_zoom + doc_h * 0.5;
+            let doc_yi = doc_yf.floor() as isize;
+            if doc_yi < 0 || doc_yi >= doc.height as isize {
+                continue;
+            }
+            let row_offset = screen_y * win_w;
+            for screen_x in min_x..max_x {
+                let doc_xf = (screen_x as f32 - center_x) * inv_zoom + doc_w * 0.5;
+                let doc_xi = doc_xf.floor() as isize;
+                if doc_xi < 0 || doc_xi >= doc.width as isize {
+                    continue;
+                }
+                let pixel_idx = row_offset + screen_x;
+                if pixel_idx >= buffer.len() {
+                    continue;
+                }
+                let [sr, sg, sb, sa] = if use_bilinear {
+                    sample_bilinear_rgba16(
+                        &self.composite16,
+                        doc.width,
+                        doc.height,
+                        doc_xf - 0.5,
+                        doc_yf - 0.5,
+                    )
+                } else {
+                    let idx = (doc_yi as usize * doc.width as usize + doc_xi as usize) * 4;
+                    if idx + 3 >= self.composite16.len() {
+                        continue;
+                    }
+                    [
+                        self.composite16[idx],
+                        self.composite16[idx + 1],
+                        self.composite16[idx + 2],
+                        self.composite16[idx + 3],
+                    ]
+                };
+                let [base_r, base_g, base_b] = if doc.is_transparent {
+                    let [r, g, b] = doc.transparency_checker_rgb8(doc_xi as u32, doc_yi as u32);
+                    [channel8_to_10(r), channel8_to_10(g), channel8_to_10(b)]
+                } else {
+                    [
+                        channel8_to_10(paper[0]),
+                        channel8_to_10(paper[1]),
+                        channel8_to_10(paper[2]),
+                    ]
+                };
+                let a = channel16_to_10(sa);
+                let src_r = channel16_to_10(sr);
+                let src_g = channel16_to_10(sg);
+                let src_b = channel16_to_10(sb);
+                buffer[pixel_idx] = pack10(
+                    blend_channel(base_r, src_r, a),
+                    blend_channel(base_g, src_g, a),
+                    blend_channel(base_b, src_b, a),
+                );
+            }
+        }
+
+        let border = pack10(
+            channel8_to_10(0x8A),
+            channel8_to_10(0x74),
+            channel8_to_10(0x58),
+        );
+        let top = min_y;
+        let btm = max_y.saturating_sub(1);
+        let left = min_x;
+        let right = max_x.saturating_sub(1);
+        for x in left..=right {
+            if top < win_h && x < win_w {
+                buffer[top * win_w + x] = border;
+            }
+            if btm < win_h && x < win_w {
+                buffer[btm * win_w + x] = border;
+            }
+        }
+        for y in top..=btm {
+            if y < win_h && left < win_w {
+                buffer[y * win_w + left] = border;
+            }
+            if y < win_h && right < win_w {
+                buffer[y * win_w + right] = border;
+            }
+        }
+        true
+    }
+
+    ///
+    /// Reuses the composite `render_canvas` already produced this frame, so it costs one
+    /// small sampling pass rather than a second full-document composite. Call it after
+    /// `render_canvas`. Returns `None` until a composite for the current document size exists.
     /// Downscaled copy of the last composite for the Navigator thumbnail.
     ///
     /// Reuses the composite `render_canvas` already produced this frame, so it costs one
@@ -498,7 +723,8 @@ impl SoftwareRenderer {
     /// `render_canvas`. Returns `None` until a composite for the current document size exists.
     pub fn navigator_thumbnail(&self, doc: &Document, max_w: usize) -> Option<egui::ColorImage> {
         let (dw, dh) = (doc.width as usize, doc.height as usize);
-        if dw == 0 || dh == 0 || self.composite_buffer.len() != dw * dh * 4 {
+        let source16 = self.srgb16_frame && self.composite16.len() == dw * dh * 4;
+        if dw == 0 || dh == 0 || (!source16 && self.composite_buffer.len() != dw * dh * 4) {
             return None;
         }
         let tw = max_w.clamp(8, dw.max(8)).min(dw);
@@ -518,11 +744,26 @@ impl SoftwareRenderer {
                             doc.paper_rgb8()
                         };
                         let i = (sy * dw + sx) * 4;
-                        let a = self.composite_buffer[i + 3] as u32;
+                        let (cr, cg, cb, a) = if source16 {
+                            let to8 = |v: u16| ((v as u32 + 128) / 257).min(255);
+                            (
+                                to8(self.composite16[i]),
+                                to8(self.composite16[i + 1]),
+                                to8(self.composite16[i + 2]),
+                                to8(self.composite16[i + 3]),
+                            )
+                        } else {
+                            (
+                                self.composite_buffer[i] as u32,
+                                self.composite_buffer[i + 1] as u32,
+                                self.composite_buffer[i + 2] as u32,
+                                self.composite_buffer[i + 3] as u32,
+                            )
+                        };
                         let inv = 255 - a;
-                        sr += (br as u32 * inv + self.composite_buffer[i] as u32 * a) / 255;
-                        sg += (bg as u32 * inv + self.composite_buffer[i + 1] as u32 * a) / 255;
-                        sb += (bb as u32 * inv + self.composite_buffer[i + 2] as u32 * a) / 255;
+                        sr += (br as u32 * inv + cr * a) / 255;
+                        sg += (bg as u32 * inv + cg * a) / 255;
+                        sb += (bb as u32 * inv + cb * a) / 255;
                     }
                 }
                 let n = (N * N) as u32;
@@ -1414,6 +1655,58 @@ fn blend_px(buffer: &mut [u32], idx: usize, color: u32, alpha: u32) {
     buffer[idx] = 0xFF00_0000 | (r << 16) | (g << 8) | b;
 }
 
+#[inline]
+fn channel8_to_10(value: u8) -> u32 {
+    ((value as u32 * 1023 + 127) / 255).min(1023)
+}
+
+#[inline]
+fn channel16_to_10(value: u16) -> u32 {
+    ((value as u32 * 1023 + 32_767) / 65_535).min(1023)
+}
+
+#[inline]
+fn pack10(r: u32, g: u32, b: u32) -> u32 {
+    r.min(1023) | (g.min(1023) << 10) | (b.min(1023) << 20) | (3 << 30)
+}
+
+#[inline]
+fn blend_channel(base: u32, src: u32, alpha: u32) -> u32 {
+    (base * (1023 - alpha) + src * alpha + 511) / 1023
+}
+
+#[inline]
+fn blend10(dst: u32, src: u32, alpha: u32) -> u32 {
+    pack10(
+        blend_channel(dst & 1023, src & 1023, alpha),
+        blend_channel((dst >> 10) & 1023, (src >> 10) & 1023, alpha),
+        blend_channel((dst >> 20) & 1023, (src >> 20) & 1023, alpha),
+    )
+}
+
+fn sample_bilinear_rgba16(src: &[u16], width: u32, height: u32, x: f32, y: f32) -> [u16; 4] {
+    if width == 0 || height == 0 || src.len() < width as usize * height as usize * 4 {
+        return [0, 0, 0, 0];
+    }
+    let x = x.clamp(0.0, width.saturating_sub(1) as f32);
+    let y = y.clamp(0.0, height.saturating_sub(1) as f32);
+    let x0 = x.floor() as usize;
+    let y0 = y.floor() as usize;
+    let x1 = (x0 + 1).min(width as usize - 1);
+    let y1 = (y0 + 1).min(height as usize - 1);
+    let fx = x - x0 as f32;
+    let fy = y - y0 as f32;
+    let sample =
+        |sx: usize, sy: usize, c: usize| -> f32 { src[(sy * width as usize + sx) * 4 + c] as f32 };
+    let mut out = [0u16; 4];
+    for (c, value) in out.iter_mut().enumerate() {
+        let top = sample(x0, y0, c) * (1.0 - fx) + sample(x1, y0, c) * fx;
+        let bottom = sample(x0, y1, c) * (1.0 - fx) + sample(x1, y1, c) * fx;
+        *value = (top * (1.0 - fy) + bottom * fy).round() as u16;
+    }
+    out
+}
+
 #[cfg(test)]
 mod ruler_tests {
     use super::*;
@@ -1641,6 +1934,37 @@ mod viewport_tests {
 
     fn px(buffer: &[u32], win: usize, x: usize, y: usize) -> u32 {
         buffer[y * win + x]
+    }
+
+    fn render10(doc: &Document, win: usize) -> Vec<u32> {
+        let mut renderer = SoftwareRenderer::new();
+        let mut buffer = vec![0u32; win * win];
+        assert!(renderer.render_canvas_srgb16(
+            &mut buffer,
+            win,
+            win,
+            doc,
+            Vec2::ZERO,
+            1.0,
+            Vec2::ZERO,
+            [0, 0, win, win],
+        ));
+        buffer
+    }
+
+    #[test]
+    fn srgb16_canvas_preserves_ten_bit_channel_values() {
+        let mut doc = Document::new_with_format(8, 8, aurelia_core::layer::PixelFormat::Srgb16);
+        let pixels = doc.layers[0].as_srgb16_mut().expect("16-bit layer");
+        let first = (1 * 8 + 1) * 4;
+        let second = (1 * 8 + 2) * 4;
+        pixels[first..first + 4].copy_from_slice(&[0, 0, 0, 65_535]);
+        pixels[second..second + 4].copy_from_slice(&[128, 0, 0, 65_535]);
+        let buffer = render10(&doc, 12);
+        // Canvas is centred; screen (3,3) maps to document (1,1), (4,3) to (2,1).
+        assert_eq!(buffer[3 * 12 + 3] & 1023, 0);
+        assert_eq!(buffer[3 * 12 + 4] & 1023, 2);
+        assert_eq!((buffer[3 * 12 + 3] >> 30) & 3, 3);
     }
 
     /// A transparent document must show the same checkerboard in the viewport that the

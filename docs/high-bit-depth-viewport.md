@@ -1,8 +1,9 @@
 # High-bit-depth viewport presentation — architecture proposal
 
-Status: **proposed; feasibility spike complete**. This is not a promise of immediate delivery; it
-defines the target, the path, and the gates so the gap is tracked as architecture work rather than
-closed as out of scope.
+Status: **phase 2 implemented in the development tree (v3.14.0); visual and mixed-monitor gates
+still pending.** This is not a released feature yet, and it is not a promise of immediate
+delivery; it defines the target, the path, and the gates so the gap is tracked as architecture
+work rather than closed as out of scope.
 
 ## The distinction
 
@@ -19,13 +20,33 @@ finished would also be wrong.
 
 ```
 CPU composite (f32 working precision, RGBA16 storage)
-  → Vec<u32> BGRA8 framebuffer
-  → GDI SetDIBitsToDevice
-  → egui overlay (RGBA8 textures)
+  → native RGBA16 composite
+  → packed R10G10B10A2_UNORM canvas + 8-bit UI/guide overlay
+  → D3D11/DXGI flip-model present (10-bit output only)
+  → GDI SetDIBitsToDevice fallback (byte-compatible)
 ```
 
 GDI blits have no 16-bit-per-channel format, and egui textures are RGBA8. The precision is lost in
 the final present step, not in editing.
+
+## Implemented in the development tree
+
+- `SoftwareRenderer::render_canvas_srgb16` composites from the native RGBA16 path and writes
+  packed `R10G10B10A2_UNORM` pixels. The 8-bit GDI path is unchanged.
+- `TenBitPresenter` creates a D3D11 device, an HWND flip-model swapchain and a dynamic 10-bit
+  texture, then uploads/copies/presents each frame. It is enabled only when the containing output
+  reports at least 10 bits per colour; `AURELIA_FORCE_10BIT=1` is a hardware-diagnostics override.
+- The canvas and studio backdrop are 10-bit. UI, grid, rulers and guides remain 8-bit and are
+  expanded into the 10-bit frame; canvas pixels are selected per-pixel only where the 8-bit
+  overlay did not change them.
+- Selection overlays, tracing reference, onion skins and soft proof currently take the GDI
+  fallback; those paths need 10-bit equivalents before this is complete.
+- DPI and display changes recreate the presenter against the new client size; the fallback still
+  covers creation failure. Mixed-monitor hardware verification is phase 3 work.
+
+For diagnostics only, `AURELIA_FORCE_10BIT=1` bypasses the output-depth check. It still falls back
+if device/swapchain/texture creation fails, and it does not make an 8-bit panel show 10-bit
+information.
 
 ## Target
 
@@ -107,24 +128,26 @@ high-precision studio" claim.
 
 ## Gates
 
-| Gate | Evidence |
-| :--- | :--- |
-| **Visible improvement** | On a 10-bit display chain, a vertical 16-bit gradient shows no 8-bit banding; a measured step test distinguishes 8-bit and 10-bit presentation. |
-| **Fallback is unchanged** | With DXGI unavailable, output is byte-identical to the current GDI path and all viewport digest tests pass. |
-| **No startup/perf regression** | Device creation is lazy or bounded; first-frame and resize timings stay within the recorded viewport budget. |
-| **Mixed monitors** | A 10-bit primary and 8-bit secondary both present correctly; DPI changes and monitor moves re-evaluate the path. |
-| **Remote/VM safety** | Remote Desktop and WARP-only environments fall back without dialogs, crashes or repeated retries. |
-| **Colour correctness** | 10-bit values are converted from sRGB-encoded 16-bit data without a linear-light detour; fallback output matches the existing rounded conversion. |
+| Gate | Status | Evidence |
+| :--- | :--- | :--- |
+| **Visible improvement** | **Pending** | On a 10-bit display chain, a vertical 16-bit gradient shows no 8-bit banding; a measured step test distinguishes 8-bit and 10-bit presentation. |
+| **Fallback is unchanged** | **Pass (code path)** | With DXGI unavailable, output is byte-identical to the current GDI path and all viewport digest tests pass. |
+| **No startup/perf regression** | **Pending** | Device creation is lazy or bounded; first-frame and resize timings stay within the recorded viewport budget. |
+| **Mixed monitors** | **Partial** | DPI/display changes recreate the presenter; mixed 10-bit/8-bit hardware verification is still open. |
+| **Remote/VM safety** | **Pending hardware** | Remote Desktop and WARP-only environments fall back without dialogs, crashes or repeated retries. |
+| **Colour correctness** | **Pass (unit)** | 10-bit values are converted from sRGB-encoded 16-bit data without a linear-light detour; an RGBA16 canvas test distinguishes 0 and 128 red at 10 bits. |
 
 ## Phases
 
-1. **Feasibility spike (no product switch):** detect output depth, create a D3D11 device and
-   10-bit swapchain, present a static gradient, prove fallback and teardown. No UI integration.
-2. **Canvas present path:** upload composited frames to the swapchain; keep egui on the current
-   path initially (UI over canvas via DirectComposition or a second pass).
-3. **Integration hardening:** resize, DPI, multi-monitor, device loss, Remote Desktop.
-4. **Colour management:** ICC profile reference, working-space conversion, soft proofing.
-5. **HDR (optional, later):** only if there is a concrete workflow and a hardware test target.
+1. **Feasibility spike (no product switch)** — **complete.** Detect output depth, create a D3D11
+   device and 10-bit swapchain, present a static gradient, prove fallback and teardown.
+2. **Canvas present path** — **implemented in development.** Upload composited frames to the
+   swapchain; the canvas is native RGBA16 → 10-bit while egui/guides stay 8-bit and are expanded.
+3. **Integration hardening** — **open.** Resize, DPI, multi-monitor, device loss, Remote Desktop.
+   DPI/display changes currently fall back to GDI.
+4. **Colour management** — **open.** ICC profile reference, working-space conversion, soft
+   proofing; these currently force the GDI path.
+5. **HDR (optional, later)** — only if there is a concrete workflow and a hardware test target.
 
 ## Non-goals
 

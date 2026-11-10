@@ -3,11 +3,10 @@
 **Status:** v3.13.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
 Win32 + GDI, unsigned installer by permanent policy. v3.12.0 is the previous release.
 
-**Baseline:** 377 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
+**Baseline:** 378 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
-**0.60** budget on the last quality run. The viewport is an **8-bit presentation** of 16-bit
-documents — a current limitation, not a closed decision: high-bit-depth presentation is the next
-feature track ([docs/high-bit-depth-viewport.md](docs/high-bit-depth-viewport.md)).
+**0.60** budget on the last quality run. The GDI fallback remains an **8-bit presentation** of
+16-bit documents; the native 10-bit canvas path is in development for v3.14.0.
 
 **How to read this:** *Now* is the active maintenance/feature work, *Next* is queued in order,
 *Later* is designed but unscoped, and *Not now* is a closed decision. Every feature ships with
@@ -15,7 +14,7 @@ tests and a written gate; P3 work starts with a short proposal in `docs/` before
 
 ---
 
-## Now — v3.13.x maintenance
+## Maintenance — v3.13.x
 
 **Status:** v3.13.0 is shipped; the audit milestone has no open issues. There is no scheduled
 feature work in this line: patch releases are reserved for regressions, security fixes and
@@ -33,10 +32,13 @@ release-process defects.
 
 ---
 
-## Next — v3.14.0: High-bit-depth presentation
+## Now — v3.14.0: High-bit-depth presentation (in progress)
 
-**Status:** proposal and feasibility spike exist; the visible gate needs 10-bit hardware. This is
-the highest-value remaining rendering gap after 3.13 colour management.
+**Status:** phase 2 is implemented in the development tree. The canvas and studio backdrop render
+from native RGBA16 into packed 10-bit pixels and present through a D3D11/DXGI flip-model
+swapchain when the output reports at least 10 bits per colour. The GDI path remains the fallback,
+and selection/tracing/onion/soft-proof frames currently use it. The visible-banding gate still
+needs a 10-bit display chain.
 
 - D3D11 FL11.1 device, 10-bit composition and HWND swapchain present with an 8-bit fallback.
 - Integrate the canvas present path and decide the egui overlay path.
