@@ -1,12 +1,12 @@
 [package]
 name = "aurelia-io"
-version = "3.14.0"
+version = "3.15.0"
 edition = "2021"
 rust-version = "1.87"
 description = "File format encoders, decoders, PNG exporter, and binary project serializer for Aurelia"
 
 [dependencies]
-aurelia-core = { path = "../aurelia-core", version = "3.14.0" }
+aurelia-core = { path = "../aurelia-core", version = "3.15.0" }
 image = { workspace = true }
 flate2 = "1.0"
 thiserror = { workspace = true }

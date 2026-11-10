@@ -11,7 +11,7 @@
 <!-- Tier 1: Project Metadata & Quality Assurance Badges -->
 <p align="center">
   <a href="https://github.com/LeTrollologist/Aurelia/releases">
-    <img src="https://img.shields.io/badge/Release-3.14.0-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
+    <img src="https://img.shields.io/badge/Release-3.15.0-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
   </a>
   <a href="crates/">
     <img src="https://img.shields.io/badge/Engine-Rust_%2B_Win32_FFI-E8963F?style=for-the-badge&logo=rust&logoColor=1A120B&labelColor=1A120B" alt="Engine: Rust with Win32 FFI" />
@@ -96,15 +96,15 @@ written in Rust, with a narrow Win32 FFI boundary for windowing, clipboard and s
 It is designed for artists, concept designers, and technical illustrators who demand precision,
 low latency, and deterministic offline reliability.
 
-## What v3.14.0 means
+## What v3.15.0 means
 
-Aurelia v3.14.0 focuses on production reliability. Existing projects remain compatible, malformed
+Aurelia v3.15.0 focuses on production reliability. Existing projects remain compatible, malformed
 imports receive stricter validation, project saves have improved durability, and Windows
 distribution artifacts now include detached cryptographic signatures and SHA-256 checksums.
 
 The release also closes the audit findings around cyclic layer hierarchies, aggregate decode
 budgets, clipboard DIB limits, Win32 window-state ownership and release metadata. Detailed
-engineering notes are in the [v3.14.0 release notes](release-notes/v3.14.0.md); the engineering
+engineering notes are in the [v3.15.0 release notes](release-notes/v3.15.0.md); the engineering
 case study is in [PORTFOLIO.md](PORTFOLIO.md).
 
 **10-bit canvas presentation is experimental and off by default.** On a 10-bit output it can be
@@ -219,12 +219,12 @@ Aurelia ships as a **per-user Windows installer**, a portable zip, or a **Rust s
 the documented Win32 FFI boundary.
 Full details, silent-install switches and verification steps live in [`INSTALL.md`](INSTALL.md).
 
-> **v3.14.0 is the current release.** It supersedes v3.13.0; use the
+> **v3.15.0 is the current release.** It supersedes v3.13.0; use the
 > explicit release links below.
 
 ### Option 1: Installer (Recommended)
 
-1. Download [`Aurelia-Setup-3.14.0.exe`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/Aurelia-Setup-3.14.0.exe) from the latest release.
+1. Download [`Aurelia-Setup-3.15.0.exe`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/Aurelia-Setup-3.15.0.exe) from the latest release.
 2. Run it — it installs per user to `%LOCALAPPDATA%\Programs\Aurelia` (no administrator rights, no UAC prompt).
 3. Optionally keep *"Open Aurelia projects with Aurelia (.aur, .hcv)"* checked for double-click opening, and tick *Create a desktop shortcut*.
 4. Launch **Aurelia** from the Start menu.
@@ -232,7 +232,7 @@ Full details, silent-install switches and verification steps live in [`INSTALL.m
 Silent install:
 
 ```powershell
-Aurelia-Setup-3.14.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+Aurelia-Setup-3.15.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 ```
 
 ---
@@ -241,10 +241,10 @@ Aurelia-Setup-3.14.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 
 No installer and no registry writes of its own:
 
-1. Download [`Aurelia-v3.14.0-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/Aurelia-v3.14.0-win64.zip) from the latest release.
+1. Download [`Aurelia-v3.15.0-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/Aurelia-v3.15.0-win64.zip) from the latest release.
 2. Extract it with PowerShell or Windows Explorer:
    ```powershell
-   Expand-Archive -Path .\Aurelia-v3.14.0-win64.zip -DestinationPath .\Aurelia
+   Expand-Archive -Path .\Aurelia-v3.15.0-win64.zip -DestinationPath .\Aurelia
    ```
 3. Double-click `Aurelia\aurelia.exe` to launch immediately.
 
@@ -260,7 +260,7 @@ raw 64-byte Ed25519 signatures — not hashes.
 [Download `SHA256SUMS.txt`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/SHA256SUMS.txt)
 
 ```powershell
-Get-FileHash .\Aurelia-v3.14.0-win64.zip -Algorithm SHA256
+Get-FileHash .\Aurelia-v3.15.0-win64.zip -Algorithm SHA256
 Get-Content .\SHA256SUMS.txt        # compare the digest
 ```
 
@@ -271,7 +271,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 pub = Ed25519PublicKey.from_public_bytes(bytes.fromhex(Path("aurelia-publisher-2026.pub").read_text().strip()))
-for name in ("Aurelia-v3.14.0-win64.zip", "Aurelia-Setup-3.14.0.exe", "SHA256SUMS.txt"):
+for name in ("Aurelia-v3.15.0-win64.zip", "Aurelia-Setup-3.15.0.exe", "SHA256SUMS.txt"):
     pub.verify(Path(name + ".sig").read_bytes(), Path(name).read_bytes())
 print("signatures verified")
 ```
@@ -282,13 +282,13 @@ SmartScreen trust. Windows may warn; verify the SHA-256 and Ed25519 signature be
 
 ### Installer scan note
 
-The v3.14.0 installer has four advisory VirusTotal detections out of 75 engines: APEX
+The v3.15.0 installer has four advisory VirusTotal detections out of 75 engines: APEX
 (`Malicious`), Cylance (`Unsafe`), DeepInstinct (`MALICIOUS`) and Skyhigh
 (`BehavesLike.Win32.ObfuscatedPoly.rc`). The portable zip and the unpacked `aurelia.exe` scan
 clean (0/75). The reported verdicts are generic or behavioral; none names a specific malware
 family, but they are not dismissed. If you want the smallest trust surface, use the portable zip.
 The exact engine results and hashes are recorded in the
-[v3.14.0 release notes](release-notes/v3.14.0.md#virustotal-verification).
+[v3.15.0 release notes](release-notes/v3.15.0.md#virustotal-verification).
 A matching Ed25519 signature is the integrity boundary; a clean scan is not proof of safety.
 See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
 

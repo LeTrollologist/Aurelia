@@ -21,7 +21,7 @@ feature work in this line: patch releases are reserved for regressions, security
 release-process defects.
 
 **Exit gate:** a patch release requires a failing regression test first, the full
-`python scripts/quality.py` gate, and the same signed/verifiable asset process as v3.14.0.
+`python scripts/quality.py` gate, and the same signed/verifiable asset process as v3.15.0.
 
 **Carry-over work from the 3.13 release:**
 
@@ -123,8 +123,8 @@ opt-in and default-off.
 | :--- | :--- |
 | Persistent presets (v3.15.0) | Versioned bounded `presets.aurp`, atomic save/load, brush-stamp persistence, gradient presets, manager rename/delete, library import/export |
 | 10-bit presentation (v3.14.0, experimental) | Opt-in D3D11/DXGI flip-model present, native RGBA16 canvas -> 10-bit, 10-bit overlays, automatic GDI fallback; visible scanout not hardware-verified |
-| Production hardening (v3.14.0) | Invalid/cyclic hierarchies rejected; aggregate project/brush decode budgets; durable unique-temp saves; clipboard, DIB and Discord IPC bounds; owned `GWLP_USERDATA` window state; PE version metadata; release ledger |
-| Colour management (v3.14.0) | ICC attach/assign/convert with one undo step, AUR `AICC`, PNG/JPEG/WebP profile embed+input, cached approximate soft proof; production |
+| Production hardening (v3.15.0) | Invalid/cyclic hierarchies rejected; aggregate project/brush decode budgets; durable unique-temp saves; clipboard, DIB and Discord IPC bounds; owned `GWLP_USERDATA` window state; PE version metadata; release ledger |
+| Colour management (v3.15.0) | ICC attach/assign/convert with one undo step, AUR `AICC`, PNG/JPEG/WebP profile embed+input, cached approximate soft proof; production |
 | Clipboard, output & brushes (v3.12.0) | Paletted DIB and PNG clipboard, RGBA16 PNG export, styled clipping/Scale Styles/style-safe Merge Down, `.abr`/`.gbr` stamp import, presence-log privacy fix, full in-house quality gate |
 | 16-bit integration (v3.11.0) | Copy Merged composites at 16 bits for 16-bit/mixed documents; sub-lattice round-trip tests for copy/paste and merged copy |
 | Persistence & recovery (v3.10.0) | Path-hashed autosave names, whole-directory recovery scan, payload-bound section counts, truncation/bit-flip corpus, atomic-save failure test |
