@@ -15,6 +15,11 @@ updates:
       - dependency-name: "aurelia-ui"
       - dependency-name: "aurelia-presence"
       - dependency-name: "aurelia-app"
+      # Cargo lockfile validation currently aborts on several 0.x major jumps
+      # (rfd/egui/glam/thiserror are the observed ones). Take those manually.
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "pip"
     directory: "/tools/release"
