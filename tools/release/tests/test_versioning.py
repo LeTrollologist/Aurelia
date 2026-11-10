@@ -86,3 +86,15 @@ def test_prerelease_files_must_agree(tmp_path):
     (tmp_path / "a.toml").write_text('[package]\nversion = "3.13.0-rc.1"\n', encoding="utf-8")
     assert check_files(tmp_path, ["a.toml"], "3.13.0-rc.1") == []
     assert check_files(tmp_path, ["a.toml"], "3.13.0") != []
+
+
+def test_current_release_notes_are_rewritten_in_docs():
+    text = """**Status:** v3.13.0 · Windows
+## Now — v3.13.0: Colour management (production)
+> **v3.13.0 is the current release.**
+| Colour management (v3.13.0) | shipped |
+"""
+    updated, count = normalize_text(text, "3.14.0")
+    assert count >= 4
+    assert "v3.14.0" in updated
+    assert "v3.13.0" not in updated

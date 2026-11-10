@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="assets/banner.svg" alt="Aurelia Banner" width="100%" />
+<img src="assets/banner.svg?v=3130" alt="Aurelia Banner" width="100%" />
 
 **A modern, high-performance, local-first digital illustration and animation studio built in Rust with a thin Win32 FFI layer.**
 
@@ -376,21 +376,23 @@ Contributions are welcome! Please feel free to submit issues, feature requests, 
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Local verification and releases (no GitHub Actions)
+### Verification and releases
 
-There is no CI workflow by design. Releases are cut locally with the journal-backed
-orchestrator in [`tools/release`](tools/release), not `scripts/pipeline.py`:
+CI runs formatting, Clippy correctness and the workspace tests on every push and pull request.
+Releases remain local and are cut with the journal-backed orchestrator in
+[`tools/release`](tools/release), not `scripts/pipeline.py`:
 
 ```powershell
-cargo test --workspace
+python scripts/quality.py
 
 $env:PYTHONPATH = "tools/release"
-python -m aurelia_release --repo . plan v3.4.1   # read-only preview
-python -m aurelia_release --repo . run  v3.4.1   # build, test, package, sign, tag, publish
+python -m aurelia_release --repo . plan v3.13.1   # read-only preview
+python -m aurelia_release --repo . run  v3.13.1   # build, test, package, sign, tag, publish
 ```
 
 The `full` profile requires a `release.toml` with build/package commands, a GitHub token, and
-the private signing key. See [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) and
+the private signing key. Put local secrets in a gitignored `.env` file (see
+[`RELEASE_PROCESS.md`](RELEASE_PROCESS.md)); never commit the token or key. See
 [`tools/release/README.md`](tools/release/README.md).
 
 ---

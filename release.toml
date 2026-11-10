@@ -11,6 +11,7 @@ version_files = [
     "crates/aurelia-presence/Cargo.toml",
     "crates/aurelia-app/Cargo.toml",
     "README.md",
+    "ROADMAP.md",
     "SECURITY.md",
     "INSTALL.md",
     "Makefile",
