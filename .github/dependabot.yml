@@ -6,10 +6,15 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
-    groups:
-      rust-dependencies:
-        patterns:
-          - "*"
+    # These are workspace path dependencies, not crates.io releases. Dependabot
+    # otherwise tries to resolve a registry version for them and fails the job.
+    ignore:
+      - dependency-name: "aurelia-core"
+      - dependency-name: "aurelia-render"
+      - dependency-name: "aurelia-io"
+      - dependency-name: "aurelia-ui"
+      - dependency-name: "aurelia-presence"
+      - dependency-name: "aurelia-app"
 
   - package-ecosystem: "pip"
     directory: "/tools/release"
