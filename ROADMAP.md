@@ -1,7 +1,7 @@
 # Aurelia · Roadmap
 
-**Status:** v3.14.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
-Win32 + GDI, unsigned installer by permanent policy. v3.13.0 is the previous release.
+**Status:** v3.15.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
+Win32 + GDI, unsigned installer by permanent policy. v3.14.0 is the previous release.
 
 **Baseline:** 390 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
@@ -14,9 +14,9 @@ tests and a written gate; P3 work starts with a short proposal in `docs/` before
 
 ---
 
-## Maintenance — v3.14.x
+## Maintenance — v3.15.x
 
-**Status:** v3.14.0 is shipped; the audit milestone has no open issues. There is no scheduled
+**Status:** v3.15.0 is shipped; the audit milestone has no open issues. There is no scheduled
 feature work in this line: patch releases are reserved for regressions, security fixes and
 release-process defects.
 
@@ -52,11 +52,12 @@ claim.
 
 ---
 
-## Now — v3.15.0: Persistent presets (in progress)
+## Shipped — v3.15.0: Persistent presets
 
-**Status:** the versioned `presets.aurp` format, atomic save/load, brush-stamp persistence,
-gradient presets, manager UI and import/export are implemented in the development tree. The
-release gate is the normal quality suite plus a restart/import/export check on Windows.
+**Status:** shipped. Brush and gradient presets persist in a versioned, bounded
+`%LOCALAPPDATA%\Aurelia\presets.aurp` file with atomic saves, corrupt/oversized/version rejection,
+a preset manager, and library import/export. The previous experimental 10-bit setting remains
+opt-in and default-off.
 
 - Version 1 header, bounded counts/strings/stamps and explicit corrupt/oversized/version errors.
 - `%LOCALAPPDATA%\Aurelia\presets.aurp`; unique temp file, `sync_all`, replacement, cleanup.
@@ -120,6 +121,7 @@ release gate is the normal quality suite plus a restart/import/export check on W
 
 | Area | State |
 | :--- | :--- |
+| Persistent presets (v3.15.0) | Versioned bounded `presets.aurp`, atomic save/load, brush-stamp persistence, gradient presets, manager rename/delete, library import/export |
 | 10-bit presentation (v3.14.0, experimental) | Opt-in D3D11/DXGI flip-model present, native RGBA16 canvas -> 10-bit, 10-bit overlays, automatic GDI fallback; visible scanout not hardware-verified |
 | Production hardening (v3.14.0) | Invalid/cyclic hierarchies rejected; aggregate project/brush decode budgets; durable unique-temp saves; clipboard, DIB and Discord IPC bounds; owned `GWLP_USERDATA` window state; PE version metadata; release ledger |
 | Colour management (v3.14.0) | ICC attach/assign/convert with one undo step, AUR `AICC`, PNG/JPEG/WebP profile embed+input, cached approximate soft proof; production |

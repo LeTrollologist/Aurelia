@@ -111,6 +111,10 @@ case study is in [PORTFOLIO.md](PORTFOLIO.md).
 enabled in **Preferences → Experimental**, but visible scanout has not been verified on every
 GPU/driver. The GDI 8-bit path remains the fallback.
 
+This release also adds a durable brush and gradient preset library at
+`%LOCALAPPDATA%\Aurelia\presets.aurp`, with bounded versioned storage, atomic saves and a preset
+manager for rename, delete and library import/export. See [docs/PRESETS.md](docs/PRESETS.md).
+
 ### Key Highlights
 
 - **Layer Raster Masks**: per-layer 8-bit masks created from the selection, with invert /
