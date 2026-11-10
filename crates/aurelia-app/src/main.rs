@@ -3145,11 +3145,7 @@ unsafe extern "system" fn window_proc(
                 app.renderer.soft_proof = app.state.soft_proof.clone();
                 app.renderer.proof_revision = app.state.document_revision;
 
-                let mut high_depth = app.tenbit.is_some()
-                    && app.renderer.soft_proof.is_none()
-                    && tracing_cfg.is_none()
-                    && onion_skins.is_empty()
-                    && app.state.selection.is_none();
+                let mut high_depth = app.tenbit.is_some();
                 if high_depth {
                     app.tenbit_canvas.resize(app.win_w * app.win_h, 0);
                     high_depth = app.renderer.render_canvas_srgb16(
@@ -3161,6 +3157,9 @@ unsafe extern "system" fn window_proc(
                         app.state.zoom,
                         center_offset,
                         viewport_clip,
+                        tracing_cfg,
+                        &onion_skins,
+                        app.state.selection.as_ref().map(|s| s.mask.as_slice()),
                     );
                     if high_depth {
                         for (dst, src) in app

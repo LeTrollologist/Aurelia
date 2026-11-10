@@ -44,7 +44,9 @@ pub struct SoftwareRenderer {
     /// The caller's document revision; the proof cache is rebuilt only when this changes.
     pub proof_revision: u64,
     proof_cache: Vec<u8>,
+    proof_cache16: Vec<u16>,
     proof_cache_key: Option<ProofCacheKey>,
+    proof_cache16_key: Option<ProofCacheKey>,
     /// Number of proof transforms actually run; tests use this to prove cache hits.
     pub proof_cache_generation: u64,
 }
@@ -68,7 +70,9 @@ impl SoftwareRenderer {
             soft_proof: None,
             proof_revision: 0,
             proof_cache: Vec::new(),
+            proof_cache16: Vec::new(),
             proof_cache_key: None,
+            proof_cache16_key: None,
             proof_cache_generation: 0,
         }
     }
@@ -512,6 +516,9 @@ impl SoftwareRenderer {
         zoom: f32,
         center_offset: Vec2,
         viewport_clip: [usize; 4],
+        tracing: Option<TracingReferenceConfig>,
+        onion_skins: &[OnionSkinFrame],
+        selection_mask: Option<&[u8]>,
     ) -> bool {
         self.srgb16_frame = false;
         if win_w == 0 || win_h == 0 || buffer.len() < win_w * win_h || zoom <= 0.0 {
@@ -618,6 +625,39 @@ impl SoftwareRenderer {
         }
         self.srgb16_frame = true;
 
+        let mut proofed = false;
+        if let Some(proof) = self.soft_proof.as_ref() {
+            let key = ProofCacheKey {
+                revision: self.proof_revision,
+                width: doc.width,
+                height: doc.height,
+                proof_hash: hash_bytes(proof.bytes()),
+                document_profile_hash: hash_bytes(doc.icc_profile().unwrap_or(&[])),
+            };
+            if self.proof_cache16_key != Some(key)
+                || self.proof_cache16.len() != self.composite16.len()
+            {
+                self.proof_cache16.clear();
+                self.proof_cache16.extend_from_slice(&self.composite16);
+                let source = doc
+                    .icc_profile()
+                    .and_then(|bytes| aurelia_core::IccProfile::from_icc(bytes.to_vec()).ok())
+                    .unwrap_or_else(aurelia_core::IccProfile::srgb);
+                let display = aurelia_core::IccProfile::srgb();
+                let _ = source.simulate_proof_rgba16(proof, &display, &mut self.proof_cache16);
+                self.proof_cache16_key = Some(key);
+                self.proof_cache_generation = self.proof_cache_generation.wrapping_add(1);
+            }
+            proofed = true;
+        } else {
+            self.proof_cache16_key = None;
+        }
+        let flat16: &[u16] = if proofed {
+            &self.proof_cache16
+        } else {
+            &self.composite16
+        };
+
         let inv_zoom = 1.0 / zoom;
         let is_exact_1to1 = (zoom - 1.0).abs() < 0.001
             && center_x.fract().abs() < 0.01
@@ -644,7 +684,7 @@ impl SoftwareRenderer {
                 }
                 let [sr, sg, sb, sa] = if use_bilinear {
                     sample_bilinear_rgba16(
-                        &self.composite16,
+                        flat16,
                         doc.width,
                         doc.height,
                         doc_xf - 0.5,
@@ -662,6 +702,7 @@ impl SoftwareRenderer {
                         self.composite16[idx + 3],
                     ]
                 };
+                let src_idx = (doc_yi as usize * doc.width as usize + doc_xi as usize) * 4;
                 let [base_r, base_g, base_b] = if doc.is_transparent {
                     let [r, g, b] = doc.transparency_checker_rgb8(doc_xi as u32, doc_yi as u32);
                     [channel8_to_10(r), channel8_to_10(g), channel8_to_10(b)]
@@ -672,15 +713,95 @@ impl SoftwareRenderer {
                         channel8_to_10(paper[2]),
                     ]
                 };
+                let mut base = pack10(base_r, base_g, base_b);
+
+                let ref_px = tracing.and_then(|cfg| {
+                    if cfg.scale <= 0.001 || cfg.opacity <= 0.001 {
+                        return None;
+                    }
+                    let rx_f = (doc_xf - cfg.offset.x) / cfg.scale;
+                    let ry_f = (doc_yf - cfg.offset.y) / cfg.scale;
+                    let rx = rx_f.floor() as isize;
+                    let ry = ry_f.floor() as isize;
+                    if rx >= 0 && rx < cfg.width as isize && ry >= 0 && ry < cfg.height as isize {
+                        let idx = (ry as usize * cfg.width as usize + rx as usize) * 4;
+                        if idx + 3 < cfg.rgba.len() {
+                            return Some([
+                                cfg.rgba[idx],
+                                cfg.rgba[idx + 1],
+                                cfg.rgba[idx + 2],
+                                cfg.rgba[idx + 3],
+                            ]);
+                        }
+                    }
+                    None
+                });
+                let trace_color = ref_px.map(|[r, g, b, _]| {
+                    pack10(channel8_to_10(r), channel8_to_10(g), channel8_to_10(b))
+                });
+                let trace_alpha = ref_px
+                    .map(|[_, _, _, a]| {
+                        let opacity = tracing.map(|t| t.opacity).unwrap_or(0.0);
+                        channel8_to_10((a as f32 * opacity).clamp(0.0, 255.0) as u8)
+                    })
+                    .unwrap_or(0);
+                if tracing.map_or(false, |t| t.is_underlay) {
+                    if let Some(color) = trace_color {
+                        base = blend10(base, color, trace_alpha);
+                    }
+                }
+                for skin in onion_skins.iter().filter(|s| s.is_prev) {
+                    if src_idx + 3 < skin.rgba.len() {
+                        let alpha =
+                            (skin.rgba[src_idx + 3] as f32 * skin.opacity).clamp(0.0, 255.0) as u8;
+                        if alpha > 0 {
+                            let tint = pack10(
+                                channel8_to_10(skin.tint_r),
+                                channel8_to_10(skin.tint_g),
+                                channel8_to_10(skin.tint_b),
+                            );
+                            base = blend10(base, tint, channel8_to_10(alpha));
+                        }
+                    }
+                }
+
                 let a = channel16_to_10(sa);
-                let src_r = channel16_to_10(sr);
-                let src_g = channel16_to_10(sg);
-                let src_b = channel16_to_10(sb);
-                buffer[pixel_idx] = pack10(
-                    blend_channel(base_r, src_r, a),
-                    blend_channel(base_g, src_g, a),
-                    blend_channel(base_b, src_b, a),
+                let doc_color = pack10(
+                    channel16_to_10(sr),
+                    channel16_to_10(sg),
+                    channel16_to_10(sb),
                 );
+                let mut out = blend10(base, doc_color, a);
+
+                for skin in onion_skins.iter().filter(|s| !s.is_prev) {
+                    if src_idx + 3 < skin.rgba.len() {
+                        let alpha =
+                            (skin.rgba[src_idx + 3] as f32 * skin.opacity).clamp(0.0, 255.0) as u8;
+                        if alpha > 0 {
+                            let tint = pack10(
+                                channel8_to_10(skin.tint_r),
+                                channel8_to_10(skin.tint_g),
+                                channel8_to_10(skin.tint_b),
+                            );
+                            out = blend10(out, tint, channel8_to_10(alpha));
+                        }
+                    }
+                }
+                if tracing.map_or(false, |t| !t.is_underlay) {
+                    if let Some(color) = trace_color {
+                        out = blend10(out, color, trace_alpha);
+                    }
+                }
+                if let Some(mask) = selection_mask {
+                    let m_idx = doc_yi as usize * doc.width as usize + doc_xi as usize;
+                    if m_idx < mask.len() && mask[m_idx] > 0 {
+                        let tint = ((mask[m_idx] as u32 * 75) / 255) as u8;
+                        let ruby =
+                            pack10(channel8_to_10(255), channel8_to_10(55), channel8_to_10(95));
+                        out = blend10(out, ruby, channel8_to_10(tint));
+                    }
+                }
+                buffer[pixel_idx] = out;
             }
         }
 
@@ -724,7 +845,17 @@ impl SoftwareRenderer {
     pub fn navigator_thumbnail(&self, doc: &Document, max_w: usize) -> Option<egui::ColorImage> {
         let (dw, dh) = (doc.width as usize, doc.height as usize);
         let source16 = self.srgb16_frame && self.composite16.len() == dw * dh * 4;
-        if dw == 0 || dh == 0 || (!source16 && self.composite_buffer.len() != dw * dh * 4) {
+        let source16: Option<&[u16]> = if source16 {
+            if self.proof_cache16.len() == dw * dh * 4 && self.proof_cache16_key.is_some() {
+                Some(&self.proof_cache16)
+            } else {
+                Some(&self.composite16)
+            }
+        } else {
+            None
+        };
+        if dw == 0 || dh == 0 || (source16.is_none() && self.composite_buffer.len() != dw * dh * 4)
+        {
             return None;
         }
         let tw = max_w.clamp(8, dw.max(8)).min(dw);
@@ -744,13 +875,13 @@ impl SoftwareRenderer {
                             doc.paper_rgb8()
                         };
                         let i = (sy * dw + sx) * 4;
-                        let (cr, cg, cb, a) = if source16 {
+                        let (cr, cg, cb, a) = if let Some(src16) = source16 {
                             let to8 = |v: u16| ((v as u32 + 128) / 257).min(255);
                             (
-                                to8(self.composite16[i]),
-                                to8(self.composite16[i + 1]),
-                                to8(self.composite16[i + 2]),
-                                to8(self.composite16[i + 3]),
+                                to8(src16[i]),
+                                to8(src16[i + 1]),
+                                to8(src16[i + 2]),
+                                to8(src16[i + 3]),
                             )
                         } else {
                             (
@@ -1948,8 +2079,51 @@ mod viewport_tests {
             1.0,
             Vec2::ZERO,
             [0, 0, win, win],
+            None,
+            &[],
+            None,
         ));
         buffer
+    }
+
+    #[test]
+    fn ten_bit_selection_tint_is_applied_to_the_canvas() {
+        let doc = Document::new_with_format(8, 8, aurelia_core::layer::PixelFormat::Srgb16);
+        let mask = {
+            let mut mask = vec![0u8; 8 * 8];
+            mask[1 * 8 + 1] = 255;
+            mask
+        };
+        let mut renderer = SoftwareRenderer::new();
+        let mut without = vec![0u32; 12 * 12];
+        let mut with = vec![0u32; 12 * 12];
+        assert!(renderer.render_canvas_srgb16(
+            &mut without,
+            12,
+            12,
+            &doc,
+            Vec2::ZERO,
+            1.0,
+            Vec2::ZERO,
+            [0, 0, 12, 12],
+            None,
+            &[],
+            None,
+        ));
+        assert!(renderer.render_canvas_srgb16(
+            &mut with,
+            12,
+            12,
+            &doc,
+            Vec2::ZERO,
+            1.0,
+            Vec2::ZERO,
+            [0, 0, 12, 12],
+            None,
+            &[],
+            Some(&mask),
+        ));
+        assert_ne!(without[3 * 12 + 3], with[3 * 12 + 3]);
     }
 
     #[test]

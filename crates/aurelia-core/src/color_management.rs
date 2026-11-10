@@ -135,6 +135,20 @@ impl IccProfile {
         proof.convert_rgba8(display, pixels)
     }
 
+    /// Approximate soft proof for the 16-bit viewport: source -> proof -> sRGB display.
+    ///
+    /// The 10-bit presentation path uses this variant so proofing does not force an 8-bit
+    /// downconversion before the frame reaches the swapchain.
+    pub fn simulate_proof_rgba16(
+        &self,
+        proof: &IccProfile,
+        display: &IccProfile,
+        pixels: &mut [u16],
+    ) -> Result<(), ColorProfileError> {
+        self.convert_rgba16(proof, pixels)?;
+        proof.convert_rgba16(display, pixels)
+    }
+
     /// Whether this profile describes the same colour space as `other`, by ICC bytes.
     pub fn same_as(&self, other: &IccProfile) -> bool {
         self.bytes == other.bytes
@@ -307,5 +321,19 @@ mod soft_proof_tests {
         assert_ne!(pixels, original, "the proof round trip must be visible");
         assert_eq!(pixels[3], 255);
         assert_eq!(pixels[7], 128, "alpha is untouched by soft proof");
+    }
+
+    #[test]
+    fn sixteen_bit_soft_proof_keeps_sixteen_bit_alpha() {
+        let srgb = IccProfile::srgb();
+        let p3 = IccProfile::from_icc(moxcms::ColorProfile::new_display_p3().encode().expect("P3"))
+            .expect("parse P3");
+        let mut pixels = vec![12_345u16, 40_000, 20_000, 65_535, 0, 65_535, 0, 32_768];
+        let original = pixels.clone();
+        srgb.simulate_proof_rgba16(&p3, &srgb, &mut pixels)
+            .expect("simulate");
+        assert_ne!(pixels, original, "the proof round trip must be visible");
+        assert_eq!(pixels[3], 65_535);
+        assert_eq!(pixels[7], 32_768, "alpha is untouched by soft proof");
     }
 }
