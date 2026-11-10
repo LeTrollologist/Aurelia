@@ -27,7 +27,7 @@ DECLARATION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(Aurelia-v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(-win64)"), r"\g<1>{v}\g<2>"),
     (re.compile(r"(Aurelia-Setup-)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
     (re.compile(r"(TAG \?= v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
-    (re.compile(r"(v)\d+\.\d+\.\d+( · PRODUCTION)"), r"\g<1>{v}\g<2>"),
+    (re.compile(r"(v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?( · PRODUCTION)"), r"\g<1>{v}\g<2>"),
     (re.compile(r'(MyAppVersionNumeric ")\d+\.\d+\.\d+\.\d+(")'), r"\g<1>{base}.0\g<2>"),
     (re.compile(r'(MyAppVersion ")\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(")'), r"\g<1>{base}\g<2>"),
 ]
