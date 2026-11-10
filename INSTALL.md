@@ -16,7 +16,7 @@ administrator rights. Pick either distribution:
 Silent install (e.g. for scripted setups):
 
 ```powershell
-Aurelia-Setup-3.13.0-beta.3.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+Aurelia-Setup-3.13.0-beta.4.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 ```
 
 Uninstalling (Settings → Apps, or the Start-menu entry) removes the program folder and
@@ -28,7 +28,7 @@ chosen another editor for those files, your choice is left alone.
 No installer, no registry writes except whatever you trigger yourself:
 
 ```powershell
-Expand-Archive -Path .\Aurelia-v3.13.0-beta.3-win64.zip -DestinationPath .\Aurelia
+Expand-Archive -Path .\Aurelia-v3.13.0-beta.4-win64.zip -DestinationPath .\Aurelia
 .\Aurelia\aurelia.exe
 ```
 
@@ -51,7 +51,7 @@ The installer wires double-click opening. To also get **"Open with Aurelia"** on
 Every release ships `SHA256SUMS.txt`:
 
 ```powershell
-Get-FileHash .\Aurelia-Setup-3.13.0-beta.3.exe -Algorithm SHA256
+Get-FileHash .\Aurelia-Setup-3.13.0-beta.4.exe -Algorithm SHA256
 # compare against the matching line in SHA256SUMS.txt
 ```
 
