@@ -388,7 +388,10 @@ mod tests {
             project_name(Some(&Path::new("art").join("two.aur"))).as_deref(),
             Some("two")
         );
-        assert_eq!(project_name(Some(Path::new("bad\u{0007}name.aur"))).as_deref(), Some("badname"));
+        assert_eq!(
+            project_name(Some(Path::new("bad\u{0007}name.aur"))).as_deref(),
+            Some("badname")
+        );
         assert_eq!(project_name(None), None);
     }
 
@@ -425,6 +428,9 @@ mod privacy_trace {
         assert!(line.contains("painting=true"));
         assert!(!line.contains("secret-client-work"));
         assert!(!line.contains("Project:"));
-        assert!(!line.contains("|"), "the old key format included the project name");
+        assert!(
+            !line.contains("|"),
+            "the old key format included the project name"
+        );
     }
 }

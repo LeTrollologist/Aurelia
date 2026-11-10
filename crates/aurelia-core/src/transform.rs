@@ -82,10 +82,7 @@ impl AffineTransform2D {
         // 5. Rotate
         let cos_r = self.rotation_rad.cos();
         let sin_r = self.rotation_rad.sin();
-        let rot_p = Vec2::new(
-            p.x * cos_r - p.y * sin_r,
-            p.x * sin_r + p.y * cos_r,
-        );
+        let rot_p = Vec2::new(p.x * cos_r - p.y * sin_r, p.x * sin_r + p.y * cos_r);
 
         // 6. Restore pivot and apply translation
         rot_p + self.pivot + self.translation
@@ -99,14 +96,23 @@ impl AffineTransform2D {
         // 2. Inverse Rotate
         let cos_r = (-self.rotation_rad).cos();
         let sin_r = (-self.rotation_rad).sin();
-        let mut rot_p = Vec2::new(
-            p.x * cos_r - p.y * sin_r,
-            p.x * sin_r + p.y * cos_r,
-        );
+        let mut rot_p = Vec2::new(p.x * cos_r - p.y * sin_r, p.x * sin_r + p.y * cos_r);
 
         // 3. Inverse Scale
-        let sx = if self.scale.x.abs() > 1e-6 { self.scale.x } else if self.scale.x < 0.0 { -1e-6 } else { 1e-6 };
-        let sy = if self.scale.y.abs() > 1e-6 { self.scale.y } else if self.scale.y < 0.0 { -1e-6 } else { 1e-6 };
+        let sx = if self.scale.x.abs() > 1e-6 {
+            self.scale.x
+        } else if self.scale.x < 0.0 {
+            -1e-6
+        } else {
+            1e-6
+        };
+        let sy = if self.scale.y.abs() > 1e-6 {
+            self.scale.y
+        } else if self.scale.y < 0.0 {
+            -1e-6
+        } else {
+            1e-6
+        };
         rot_p.x /= sx;
         rot_p.y /= sy;
 
@@ -144,7 +150,7 @@ impl AffineTransform2D {
 pub struct PerspectiveQuadTransform {
     pub src_corners: [Vec2; 4], // [TopLeft, TopRight, BottomRight, BottomLeft]
     pub dst_corners: [Vec2; 4],
-    inv_h: [f32; 9],           // 3x3 inverse homography matrix (row-major)
+    inv_h: [f32; 9], // 3x3 inverse homography matrix (row-major)
     pub is_valid: bool,
 }
 
@@ -163,11 +169,7 @@ impl Default for PerspectiveQuadTransform {
                 Vec2::new(100.0, 100.0),
                 Vec2::new(0.0, 100.0),
             ],
-            inv_h: [
-                1.0, 0.0, 0.0,
-                0.0, 1.0, 0.0,
-                0.0, 0.0, 1.0,
-            ],
+            inv_h: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
             is_valid: true,
         }
     }
@@ -290,9 +292,7 @@ fn solve_homography(from: &[Vec2; 4], to: &[Vec2; 4]) -> Option<[f32; 9]> {
     }
 
     Some([
-        m[0][8], m[1][8], m[2][8],
-        m[3][8], m[4][8], m[5][8],
-        m[6][8], m[7][8], 1.0,
+        m[0][8], m[1][8], m[2][8], m[3][8], m[4][8], m[5][8], m[6][8], m[7][8], 1.0,
     ])
 }
 
@@ -317,9 +317,17 @@ impl MeshWarpGrid {
         let mut vertices = Vec::with_capacity(rows * cols);
 
         for r in 0..rows {
-            let v = if rows > 1 { r as f32 / (rows - 1) as f32 } else { 0.0 };
+            let v = if rows > 1 {
+                r as f32 / (rows - 1) as f32
+            } else {
+                0.0
+            };
             for c in 0..cols {
-                let u = if cols > 1 { c as f32 / (cols - 1) as f32 } else { 0.0 };
+                let u = if cols > 1 {
+                    c as f32 / (cols - 1) as f32
+                } else {
+                    0.0
+                };
                 let pt = src_origin + Vec2::new(u * patch_w, v * patch_h);
                 vertices.push(pt);
             }
@@ -340,9 +348,17 @@ impl MeshWarpGrid {
         let cols = self.cols;
         self.vertices.clear();
         for r in 0..rows {
-            let v = if rows > 1 { r as f32 / (rows - 1) as f32 } else { 0.0 };
+            let v = if rows > 1 {
+                r as f32 / (rows - 1) as f32
+            } else {
+                0.0
+            };
             for c in 0..cols {
-                let u = if cols > 1 { c as f32 / (cols - 1) as f32 } else { 0.0 };
+                let u = if cols > 1 {
+                    c as f32 / (cols - 1) as f32
+                } else {
+                    0.0
+                };
                 let pt = self.src_origin + Vec2::new(u * self.patch_w, v * self.patch_h);
                 self.vertices.push(pt);
             }
@@ -375,9 +391,17 @@ impl MeshWarpGrid {
 
         let mut new_vertices = Vec::with_capacity(new_rows * new_cols);
         for r in 0..new_rows {
-            let v = if new_rows > 1 { r as f32 / (new_rows - 1) as f32 } else { 0.0 };
+            let v = if new_rows > 1 {
+                r as f32 / (new_rows - 1) as f32
+            } else {
+                0.0
+            };
             for c in 0..new_cols {
-                let u = if new_cols > 1 { c as f32 / (new_cols - 1) as f32 } else { 0.0 };
+                let u = if new_cols > 1 {
+                    c as f32 / (new_cols - 1) as f32
+                } else {
+                    0.0
+                };
                 let sample_pos = self.sample_surface(u, v);
                 new_vertices.push(sample_pos);
             }
@@ -430,11 +454,16 @@ impl MeshWarpGrid {
                 let min_y = p00.y.min(p10.y).min(p11.y).min(p01.y) - 1.0;
                 let max_y = p00.y.max(p10.y).max(p11.y).max(p01.y) + 1.0;
 
-                if canvas_pt.x < min_x || canvas_pt.x > max_x || canvas_pt.y < min_y || canvas_pt.y > max_y {
+                if canvas_pt.x < min_x
+                    || canvas_pt.x > max_x
+                    || canvas_pt.y < min_y
+                    || canvas_pt.y > max_y
+                {
                     continue;
                 }
 
-                if let Some((cell_u, cell_v)) = inverse_bilinear_quad(p00, p10, p11, p01, canvas_pt) {
+                if let Some((cell_u, cell_v)) = inverse_bilinear_quad(p00, p10, p11, p01, canvas_pt)
+                {
                     if (0.0..=1.0).contains(&cell_u) && (0.0..=1.0).contains(&cell_v) {
                         let global_u = (c as f32 + cell_u) / (self.cols - 1) as f32;
                         let global_v = (r as f32 + cell_v) / (self.rows - 1) as f32;
@@ -488,10 +517,7 @@ fn inverse_bilinear_quad(a: Vec2, b: Vec2, c: Vec2, d: Vec2, p: Vec2) -> Option<
     }
 
     let sqrt_d = discriminant.sqrt();
-    let v_candidates = [
-        (-k1 + sqrt_d) / (2.0 * k2),
-        (-k1 - sqrt_d) / (2.0 * k2),
-    ];
+    let v_candidates = [(-k1 + sqrt_d) / (2.0 * k2), (-k1 - sqrt_d) / (2.0 * k2)];
 
     for &v in &v_candidates {
         if (-0.05..=1.05).contains(&v) {
@@ -865,9 +891,16 @@ fn scale_sample<C: Channel, S: Channel>(sample: [f32; 4]) -> [u64; 4] {
     let dst_max = C::MAX_SCALED as f64;
     let src_max = S::MAX_SCALED as f64;
     let map = |value: f32| -> u64 {
-        (value as f64 * dst_max / src_max).round().clamp(0.0, dst_max) as u64
+        (value as f64 * dst_max / src_max)
+            .round()
+            .clamp(0.0, dst_max) as u64
     };
-    [map(sample[0]), map(sample[1]), map(sample[2]), map(sample[3])]
+    [
+        map(sample[0]),
+        map(sample[1]),
+        map(sample[2]),
+        map(sample[3]),
+    ]
 }
 /// Alpha-composites a source pixel onto destination buffer
 #[inline]
@@ -951,7 +984,9 @@ pub fn render_transformed_patch<C: Channel, S: Channel>(
             let local_x = src_canvas_pt.x - patch_origin.x;
             let local_y = src_canvas_pt.y - patch_origin.y;
 
-            let sample = sample_interpolated_scaled::<S>(src_patch, patch_w, patch_h, local_x, local_y, interp);
+            let sample = sample_interpolated_scaled::<S>(
+                src_patch, patch_w, patch_h, local_x, local_y, interp,
+            );
             if sample[3] > 0.0 {
                 let dst_idx = (y * doc_w as usize + x) * 4;
                 composite_pixel_in_place(dst_layer_pixels, dst_idx, scale_sample::<C, S>(sample));
@@ -999,10 +1034,16 @@ pub fn render_quad_transformed_patch<C: Channel, S: Channel>(
                 let local_x = src_pt.x - quad.src_corners[0].x;
                 let local_y = src_pt.y - quad.src_corners[0].y;
 
-                let sample = sample_interpolated_scaled::<S>(src_patch, patch_w, patch_h, local_x, local_y, interp);
+                let sample = sample_interpolated_scaled::<S>(
+                    src_patch, patch_w, patch_h, local_x, local_y, interp,
+                );
                 if sample[3] > 0.0 {
                     let dst_idx = (y * doc_w as usize + x) * 4;
-                    composite_pixel_in_place(dst_layer_pixels, dst_idx, scale_sample::<C, S>(sample));
+                    composite_pixel_in_place(
+                        dst_layer_pixels,
+                        dst_idx,
+                        scale_sample::<C, S>(sample),
+                    );
                 }
             }
         }
@@ -1045,10 +1086,16 @@ pub fn render_mesh_warped_patch<C: Channel, S: Channel>(
         for x in start_x..end_x {
             let canvas_pt = Vec2::new(x as f32 + 0.5, y as f32 + 0.5);
             if let Some(src_pt) = mesh.inverse_sample(canvas_pt) {
-                let sample = sample_interpolated_scaled::<S>(src_patch, patch_w, patch_h, src_pt.x, src_pt.y, interp);
+                let sample = sample_interpolated_scaled::<S>(
+                    src_patch, patch_w, patch_h, src_pt.x, src_pt.y, interp,
+                );
                 if sample[3] > 0.0 {
                     let dst_idx = (y * doc_w as usize + x) * 4;
-                    composite_pixel_in_place(dst_layer_pixels, dst_idx, scale_sample::<C, S>(sample));
+                    composite_pixel_in_place(
+                        dst_layer_pixels,
+                        dst_idx,
+                        scale_sample::<C, S>(sample),
+                    );
                 }
             }
         }
@@ -1086,9 +1133,13 @@ pub fn render_tps_warped_patch<C: Channel, S: Channel>(
     // Add padding around pins for elastic deformation bounds
     let pad = 32.0_f32;
     let start_x = ((min_x - pad).floor() as isize).max(0).min(doc_w as isize) as usize;
-    let end_x = ((max_x + pad).ceil() as isize + 1).max(0).min(doc_w as isize) as usize;
+    let end_x = ((max_x + pad).ceil() as isize + 1)
+        .max(0)
+        .min(doc_w as isize) as usize;
     let start_y = ((min_y - pad).floor() as isize).max(0).min(doc_h as isize) as usize;
-    let end_y = ((max_y + pad).ceil() as isize + 1).max(0).min(doc_h as isize) as usize;
+    let end_y = ((max_y + pad).ceil() as isize + 1)
+        .max(0)
+        .min(doc_h as isize) as usize;
 
     for y in start_y..end_y {
         for x in start_x..end_x {
@@ -1097,11 +1148,21 @@ pub fn render_tps_warped_patch<C: Channel, S: Channel>(
             let local_x = src_canvas_pt.x - patch_origin.x;
             let local_y = src_canvas_pt.y - patch_origin.y;
 
-            if local_x >= 0.0 && local_x < patch_w as f32 && local_y >= 0.0 && local_y < patch_h as f32 {
-                let sample = sample_interpolated_scaled::<S>(src_patch, patch_w, patch_h, local_x, local_y, interp);
+            if local_x >= 0.0
+                && local_x < patch_w as f32
+                && local_y >= 0.0
+                && local_y < patch_h as f32
+            {
+                let sample = sample_interpolated_scaled::<S>(
+                    src_patch, patch_w, patch_h, local_x, local_y, interp,
+                );
                 if sample[3] > 0.0 {
                     let dst_idx = (y * doc_w as usize + x) * 4;
-                    composite_pixel_in_place(dst_layer_pixels, dst_idx, scale_sample::<C, S>(sample));
+                    composite_pixel_in_place(
+                        dst_layer_pixels,
+                        dst_idx,
+                        scale_sample::<C, S>(sample),
+                    );
                 }
             }
         }
@@ -1206,7 +1267,6 @@ mod tests {
         assert!((center_mapped.y - 45.0).abs() < 0.2);
     }
 }
-
 
 // ── Channel-generic sampling (Commit A of the free-transform refactor) ──────────────────────
 //
@@ -1466,7 +1526,10 @@ impl TransformPatch {
                 let destination = ((py as usize) * width as usize + px as usize) * 4;
                 match &mut patch {
                     TransformPatch::Srgb8(bytes) => {
-                        let Some(pixel) = layer.as_srgb8().and_then(|view| view.get(source..source + 4)) else {
+                        let Some(pixel) = layer
+                            .as_srgb8()
+                            .and_then(|view| view.get(source..source + 4))
+                        else {
                             continue;
                         };
                         if destination + 4 <= bytes.len() {
@@ -1474,7 +1537,10 @@ impl TransformPatch {
                         }
                     }
                     TransformPatch::Srgb16(channels) => {
-                        let Some(pixel) = layer.as_srgb16().and_then(|view| view.get(source..source + 4)) else {
+                        let Some(pixel) = layer
+                            .as_srgb16()
+                            .and_then(|view| view.get(source..source + 4))
+                        else {
                             continue;
                         };
                         if destination + 4 <= channels.len() {

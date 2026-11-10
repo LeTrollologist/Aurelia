@@ -43,6 +43,9 @@ every instruction executing in the process is memory-safe; the Win32/CRT/FFI lay
   transferred are released.
 - Discord IPC frames are capped at 1 MB in both polling and the READY handshake. READY must be a
   FRAME (opcode 1) and its body must arrive before the handshake deadline.
+- Project saves use a unique sibling temporary file, call `sync_all` before replacement, and
+  clean the temporary file on failure. A failed write or replacement leaves the previous
+  destination intact; parent-directory synchronization is best-effort where supported.
 - Image imports use the `image` crate decoders.
 - There is no plugin system and no executed project content.
 

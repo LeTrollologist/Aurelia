@@ -6,7 +6,9 @@ use aurelia_io::project::{load_project_from_reader, save_project_to_writer};
 use std::io::Cursor;
 
 fn srgb_icc() -> Vec<u8> {
-    moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB")
+    moxcms::ColorProfile::new_srgb()
+        .encode()
+        .expect("encode sRGB")
 }
 
 fn round_trip(doc: &Document) -> Document {

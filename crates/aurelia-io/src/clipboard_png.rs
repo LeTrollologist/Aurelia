@@ -36,10 +36,7 @@ pub fn decode_png_rgba8(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     }
     let width = u32::from_be_bytes(bytes[16..20].try_into().ok()?);
     let height = u32::from_be_bytes(bytes[20..24].try_into().ok()?);
-    if width == 0
-        || height == 0
-        || (width as u64) * (height as u64) > MAX_CLIPBOARD_PIXELS
-    {
+    if width == 0 || height == 0 || (width as u64) * (height as u64) > MAX_CLIPBOARD_PIXELS {
         return None;
     }
     let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).ok()?;

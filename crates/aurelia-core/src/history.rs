@@ -321,7 +321,8 @@ impl Command for ProfileConversionCommand {
 }
 
 #[derive(Debug)]
-pub struct AddLayerCommand {    pub layer: Layer,
+pub struct AddLayerCommand {
+    pub layer: Layer,
     pub insert_index: usize,
 }
 
@@ -335,7 +336,8 @@ impl Command for AddLayerCommand {
     }
 
     fn redo(&mut self, doc: &mut Document) {
-        doc.layers.insert(self.insert_index.min(doc.layers.len()), self.layer.clone());
+        doc.layers
+            .insert(self.insert_index.min(doc.layers.len()), self.layer.clone());
         doc.active_layer_id = self.layer.id;
     }
 }
@@ -379,7 +381,10 @@ impl Command for DeleteLayerCommand {
     }
 
     fn undo(&mut self, doc: &mut Document) {
-        doc.layers.insert(self.previous_index.min(doc.layers.len()), self.layer.clone());
+        doc.layers.insert(
+            self.previous_index.min(doc.layers.len()),
+            self.layer.clone(),
+        );
         doc.active_layer_id = self.layer.id;
     }
 
@@ -666,7 +671,10 @@ impl HistoryStack {
 
 #[cfg(test)]
 mod tests {
-    use super::{Command, FullDocumentSnapshotCommand, HistoryStack, LayerPixelsDeltaCommand, LayerPixelsSnapshotCommand};
+    use super::{
+        Command, FullDocumentSnapshotCommand, HistoryStack, LayerPixelsDeltaCommand,
+        LayerPixelsSnapshotCommand,
+    };
     use crate::document::Document;
 
     fn pixels_of(doc: &Document, layer_id: u64) -> Vec<u8> {
@@ -707,12 +715,24 @@ mod tests {
         let after = pixels_of(&doc, layer_id);
         assert_ne!(before, after, "the fixture must actually change pixels");
 
-        let mut command = LayerPixelsDeltaCommand::new(layer_id, "Dab", before.clone(), after.clone());
+        let mut command =
+            LayerPixelsDeltaCommand::new(layer_id, "Dab", before.clone(), after.clone());
         command.undo(&mut doc);
-        assert_eq!(pixels_of(&doc, layer_id), before, "undo must restore every byte");
+        assert_eq!(
+            pixels_of(&doc, layer_id),
+            before,
+            "undo must restore every byte"
+        );
         command.redo(&mut doc);
-        assert_eq!(pixels_of(&doc, layer_id), after, "redo must restore every byte");
-        assert!(command.cost() < before.len(), "a small dab must not cost a whole buffer");
+        assert_eq!(
+            pixels_of(&doc, layer_id),
+            after,
+            "redo must restore every byte"
+        );
+        assert!(
+            command.cost() < before.len(),
+            "a small dab must not cost a whole buffer"
+        );
     }
 
     /// Scattered edits, a length change, and an edit that changes nothing - the three cases
@@ -731,19 +751,26 @@ mod tests {
             }
         }
         let scattered = pixels_of(&doc, layer_id);
-        let mut command = LayerPixelsDeltaCommand::new(layer_id, "Scatter", start.clone(), scattered.clone());
+        let mut command =
+            LayerPixelsDeltaCommand::new(layer_id, "Scatter", start.clone(), scattered.clone());
         command.undo(&mut doc);
         assert_eq!(pixels_of(&doc, layer_id), start);
         command.redo(&mut doc);
         assert_eq!(pixels_of(&doc, layer_id), scattered);
 
         // No-op: retains nothing, so a caller can skip it.
-        let noop = LayerPixelsDeltaCommand::new(layer_id, "Noop", scattered.clone(), scattered.clone());
+        let noop =
+            LayerPixelsDeltaCommand::new(layer_id, "Noop", scattered.clone(), scattered.clone());
         assert!(noop.is_empty());
         assert_eq!(noop.cost(), 0);
 
         // Different lengths (a resize) fall back to whole buffers and still restore exactly.
-        let mut resized = LayerPixelsDeltaCommand::new(layer_id, "Resize", scattered.clone(), scattered[..100].to_vec());
+        let mut resized = LayerPixelsDeltaCommand::new(
+            layer_id,
+            "Resize",
+            scattered.clone(),
+            scattered[..100].to_vec(),
+        );
         assert!(resized.cost() > 0);
         resized.undo(&mut doc);
         assert_eq!(pixels_of(&doc, layer_id), scattered);
@@ -783,12 +810,20 @@ mod tests {
         while stack.can_undo() {
             stack.undo(&mut doc);
         }
-        assert_eq!(pixels_of(&doc, layer_id), initial, "undoing everything must return to the start");
+        assert_eq!(
+            pixels_of(&doc, layer_id),
+            initial,
+            "undoing everything must return to the start"
+        );
 
         while stack.can_redo() {
             stack.redo(&mut doc);
         }
-        assert_eq!(pixels_of(&doc, layer_id), final_state, "redoing everything must return to the end");
+        assert_eq!(
+            pixels_of(&doc, layer_id),
+            final_state,
+            "redoing everything must return to the end"
+        );
 
         // Partial and interleaved: undo 50, redo 20, and the state must land on the same
         // intermediate buffer a straight session would have produced at that point.
@@ -822,7 +857,12 @@ mod tests {
             let before = pixels_of(&delta_doc, layer_id);
             paint_square(&mut delta_doc, layer_id, x, y, 8, value);
             let after = pixels_of(&delta_doc, layer_id);
-            delta_stack.push(Box::new(LayerPixelsDeltaCommand::new(layer_id, "Stroke", before.clone(), after.clone())));
+            delta_stack.push(Box::new(LayerPixelsDeltaCommand::new(
+                layer_id,
+                "Stroke",
+                before.clone(),
+                after.clone(),
+            )));
 
             let before = pixels_of(&snapshot_doc, layer_id);
             paint_square(&mut snapshot_doc, layer_id, x, y, 8, value);
@@ -872,7 +912,8 @@ mod tests {
         }
         let after = pixels_of(&doc, layer_id);
 
-        let mut command = LayerPixelsDeltaCommand::new(layer_id, "Opaque bytes", before.clone(), after.clone());
+        let mut command =
+            LayerPixelsDeltaCommand::new(layer_id, "Opaque bytes", before.clone(), after.clone());
         command.undo(&mut doc);
         assert_eq!(pixels_of(&doc, layer_id), before, "undo must be byte-exact");
         command.redo(&mut doc);
@@ -888,7 +929,9 @@ mod tests {
         let mut doc = Document::new(8, 8);
         let layer_id = doc.active_layer_id;
         if let Some(layer) = doc.get_layer_mut(layer_id) {
-            let channels: Vec<u16> = (0..(8 * 8 * 4) as u16).map(|i| i.wrapping_mul(257)).collect();
+            let channels: Vec<u16> = (0..(8 * 8 * 4) as u16)
+                .map(|i| i.wrapping_mul(257))
+                .collect();
             *layer.buffer_mut() = LayerBuffer::Srgb16(channels);
         }
         let read_all = |doc: &Document| -> Vec<u8> {
@@ -907,11 +950,20 @@ mod tests {
         let after = read_all(&doc);
         assert_ne!(before, after, "the fixture must change channels");
 
-        let mut command = LayerPixelsDeltaCommand::new(layer_id, "16-bit edit", before.clone(), after.clone());
+        let mut command =
+            LayerPixelsDeltaCommand::new(layer_id, "16-bit edit", before.clone(), after.clone());
         command.undo(&mut doc);
-        assert_eq!(read_all(&doc), before, "undo of a 16-bit layer must be byte-exact");
+        assert_eq!(
+            read_all(&doc),
+            before,
+            "undo of a 16-bit layer must be byte-exact"
+        );
         command.redo(&mut doc);
-        assert_eq!(read_all(&doc), after, "redo of a 16-bit layer must be byte-exact");
+        assert_eq!(
+            read_all(&doc),
+            after,
+            "redo of a 16-bit layer must be byte-exact"
+        );
     }
 
     /// The whole-buffer snapshot commands are the fallback the delta does not cover. They used
@@ -941,7 +993,10 @@ mod tests {
         }
         let after_bytes = doc.get_layer(layer_id).expect("layer").storage_bytes();
         let after_layers = doc.layers.clone();
-        assert_ne!(before_bytes, after_bytes, "the fixture must change channels");
+        assert_ne!(
+            before_bytes, after_bytes,
+            "the fixture must change channels"
+        );
 
         let expected_cost = before_layers.iter().map(|l| l.storage_len()).sum::<usize>()
             + after_layers.iter().map(|l| l.storage_len()).sum::<usize>();
@@ -958,7 +1013,11 @@ mod tests {
             before_active_id: layer_id,
             after_active_id: layer_id,
         };
-        assert_eq!(snapshot.cost(), expected_cost, "cost must count storage bytes");
+        assert_eq!(
+            snapshot.cost(),
+            expected_cost,
+            "cost must count storage bytes"
+        );
 
         snapshot.undo(&mut doc);
         assert_eq!(
@@ -981,9 +1040,15 @@ mod tests {
             after_pixels: after_bytes.clone(),
         };
         single.undo(&mut doc);
-        assert_eq!(doc.get_layer(layer_id).expect("layer").storage_bytes(), before_bytes);
+        assert_eq!(
+            doc.get_layer(layer_id).expect("layer").storage_bytes(),
+            before_bytes
+        );
         single.redo(&mut doc);
-        assert_eq!(doc.get_layer(layer_id).expect("layer").storage_bytes(), after_bytes);
+        assert_eq!(
+            doc.get_layer(layer_id).expect("layer").storage_bytes(),
+            after_bytes
+        );
     }
 
     /// The History panel reads labels and costs through the read-only API only. Entry order is
@@ -1011,8 +1076,15 @@ mod tests {
         }
 
         let entries = stack.undo_entries();
-        assert_eq!(entries.iter().map(|e| e.label).collect::<Vec<_>>(), vec!["Stroke", "Fill", "Fill"]);
-        assert_eq!(stack.total_retained_bytes(), expected_bytes, "undo bytes account every step");
+        assert_eq!(
+            entries.iter().map(|e| e.label).collect::<Vec<_>>(),
+            vec!["Stroke", "Fill", "Fill"]
+        );
+        assert_eq!(
+            stack.total_retained_bytes(),
+            expected_bytes,
+            "undo bytes account every step"
+        );
         assert!(entries.iter().all(|e| e.bytes > 0));
 
         // Undo moves a step to the redo stack and the totals must not double-count it.
@@ -1028,7 +1100,9 @@ mod tests {
         let before = pixels_of(&doc, layer_id);
         paint_square(&mut doc, layer_id, 1, 1, 2, 200);
         let after = pixels_of(&doc, layer_id);
-        stack.push(Box::new(LayerPixelsDeltaCommand::new(layer_id, "Dab", before, after)));
+        stack.push(Box::new(LayerPixelsDeltaCommand::new(
+            layer_id, "Dab", before, after,
+        )));
         assert_eq!(stack.redo_retained_bytes(), 0);
         assert!(stack.redo_entries().is_empty());
 
@@ -1043,7 +1117,11 @@ mod tests {
         );
 
         stack.set_max_bytes(1);
-        assert_eq!(stack.undo_entries().len(), 1, "one oversized step always survives");
+        assert_eq!(
+            stack.undo_entries().len(),
+            1,
+            "one oversized step always survives"
+        );
         stack.clear();
         assert_eq!(stack.total_retained_bytes(), 0);
         assert!(stack.undo_entries().is_empty() && stack.redo_entries().is_empty());
@@ -1059,7 +1137,9 @@ mod tests {
         paint_square(&mut doc, layer_id, 0, 0, 2, 77);
         let after = pixels_of(&doc, layer_id);
         let mut stack = HistoryStack::new(16);
-        stack.push(Box::new(LayerPixelsDeltaCommand::new(layer_id, "Dab", before, after)));
+        stack.push(Box::new(LayerPixelsDeltaCommand::new(
+            layer_id, "Dab", before, after,
+        )));
         stack.undo(&mut doc);
 
         let generation = stack.generation();
@@ -1112,19 +1192,31 @@ mod mask_history_tests {
         assert_ne!(before, after, "the fixture must change the mask");
 
         command.undo(&mut doc);
-        let restored = doc.get_layer(layer_id).and_then(|l| l.mask.as_ref()).expect("mask");
+        let restored = doc
+            .get_layer(layer_id)
+            .and_then(|l| l.mask.as_ref())
+            .expect("mask");
         assert_eq!(restored.pixels, before);
-        assert!(restored.enabled, "disabled state is part of the undone state");
+        assert!(
+            restored.enabled,
+            "disabled state is part of the undone state"
+        );
 
         command.redo(&mut doc);
-        let reapplied = doc.get_layer(layer_id).and_then(|l| l.mask.as_ref()).expect("mask");
+        let reapplied = doc
+            .get_layer(layer_id)
+            .and_then(|l| l.mask.as_ref())
+            .expect("mask");
         assert_eq!(reapplied.pixels, after);
         assert!(!reapplied.enabled);
 
         // A missing mask is not resurrected by undo, and must not panic.
         doc.remove_layer_mask(layer_id);
         command.undo(&mut doc);
-        assert!(doc.get_layer(layer_id).and_then(|l| l.mask.as_ref()).is_none());
+        assert!(doc
+            .get_layer(layer_id)
+            .and_then(|l| l.mask.as_ref())
+            .is_none());
     }
 
     /// LayerMask is the mask type the command guards against; a size change (for example after
@@ -1143,12 +1235,18 @@ mod mask_history_tests {
             after_enabled: true,
         };
         command.undo(&mut doc);
-        let mask = doc.get_layer(layer_id).and_then(|l| l.mask.as_ref()).expect("mask");
-        assert_eq!(mask.pixels.len(), 64, "the mismatched snapshot must not resize the mask");
+        let mask = doc
+            .get_layer(layer_id)
+            .and_then(|l| l.mask.as_ref())
+            .expect("mask");
+        assert_eq!(
+            mask.pixels.len(),
+            64,
+            "the mismatched snapshot must not resize the mask"
+        );
         assert!(mask.is_all_visible());
     }
 }
-
 
 #[cfg(test)]
 mod eviction_integrity {
@@ -1198,14 +1296,20 @@ mod eviction_integrity {
             states.push(after);
         }
         assert!(evictions > 0, "the fixture never exercised eviction");
-        assert!(stack.len() < states.len(), "the budget must have dropped steps");
+        assert!(
+            stack.len() < states.len(),
+            "the budget must have dropped steps"
+        );
         let final_bytes = states.last().cloned().expect("states");
 
         while stack.can_undo() {
             stack.undo(&mut doc);
         }
         let after_full_undo = doc.get_layer(id).expect("layer").storage_bytes();
-        assert_ne!(after_full_undo, final_bytes, "undo must actually move away from the end");
+        assert_ne!(
+            after_full_undo, final_bytes,
+            "undo must actually move away from the end"
+        );
 
         while stack.can_redo() {
             stack.redo(&mut doc);
@@ -1243,10 +1347,19 @@ mod eviction_integrity {
                 after_pixels,
             )));
 
-            let before_mask = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.pixels.clone()).expect("mask");
-            let enabled_before = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.enabled).expect("mask");
+            let before_mask = doc
+                .get_layer(id)
+                .and_then(|l| l.mask.as_ref())
+                .map(|m| m.pixels.clone())
+                .expect("mask");
+            let enabled_before = doc
+                .get_layer(id)
+                .and_then(|l| l.mask.as_ref())
+                .map(|m| m.enabled)
+                .expect("mask");
             let write_at = step as usize
-                % doc.get_layer(id)
+                % doc
+                    .get_layer(id)
                     .and_then(|l| l.mask.as_ref())
                     .map(|m| m.pixels.len())
                     .unwrap_or(1);
@@ -1256,8 +1369,16 @@ mod eviction_integrity {
                 }
                 mask.enabled = step % 3 != 0;
             }
-            let after_mask = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.pixels.clone()).expect("mask");
-            let enabled_after = doc.get_layer(id).and_then(|l| l.mask.as_ref()).map(|m| m.enabled).expect("mask");
+            let after_mask = doc
+                .get_layer(id)
+                .and_then(|l| l.mask.as_ref())
+                .map(|m| m.pixels.clone())
+                .expect("mask");
+            let enabled_after = doc
+                .get_layer(id)
+                .and_then(|l| l.mask.as_ref())
+                .map(|m| m.enabled)
+                .expect("mask");
             stack.push(Box::new(MaskPixelsCommand {
                 layer_id: id,
                 description: "mask",
@@ -1275,8 +1396,14 @@ mod eviction_integrity {
         while stack.can_redo() {
             stack.redo(&mut doc);
         }
-        let mask = doc.get_layer(id).and_then(|l| l.mask.as_ref()).expect("mask");
-        assert_eq!(mask.pixels, last_mask, "redo must restore the final mask bytes");
+        let mask = doc
+            .get_layer(id)
+            .and_then(|l| l.mask.as_ref())
+            .expect("mask");
+        assert_eq!(
+            mask.pixels, last_mask,
+            "redo must restore the final mask bytes"
+        );
     }
 
     /// A new edit after undo clears redo, and the cleared entries stop counting against the
@@ -1291,7 +1418,9 @@ mod eviction_integrity {
                 channels[step as usize] = channels[step as usize].wrapping_add(700);
             }
             let after = doc.get_layer(id).expect("layer").storage_bytes();
-            stack.push(Box::new(LayerPixelsDeltaCommand::new(id, "step", before, after)));
+            stack.push(Box::new(LayerPixelsDeltaCommand::new(
+                id, "step", before, after,
+            )));
         }
         stack.undo(&mut doc);
         stack.undo(&mut doc);
@@ -1303,7 +1432,9 @@ mod eviction_integrity {
             channels[0] ^= 0xFFFF;
         }
         let after = doc.get_layer(id).expect("layer").storage_bytes();
-        stack.push(Box::new(LayerPixelsDeltaCommand::new(id, "branch", before, after)));
+        stack.push(Box::new(LayerPixelsDeltaCommand::new(
+            id, "branch", before, after,
+        )));
         assert!(!stack.can_redo(), "a new edit must invalidate redo");
         assert_eq!(stack.redo_retained_bytes(), 0);
     }

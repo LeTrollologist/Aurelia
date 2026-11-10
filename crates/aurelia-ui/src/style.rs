@@ -22,9 +22,18 @@ pub fn configure_aurelia_style(ctx: &egui::Context, accent: Color) {
     style.text_styles = [
         (TextStyle::Heading, FontId::new(15.5, fonts::display())),
         (TextStyle::Body, FontId::new(12.5, FontFamily::Proportional)),
-        (TextStyle::Button, FontId::new(12.5, FontFamily::Proportional)),
-        (TextStyle::Small, FontId::new(11.0, FontFamily::Proportional)),
-        (TextStyle::Monospace, FontId::new(11.5, FontFamily::Monospace)),
+        (
+            TextStyle::Button,
+            FontId::new(12.5, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Small,
+            FontId::new(11.0, FontFamily::Proportional),
+        ),
+        (
+            TextStyle::Monospace,
+            FontId::new(11.5, FontFamily::Monospace),
+        ),
     ]
     .into();
 
@@ -109,4 +118,3 @@ pub fn configure_aurelia_style(ctx: &egui::Context, accent: Color) {
 
     ctx.set_style(style);
 }
-

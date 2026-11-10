@@ -48,10 +48,7 @@ fn save_and_reload_survive_history_eviction() {
         }
         let after = doc.get_layer(id).expect("layer").storage_bytes();
         history.push(Box::new(LayerPixelsDeltaCommand::new(
-            id,
-            "paint",
-            before,
-            after,
+            id, "paint", before, after,
         )));
 
         let before_mask = doc
@@ -105,7 +102,14 @@ fn save_and_reload_survive_history_eviction() {
 
     let layer = loaded.get_layer(id).expect("layer survives the round trip");
     assert_eq!(layer.format(), aurelia_core::layer::PixelFormat::Srgb16);
-    assert_eq!(layer.storage_bytes(), expected_pixels, "16-bit bytes must round-trip exactly");
+    assert_eq!(
+        layer.storage_bytes(),
+        expected_pixels,
+        "16-bit bytes must round-trip exactly"
+    );
     let mask = layer.mask.as_ref().expect("mask survives the round trip");
-    assert_eq!(mask.pixels, expected_mask, "mask bytes must round-trip exactly");
+    assert_eq!(
+        mask.pixels, expected_mask,
+        "mask bytes must round-trip exactly"
+    );
 }

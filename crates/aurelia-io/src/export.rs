@@ -46,7 +46,11 @@ pub enum ExportError {
     AggregateTooLarge { required: u64, max: u64 },
     /// A frame buffer's length does not match the declared geometry.
     #[error("frame {index} has {actual} bytes, expected {expected}")]
-    FrameSizeMismatch { index: usize, expected: usize, actual: usize },
+    FrameSizeMismatch {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
     /// The combined sprite-sheet dimensions do not fit the image container.
     #[error("a {width}x{height} sprite sheet cannot be encoded")]
     SheetTooLarge { width: u64, height: u64 },
@@ -310,7 +314,13 @@ pub fn export_flat_image_with_limits(
             .and_then(|pixels| pixels.checked_mul(4))
             .ok_or(ExportError::UnsupportedFormat)?;
         check_frame_len_16(&pixels, 0, pixel_count)?;
-        return write_rgba16_to_path(&pixels, doc.width, doc.height, doc.icc_profile(), path.as_ref());
+        return write_rgba16_to_path(
+            &pixels,
+            doc.width,
+            doc.height,
+            doc.icc_profile(),
+            path.as_ref(),
+        );
     }
 
     let pixels = doc.composite_layers(include_background);
@@ -341,7 +351,10 @@ fn write_rgba16_to_path(
         if let Some(icc) = icc_profile {
             let _ = encoder.set_icc_profile(icc.to_vec());
         }
-        let bytes: Vec<u8> = pixels.iter().flat_map(|value| value.to_ne_bytes()).collect();
+        let bytes: Vec<u8> = pixels
+            .iter()
+            .flat_map(|value| value.to_ne_bytes())
+            .collect();
         encoder.write_image(&bytes, width, height, ExtendedColorType::Rgba16)?;
         Ok(())
     })
@@ -429,7 +442,8 @@ fn inject_webp_icc(
         if at + 8 > raw.len() {
             break;
         }
-        let size = u32::from_le_bytes([raw[at + 4], raw[at + 5], raw[at + 6], raw[at + 7]]) as usize;
+        let size =
+            u32::from_le_bytes([raw[at + 4], raw[at + 5], raw[at + 6], raw[at + 7]]) as usize;
         let end = at
             .checked_add(8)
             .and_then(|value| value.checked_add(size))
@@ -558,8 +572,8 @@ where
                 });
             }
             check_frame_len(&data, index, expected)?;
-            let img = RgbaImage::from_raw(width, height, data)
-                .ok_or(ExportError::UnsupportedFormat)?;
+            let img =
+                RgbaImage::from_raw(width, height, data).ok_or(ExportError::UnsupportedFormat)?;
             encoder.encode_frame(Frame::from_parts(img, 0, 0, delay))?;
             count += 1;
         }
@@ -741,11 +755,10 @@ where
             max: limits.max_total_bytes,
         });
     }
-    let sheet_bytes =
-        usize::try_from(sheet_bytes).map_err(|_| ExportError::SheetTooLarge {
-            width: sheet_w,
-            height: sheet_h,
-        })?;
+    let sheet_bytes = usize::try_from(sheet_bytes).map_err(|_| ExportError::SheetTooLarge {
+        width: sheet_w,
+        height: sheet_h,
+    })?;
 
     let (sheet_w, sheet_h) = (sheet_w as u32, sheet_h as u32);
     let mut sheet = vec![0u8; sheet_bytes];
@@ -802,5 +815,12 @@ pub fn export_sprite_sheet_with_limits(
     path: impl AsRef<Path>,
     limits: &ExportLimits,
 ) -> Result<(u32, u32), ExportError> {
-    export_sprite_sheet_stream(frames_rgba.iter().cloned(), width, height, columns, path, limits)
+    export_sprite_sheet_stream(
+        frames_rgba.iter().cloned(),
+        width,
+        height,
+        columns,
+        path,
+        limits,
+    )
 }

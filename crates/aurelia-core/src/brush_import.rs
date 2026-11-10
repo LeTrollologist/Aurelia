@@ -58,6 +58,7 @@ pub enum BrushImportError {
     UnsupportedFormat,
     NoStamps,
     Corrupt(&'static str),
+    BudgetExceeded,
 }
 
 impl std::fmt::Display for BrushImportError {
@@ -67,6 +68,12 @@ impl std::fmt::Display for BrushImportError {
             Self::UnsupportedFormat => write!(formatter, "unsupported brush file format"),
             Self::NoStamps => write!(formatter, "no sampled brush stamps found"),
             Self::Corrupt(reason) => write!(formatter, "corrupt brush file: {reason}"),
+            Self::BudgetExceeded => {
+                write!(
+                    formatter,
+                    "brush import exceeds the aggregate decoded-memory budget"
+                )
+            }
         }
     }
 }
@@ -75,6 +82,40 @@ impl std::error::Error for BrushImportError {}
 
 const MAX_STAMP_DIMENSION: u32 = 4096;
 const MAX_STAMPS: usize = 256;
+/// Aggregate decoded pixel budget across all stamps in one import. At the 4-byte-per-pixel
+/// accounting used by the importer this is 252 MiB; a 4096×4096 stamp costs ~67 MB, so three
+/// full-size stamps fit and a fourth is rejected.
+const MAX_IMPORT_PIXELS: u64 = 63 * 1024 * 1024;
+const MAX_IMPORT_BYTES: u64 = 252 * 1024 * 1024;
+
+#[derive(Default)]
+struct BrushBudget {
+    pixels: u64,
+    bytes: u64,
+}
+
+impl BrushBudget {
+    fn reserve(&mut self, width: u32, height: u32) -> Result<(), BrushImportError> {
+        let pixels = (width as u64)
+            .checked_mul(height as u64)
+            .ok_or(BrushImportError::BudgetExceeded)?;
+        let bytes = pixels
+            .checked_mul(4)
+            .ok_or(BrushImportError::BudgetExceeded)?;
+        self.pixels = self
+            .pixels
+            .checked_add(pixels)
+            .ok_or(BrushImportError::BudgetExceeded)?;
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or(BrushImportError::BudgetExceeded)?;
+        if self.pixels > MAX_IMPORT_PIXELS || self.bytes > MAX_IMPORT_BYTES {
+            return Err(BrushImportError::BudgetExceeded);
+        }
+        Ok(())
+    }
+}
 
 /// Decodes a brush file by its extension (`.gbr` or `.abr`), falling back to content sniffing.
 pub fn decode_brush_file(
@@ -86,9 +127,10 @@ pub fn decode_brush_file(
         .and_then(|extension| extension.to_str())
         .map(|extension| extension.to_ascii_lowercase());
     match extension.as_deref() {
-        Some("gbr") => decode_gbr(bytes),
-        Some("abr") => decode_abr(bytes),
-        _ => decode_abr(bytes).or_else(|_| decode_gbr(bytes)),
+        Some("gbr") => decode_gbr_with_budget(bytes, &mut BrushBudget::default()),
+        Some("abr") => decode_abr_with_budget(bytes, &mut BrushBudget::default()),
+        _ => decode_abr_with_budget(bytes, &mut BrushBudget::default())
+            .or_else(|_| decode_gbr_with_budget(bytes, &mut BrushBudget::default())),
     }
 }
 
@@ -104,8 +146,17 @@ fn be_i32(bytes: &[u8], at: usize) -> Option<i32> {
     Some(i32::from_be_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
 }
 
-/// GIMP `.gbr`: 4 big-endian u32 values, a NUL-terminated name, then 1 or 4 bytes per pixel.
+/// Test/helper entry point with a fresh aggregate budget.
+#[cfg(test)]
 fn decode_gbr(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
+    decode_gbr_with_budget(bytes, &mut BrushBudget::default())
+}
+
+/// GIMP `.gbr`: 4 big-endian u32 values, a NUL-terminated name, then 1 or 4 bytes per pixel.
+fn decode_gbr_with_budget(
+    bytes: &[u8],
+    budget: &mut BrushBudget,
+) -> Result<Vec<BrushStamp>, BrushImportError> {
     if bytes.len() < 16 {
         return Err(BrushImportError::TooSmall);
     }
@@ -116,13 +167,10 @@ fn decode_gbr(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
     if magic != 2 || !matches!(bpp, 1 | 4) {
         return Err(BrushImportError::UnsupportedFormat);
     }
-    if width == 0
-        || height == 0
-        || width > MAX_STAMP_DIMENSION
-        || height > MAX_STAMP_DIMENSION
-    {
+    if width == 0 || height == 0 || width > MAX_STAMP_DIMENSION || height > MAX_STAMP_DIMENSION {
         return Err(BrushImportError::Corrupt("stamp dimensions out of range"));
     }
+    budget.reserve(width, height)?;
 
     let mut name_end = 16;
     while name_end < bytes.len() && bytes[name_end] != 0 {
@@ -131,7 +179,9 @@ fn decode_gbr(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
     if name_end >= bytes.len() {
         return Err(BrushImportError::Corrupt("unterminated brush name"));
     }
-    let name = String::from_utf8_lossy(&bytes[16..name_end]).trim().to_string();
+    let name = String::from_utf8_lossy(&bytes[16..name_end])
+        .trim()
+        .to_string();
     let data_start = name_end + 1;
     let pixels = (width as usize)
         .checked_mul(height as usize)
@@ -152,32 +202,49 @@ fn decode_gbr(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
         });
     }
     Ok(vec![BrushStamp {
-        name: if name.is_empty() { "Imported Brush".into() } else { name },
+        name: if name.is_empty() {
+            "Imported Brush".into()
+        } else {
+            name
+        },
         width,
         height,
         alpha,
     }])
 }
 
-/// Photoshop `.abr`: legacy v1/v2 entry stream, or a sampled-tip scan for later containers.
+/// Test/helper entry point with a fresh aggregate budget.
+#[cfg(test)]
 fn decode_abr(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
+    decode_abr_with_budget(bytes, &mut BrushBudget::default())
+}
+
+/// Photoshop `.abr`: legacy v1/v2 entry stream, or a sampled-tip scan for later containers.
+fn decode_abr_with_budget(
+    bytes: &[u8],
+    budget: &mut BrushBudget,
+) -> Result<Vec<BrushStamp>, BrushImportError> {
     if bytes.len() < 4 {
         return Err(BrushImportError::TooSmall);
     }
     match be_u16(bytes, 0) {
-        Some(1 | 2) => decode_abr_legacy(bytes),
-        Some(6 | 7 | 9 | 10) => scan_abr_tips(bytes),
+        Some(1 | 2) => decode_abr_legacy(bytes, budget),
+        Some(6 | 7 | 9 | 10) => scan_abr_tips(bytes, budget),
         _ => Err(BrushImportError::UnsupportedFormat),
     }
 }
 
-fn decode_abr_legacy(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
+fn decode_abr_legacy(
+    bytes: &[u8],
+    budget: &mut BrushBudget,
+) -> Result<Vec<BrushStamp>, BrushImportError> {
     let version = be_u16(bytes, 0).unwrap_or(0);
     let count = be_u16(bytes, 2).ok_or(BrushImportError::TooSmall)? as usize;
     let mut cursor = 4usize;
     let mut stamps = Vec::new();
     for index in 0..count.min(MAX_STAMPS) {
-        let brush_type = be_u16(bytes, cursor).ok_or(BrushImportError::Corrupt("truncated entry"))?;
+        let brush_type =
+            be_u16(bytes, cursor).ok_or(BrushImportError::Corrupt("truncated entry"))?;
         cursor += 2;
         let entry_len =
             be_u32(bytes, cursor).ok_or(BrushImportError::Corrupt("truncated entry"))? as usize;
@@ -226,7 +293,7 @@ fn decode_abr_legacy(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> 
         cursor = cursor
             .checked_add(1 + 8)
             .ok_or(BrushImportError::Corrupt("entry header overflow"))?;
-        let stamp = parse_bitmap_header(bytes, &mut cursor, entry_end, &name, index)?;
+        let stamp = parse_bitmap_header(bytes, &mut cursor, entry_end, &name, index, budget)?;
         stamps.push(stamp);
         cursor = entry_end.max(cursor);
     }
@@ -244,6 +311,7 @@ fn parse_bitmap_header(
     limit: usize,
     name: &str,
     index: usize,
+    budget: &mut BrushBudget,
 ) -> Result<BrushStamp, BrushImportError> {
     let top = be_i32(bytes, *cursor).ok_or(BrushImportError::Corrupt("bitmap header truncated"))?;
     let left =
@@ -252,10 +320,11 @@ fn parse_bitmap_header(
         be_i32(bytes, *cursor + 8).ok_or(BrushImportError::Corrupt("bitmap header truncated"))?;
     let right =
         be_i32(bytes, *cursor + 12).ok_or(BrushImportError::Corrupt("bitmap header truncated"))?;
-    let depth = be_u16(bytes, *cursor + 16)
+    let depth =
+        be_u16(bytes, *cursor + 16).ok_or(BrushImportError::Corrupt("bitmap header truncated"))?;
+    let compression = *bytes
+        .get(*cursor + 18)
         .ok_or(BrushImportError::Corrupt("bitmap header truncated"))?;
-    let compression =
-        *bytes.get(*cursor + 18).ok_or(BrushImportError::Corrupt("bitmap header truncated"))?;
     *cursor += 19;
 
     let width = right.saturating_sub(left);
@@ -269,6 +338,7 @@ fn parse_bitmap_header(
     {
         return Err(BrushImportError::Corrupt("invalid sampled tip"));
     }
+    budget.reserve(width as u32, height as u32)?;
     let bpp = (depth / 8) as usize;
     let pixels = (width as usize)
         .checked_mul(height as usize)
@@ -299,7 +369,11 @@ fn parse_bitmap_header(
 
     let fallback = format!("Imported Brush {}", index + 1);
     Ok(BrushStamp {
-        name: if name.trim().is_empty() { fallback } else { name.trim().to_string() },
+        name: if name.trim().is_empty() {
+            fallback
+        } else {
+            name.trim().to_string()
+        },
         width: width as u32,
         height: height as u32,
         alpha,
@@ -381,7 +455,10 @@ fn unpack_bits_row(packed: &[u8], out: &mut [u8]) -> bool {
 /// Modern `.abr` containers put sampled-tip bitmap headers inside `samp` blocks. Without a full
 /// descriptor parser, scan for the shared header shape, accept raw tips only, and skip over the
 /// pixels already consumed so a nested payload cannot be mistaken for another header.
-fn scan_abr_tips(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
+fn scan_abr_tips(
+    bytes: &[u8],
+    budget: &mut BrushBudget,
+) -> Result<Vec<BrushStamp>, BrushImportError> {
     let mut stamps = Vec::new();
     let mut at = 4usize;
     while at + 19 <= bytes.len() && stamps.len() < MAX_STAMPS {
@@ -407,7 +484,7 @@ fn scan_abr_tips(bytes: &[u8]) -> Result<Vec<BrushStamp>, BrushImportError> {
             if at + 19 + expected <= bytes.len() {
                 let mut cursor = at;
                 if let Ok(stamp) =
-                    parse_bitmap_header(bytes, &mut cursor, bytes.len(), "", stamps.len())
+                    parse_bitmap_header(bytes, &mut cursor, bytes.len(), "", stamps.len(), budget)
                 {
                     stamps.push(stamp);
                     at = cursor;
@@ -530,6 +607,31 @@ mod tests {
         let bytes = [0u8, 3, 0, 1, 0, 0];
         assert_eq!(decode_abr(&bytes), Err(BrushImportError::UnsupportedFormat));
     }
+
+    #[test]
+    fn aggregate_import_budget_rejects_too_many_large_stamps() {
+        let mut budget = BrushBudget::default();
+        for _ in 0..3 {
+            assert!(budget.reserve(4096, 4096).is_ok(), "three 4096 stamps fit");
+        }
+        assert_eq!(
+            budget.reserve(4096, 4096),
+            Err(BrushImportError::BudgetExceeded),
+            "the fourth 4096 stamp must exceed the aggregate budget"
+        );
+    }
+
+    #[test]
+    fn aggregate_import_budget_is_checked_before_a_stamp_is_decoded() {
+        let mut budget = BrushBudget::default();
+        budget.reserve(4096, 4096).expect("first stamp");
+        budget.reserve(4096, 4096).expect("second stamp");
+        budget.reserve(4096, 4096).expect("third stamp");
+        assert!(matches!(
+            budget.reserve(4096, 4096),
+            Err(BrushImportError::BudgetExceeded)
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -544,7 +646,10 @@ mod rle_tests {
 
         let mut short = [0u8; 4];
         assert!(!unpack_bits_row(&[0x05, 1], &mut short), "literal overruns");
-        assert!(!unpack_bits_row(&[0xfd], &mut short), "run missing its byte");
+        assert!(
+            !unpack_bits_row(&[0xfd], &mut short),
+            "run missing its byte"
+        );
     }
 
     #[test]

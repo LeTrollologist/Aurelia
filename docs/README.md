@@ -13,6 +13,7 @@ the contract.
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Supported OS, formats, exports, feature limits |
 | [PERFORMANCE.md](PERFORMANCE.md) | Measured numbers and how to reproduce them |
 | [SECURITY_MODEL.md](SECURITY_MODEL.md) | Rust/FFI boundary, signing, VirusTotal, network policy |
+| [QUALITY.md](QUALITY.md) | Formatting, Clippy and test policy enforced by the release gate |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Installer, save, Discord and startup failures |
 
 Release mechanics live in [RELEASE_PROCESS.md](../RELEASE_PROCESS.md).

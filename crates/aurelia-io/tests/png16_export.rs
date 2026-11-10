@@ -2,14 +2,13 @@
 
 use aurelia_core::document::Document;
 use aurelia_core::layer::PixelFormat;
-use aurelia_io::export::{export_flat_image, export_flat_image_with_limits, ExportError, ExportFormat, ExportLimits};
+use aurelia_io::export::{
+    export_flat_image, export_flat_image_with_limits, ExportError, ExportFormat, ExportLimits,
+};
 use std::path::PathBuf;
 
 fn temp_path(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!(
-        "aurelia-png16-{}-{name}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("aurelia-png16-{}-{name}", std::process::id()))
 }
 
 fn sixteen_bit_doc() -> Document {
@@ -51,7 +50,11 @@ fn eight_bit_png_is_unchanged() {
     doc.is_transparent = true;
     let id = doc.active_layer_id;
     {
-        let pixels = doc.get_layer_mut(id).expect("layer").as_srgb8_mut().expect("8-bit");
+        let pixels = doc
+            .get_layer_mut(id)
+            .expect("layer")
+            .as_srgb8_mut()
+            .expect("8-bit");
         let at = (2 * 4 + 2) * 4;
         pixels[at] = 17;
         pixels[at + 1] = 34;
@@ -76,7 +79,11 @@ fn a_mixed_document_exports_wide_png() {
         .expect("layer")
         .convert_format(PixelFormat::Srgb16);
     {
-        let pixels = doc.get_layer_mut(id).expect("layer").as_srgb16_mut().expect("16-bit");
+        let pixels = doc
+            .get_layer_mut(id)
+            .expect("layer")
+            .as_srgb16_mut()
+            .expect("16-bit");
         let at = (4 + 1) * 4;
         pixels[at] = 700;
         pixels[at + 3] = 65535;
@@ -94,7 +101,10 @@ fn a_mixed_document_exports_wide_png() {
 fn jpeg_stays_8bit_and_wide_png_respects_the_budget() {
     let path = temp_path("narrow.jpg");
     export_flat_image(&sixteen_bit_doc(), &path, ExportFormat::Jpeg, false).expect("jpeg");
-    assert_eq!(image::open(&path).expect("decode").to_rgba8().dimensions(), (4, 4));
+    assert_eq!(
+        image::open(&path).expect("decode").to_rgba8().dimensions(),
+        (4, 4)
+    );
     let _ = std::fs::remove_file(&path);
 
     let limits = ExportLimits {
@@ -118,7 +128,9 @@ fn jpeg_stays_8bit_and_wide_png_respects_the_budget() {
 fn png_export_embeds_the_document_profile() {
     use image::ImageDecoder;
 
-    let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
+    let icc = moxcms::ColorProfile::new_srgb()
+        .encode()
+        .expect("encode sRGB");
     let mut doc = sixteen_bit_doc();
     doc.set_icc_profile(icc.clone()).expect("attach");
     let path = temp_path("profiled.png");
@@ -127,7 +139,10 @@ fn png_export_embeds_the_document_profile() {
     let file = std::fs::File::open(&path).expect("open png");
     let mut decoder =
         image::codecs::png::PngDecoder::new(std::io::BufReader::new(file)).expect("decoder");
-    let embedded = decoder.icc_profile().expect("read icc").expect("icc present");
+    let embedded = decoder
+        .icc_profile()
+        .expect("read icc")
+        .expect("icc present");
     assert_eq!(embedded, icc);
     let _ = std::fs::remove_file(&path);
 }
@@ -136,7 +151,9 @@ fn png_export_embeds_the_document_profile() {
 fn jpeg_export_embeds_the_document_profile() {
     use image::ImageDecoder;
 
-    let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
+    let icc = moxcms::ColorProfile::new_srgb()
+        .encode()
+        .expect("encode sRGB");
     let mut doc = Document::new(8, 8);
     doc.set_icc_profile(icc.clone()).expect("attach");
     let path = temp_path("profiled.jpg");
@@ -145,14 +162,19 @@ fn jpeg_export_embeds_the_document_profile() {
     let file = std::fs::File::open(&path).expect("open jpeg");
     let mut decoder =
         image::codecs::jpeg::JpegDecoder::new(std::io::BufReader::new(file)).expect("decoder");
-    let embedded = decoder.icc_profile().expect("read icc").expect("icc present");
+    let embedded = decoder
+        .icc_profile()
+        .expect("read icc")
+        .expect("icc present");
     assert_eq!(embedded, icc);
     let _ = std::fs::remove_file(&path);
 }
 
 #[test]
 fn webp_embeds_the_profile_in_an_extended_container() {
-    let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
+    let icc = moxcms::ColorProfile::new_srgb()
+        .encode()
+        .expect("encode sRGB");
     let mut doc = Document::new(8, 8);
     doc.set_icc_profile(icc.clone()).expect("attach");
     let path = temp_path("profiled.webp");
@@ -170,7 +192,8 @@ fn webp_embeds_the_profile_in_an_extended_container() {
     let mut saw_vp8x = false;
     let mut iccp = None;
     while at + 8 <= data.len() {
-        let size = u32::from_le_bytes(data[at + 4..at + 8].try_into().expect("chunk size")) as usize;
+        let size =
+            u32::from_le_bytes(data[at + 4..at + 8].try_into().expect("chunk size")) as usize;
         match &data[at..at + 4] {
             b"VP8X" => {
                 saw_vp8x = true;

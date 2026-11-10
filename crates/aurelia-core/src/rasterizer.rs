@@ -1,5 +1,7 @@
 use crate::blend::BlendMode;
-use crate::brush::{BrushPoint, BrushSettings, EraserMode, GradientType, ShapeFillMode, TextAlign, ToolType};
+use crate::brush::{
+    BrushPoint, BrushSettings, EraserMode, GradientType, ShapeFillMode, TextAlign, ToolType,
+};
 use crate::color::Color;
 use crate::document::Document;
 use crate::layer::{Layer, LayerBuffer};
@@ -227,12 +229,32 @@ impl StrokeRasterizer {
     ) {
         match layer.buffer_mut() {
             crate::layer::LayerBuffer::Srgb8(pixels) => Self::stamp_impl(
-                doc_w, doc_h, pixels, selection, stamp_center, prev_center, radius, brush,
-                blend_mode, alpha_locked, bg_color, step_index,
+                doc_w,
+                doc_h,
+                pixels,
+                selection,
+                stamp_center,
+                prev_center,
+                radius,
+                brush,
+                blend_mode,
+                alpha_locked,
+                bg_color,
+                step_index,
             ),
             crate::layer::LayerBuffer::Srgb16(pixels) => Self::stamp_impl(
-                doc_w, doc_h, pixels, selection, stamp_center, prev_center, radius, brush,
-                blend_mode, alpha_locked, bg_color, step_index,
+                doc_w,
+                doc_h,
+                pixels,
+                selection,
+                stamp_center,
+                prev_center,
+                radius,
+                brush,
+                blend_mode,
+                alpha_locked,
+                bg_color,
+                step_index,
             ),
         }
     }
@@ -295,7 +317,8 @@ impl StrokeRasterizer {
                         continue;
                     }
 
-                    let p_alpha = (0.25 + 0.75 * hash21(i as u32, 3, seed)) * opacity * 0.45 * mask_factor;
+                    let p_alpha =
+                        (0.25 + 0.75 * hash21(i as u32, 3, seed)) * opacity * 0.45 * mask_factor;
                     let src = stamp_color;
                     let mut blended = blend_mode.composite_working(dst, src, p_alpha);
                     if alpha_locked {
@@ -339,69 +362,77 @@ impl StrokeRasterizer {
                         stamp.coverage(dx_f, dy_f, radius) * opacity
                     } else {
                         match tool {
-                        ToolType::Pencil => {
-                            if d_sq <= inner_radius_sq {
-                                opacity
-                            } else {
-                                let edge = (1.0 - (d - inner_r) / (radius - inner_r).max(0.001)).clamp(0.0, 1.0);
-                                edge * opacity
-                            }
-                        }
-                        ToolType::Chalk => {
-                            let noise = hash21(x, y, (step_index as u32).wrapping_mul(2654435761));
-                            if noise > 0.45 {
-                                let edge_fade = 1.0 - (d / radius).powi(2);
-                                (noise * 0.9 + 0.1) * edge_fade * opacity
-                            } else {
-                                0.0
-                            }
-                        }
-                        ToolType::Watercolor => {
-                            let t = d / radius;
-                            let wet_profile = if t < 0.7 {
-                                0.35 + 0.25 * (t / 0.7)
-                            } else {
-                                0.6 + 0.4 * ((t - 0.7) / 0.3)
-                            };
-                            let noise = hash21(x, y, (step_index as u32).wrapping_mul(1234567));
-                            wet_profile * (0.8 + 0.2 * noise) * opacity * 0.45
-                        }
-                        ToolType::Smudge => {
-                            let t = d / radius;
-                            let falloff = (1.0 - t * t).max(0.0);
-                            let factor = falloff * falloff * (3.0 - 2.0 * falloff);
-                            (factor * brush.smudge_strength).clamp(0.0, 1.0) * opacity
-                        }
-                        ToolType::Eraser => match brush.eraser_mode {
-                            EraserMode::HardPixel => {
-                                if d <= radius {
+                            ToolType::Pencil => {
+                                if d_sq <= inner_radius_sq {
                                     opacity
+                                } else {
+                                    let edge = (1.0
+                                        - (d - inner_r) / (radius - inner_r).max(0.001))
+                                    .clamp(0.0, 1.0);
+                                    edge * opacity
+                                }
+                            }
+                            ToolType::Chalk => {
+                                let noise =
+                                    hash21(x, y, (step_index as u32).wrapping_mul(2654435761));
+                                if noise > 0.45 {
+                                    let edge_fade = 1.0 - (d / radius).powi(2);
+                                    (noise * 0.9 + 0.1) * edge_fade * opacity
                                 } else {
                                     0.0
                                 }
                             }
+                            ToolType::Watercolor => {
+                                let t = d / radius;
+                                let wet_profile = if t < 0.7 {
+                                    0.35 + 0.25 * (t / 0.7)
+                                } else {
+                                    0.6 + 0.4 * ((t - 0.7) / 0.3)
+                                };
+                                let noise = hash21(x, y, (step_index as u32).wrapping_mul(1234567));
+                                wet_profile * (0.8 + 0.2 * noise) * opacity * 0.45
+                            }
+                            ToolType::Smudge => {
+                                let t = d / radius;
+                                let falloff = (1.0 - t * t).max(0.0);
+                                let factor = falloff * falloff * (3.0 - 2.0 * falloff);
+                                (factor * brush.smudge_strength).clamp(0.0, 1.0) * opacity
+                            }
+                            ToolType::Eraser => match brush.eraser_mode {
+                                EraserMode::HardPixel => {
+                                    if d <= radius {
+                                        opacity
+                                    } else {
+                                        0.0
+                                    }
+                                }
+                                _ => {
+                                    let base_alpha = if d_sq <= inner_radius_sq {
+                                        1.0
+                                    } else {
+                                        (1.0 - (d - inner_r) / (radius - inner_r).max(0.001))
+                                            .clamp(0.0, 1.0)
+                                    };
+                                    base_alpha * opacity
+                                }
+                            },
                             _ => {
                                 let base_alpha = if d_sq <= inner_radius_sq {
                                     1.0
                                 } else {
-                                    (1.0 - (d - inner_r) / (radius - inner_r).max(0.001)).clamp(0.0, 1.0)
+                                    (1.0 - (d - inner_r) / (radius - inner_r).max(0.001))
+                                        .clamp(0.0, 1.0)
                                 };
                                 base_alpha * opacity
                             }
-                        },
-                        _ => {
-                            let base_alpha = if d_sq <= inner_radius_sq {
-                                1.0
-                            } else {
-                                (1.0 - (d - inner_r) / (radius - inner_r).max(0.001)).clamp(0.0, 1.0)
-                            };
-                            base_alpha * opacity
                         }
-                    }
                     };
 
                     // Apply Wet Edge Watercolor Pigment Pooling effect
-                    if brush.wet_edge_strength > 0.001 && tool != ToolType::Eraser && tool != ToolType::Smudge {
+                    if brush.wet_edge_strength > 0.001
+                        && tool != ToolType::Eraser
+                        && tool != ToolType::Smudge
+                    {
                         let t = (d / radius).clamp(0.0, 1.0);
                         let fringe_w = brush.wet_edge_fringe_width.clamp(0.05, 0.5);
                         let fringe_start = 1.0 - fringe_w;
@@ -475,9 +506,12 @@ impl StrokeRasterizer {
                             EraserMode::ColorErase => {
                                 let target = brush.secondary_color.to_rgba8();
                                 let tol = brush.color_erase_tolerance as i32;
-                                let matches = (u8::from_f32(dst[0]) as i32 - target[0] as i32).abs() <= tol
-                                    && (u8::from_f32(dst[1]) as i32 - target[1] as i32).abs() <= tol
-                                    && (u8::from_f32(dst[2]) as i32 - target[2] as i32).abs() <= tol;
+                                let matches =
+                                    (u8::from_f32(dst[0]) as i32 - target[0] as i32).abs() <= tol
+                                        && (u8::from_f32(dst[1]) as i32 - target[1] as i32).abs()
+                                            <= tol
+                                        && (u8::from_f32(dst[2]) as i32 - target[2] as i32).abs()
+                                            <= tol;
                                 if matches {
                                     let current = pixels[idx + 3];
                                     pixels[idx + 3] = Self::scaled_alpha(current, alpha);
@@ -553,7 +587,11 @@ impl StrokeRasterizer {
                 brush,
                 blend_mode,
                 alpha_locked,
-                if brush.eraser_to_background { bg_col } else { Color::TRANSPARENT },
+                if brush.eraser_to_background {
+                    bg_col
+                } else {
+                    Color::TRANSPARENT
+                },
                 i,
             );
         }
@@ -582,9 +620,15 @@ impl StrokeRasterizer {
         let layer_offset = Vec2::new(layer.offset_x as f32, layer.offset_y as f32);
         let alpha_locked = layer.alpha_locked;
         let dist = p0.position.distance(p1.position);
-        let tangent = if dist > 0.001 { Some(p1.position - p0.position) } else { None };
+        let tangent = if dist > 0.001 {
+            Some(p1.position - p0.position)
+        } else {
+            None
+        };
         let cal_factor = brush.calligraphy_factor(tangent);
-        let avg_size = (brush.effective_size(p0.pressure) + brush.effective_size(p1.pressure)) * 0.5 * cal_factor;
+        let avg_size = (brush.effective_size(p0.pressure) + brush.effective_size(p1.pressure))
+            * 0.5
+            * cal_factor;
         let spacing = (avg_size * brush.spacing).max(0.5);
         let steps = (dist / spacing).ceil().max(1.0) as usize;
 
@@ -601,11 +645,14 @@ impl StrokeRasterizer {
             let radius = brush.effective_size(pressure) * 0.5 * cal_factor;
 
             let sym_points = symmetry.transform_points(pos, doc_w as f32, doc_h as f32);
-            let prev_sym_points = prev_pos.map(|pp| symmetry.transform_points(pp, doc_w as f32, doc_h as f32));
+            let prev_sym_points =
+                prev_pos.map(|pp| symmetry.transform_points(pp, doc_w as f32, doc_h as f32));
 
             let blend_mode = layer.blend_mode;
             for (s_idx, sp) in sym_points.into_iter().enumerate() {
-                let prev_sp = prev_sym_points.as_ref().map(|psp| psp[s_idx] - layer_offset);
+                let prev_sp = prev_sym_points
+                    .as_ref()
+                    .map(|psp| psp[s_idx] - layer_offset);
                 let local_sp = sp - layer_offset;
                 Self::blend_stamp(
                     doc_w,
@@ -618,7 +665,11 @@ impl StrokeRasterizer {
                     brush,
                     blend_mode,
                     alpha_locked,
-                    if brush.eraser_to_background { bg_col } else { Color::TRANSPARENT },
+                    if brush.eraser_to_background {
+                        bg_col
+                    } else {
+                        Color::TRANSPARENT
+                    },
                     i.wrapping_add(s_idx * 1000),
                 );
             }
@@ -629,12 +680,10 @@ impl StrokeRasterizer {
     fn catmull_rom_eval(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: f32) -> Vec2 {
         let t2 = t * t;
         let t3 = t2 * t;
-        0.5 * (
-            (2.0 * p1)
-                + (-p0 + p2) * t
-                + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
-                + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3
-        )
+        0.5 * ((2.0 * p1)
+            + (-p0 + p2) * t
+            + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+            + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3)
     }
 
     pub fn paint_spline(
@@ -663,7 +712,8 @@ impl StrokeRasterizer {
         let alpha_locked = layer.alpha_locked;
 
         let approx_len = p1.position.distance(p2.position);
-        let avg_size = (brush.effective_size(p1.pressure) + brush.effective_size(p2.pressure)) * 0.5;
+        let avg_size =
+            (brush.effective_size(p1.pressure) + brush.effective_size(p2.pressure)) * 0.5;
         let spacing = (avg_size * brush.spacing).max(0.5);
         let steps = (approx_len / spacing).ceil().max(1.0) as usize;
 
@@ -698,7 +748,11 @@ impl StrokeRasterizer {
                     brush,
                     blend_mode,
                     alpha_locked,
-                    if brush.eraser_to_background { bg_col } else { Color::TRANSPARENT },
+                    if brush.eraser_to_background {
+                        bg_col
+                    } else {
+                        Color::TRANSPARENT
+                    },
                     i.wrapping_add(s_idx * 1000),
                 );
             }
@@ -744,19 +798,35 @@ impl StrokeRasterizer {
         let stroke_w = (brush.size * 0.5).max(1.0);
 
         if mode == ShapeFillMode::Fill || mode == ShapeFillMode::Both {
-            let sym_boxes = symmetry.transform_points(Vec2::new(min_x, min_y), doc_w as f32, doc_h as f32);
-            let sym_ends = symmetry.transform_points(Vec2::new(max_x, max_y), doc_w as f32, doc_h as f32);
+            let sym_boxes =
+                symmetry.transform_points(Vec2::new(min_x, min_y), doc_w as f32, doc_h as f32);
+            let sym_ends =
+                symmetry.transform_points(Vec2::new(max_x, max_y), doc_w as f32, doc_h as f32);
 
             let fill_col = brush.secondary_color.to_rgba8();
             let (fill_mode, fill_opacity) = (layer.blend_mode, brush.opacity);
             match layer.buffer_mut() {
                 LayerBuffer::Srgb8(pixels) => Self::fill_boxes(
-                    pixels, doc_w, doc_h, &sym_boxes, &sym_ends, active_mask, fill_col,
-                    fill_mode, fill_opacity,
+                    pixels,
+                    doc_w,
+                    doc_h,
+                    &sym_boxes,
+                    &sym_ends,
+                    active_mask,
+                    fill_col,
+                    fill_mode,
+                    fill_opacity,
                 ),
                 LayerBuffer::Srgb16(pixels) => Self::fill_boxes(
-                    pixels, doc_w, doc_h, &sym_boxes, &sym_ends, active_mask, fill_col,
-                    fill_mode, fill_opacity,
+                    pixels,
+                    doc_w,
+                    doc_h,
+                    &sym_boxes,
+                    &sym_ends,
+                    active_mask,
+                    fill_col,
+                    fill_mode,
+                    fill_opacity,
                 ),
             }
         }
@@ -769,10 +839,38 @@ impl StrokeRasterizer {
 
             let mut stroke_brush = brush.clone();
             stroke_brush.size = stroke_w;
-            Self::paint_segment(doc, BrushPoint::new(p0, 1.0), BrushPoint::new(p1, 1.0), &stroke_brush, symmetry, selection);
-            Self::paint_segment(doc, BrushPoint::new(p1, 1.0), BrushPoint::new(p2, 1.0), &stroke_brush, symmetry, selection);
-            Self::paint_segment(doc, BrushPoint::new(p2, 1.0), BrushPoint::new(p3, 1.0), &stroke_brush, symmetry, selection);
-            Self::paint_segment(doc, BrushPoint::new(p3, 1.0), BrushPoint::new(p0, 1.0), &stroke_brush, symmetry, selection);
+            Self::paint_segment(
+                doc,
+                BrushPoint::new(p0, 1.0),
+                BrushPoint::new(p1, 1.0),
+                &stroke_brush,
+                symmetry,
+                selection,
+            );
+            Self::paint_segment(
+                doc,
+                BrushPoint::new(p1, 1.0),
+                BrushPoint::new(p2, 1.0),
+                &stroke_brush,
+                symmetry,
+                selection,
+            );
+            Self::paint_segment(
+                doc,
+                BrushPoint::new(p2, 1.0),
+                BrushPoint::new(p3, 1.0),
+                &stroke_brush,
+                symmetry,
+                selection,
+            );
+            Self::paint_segment(
+                doc,
+                BrushPoint::new(p3, 1.0),
+                BrushPoint::new(p0, 1.0),
+                &stroke_brush,
+                symmetry,
+                selection,
+            );
         }
     }
 
@@ -794,59 +892,60 @@ impl StrokeRasterizer {
         active_mask: Option<&SelectionMask>,
         blend_mode: BlendMode,
     ) {
-            for y in min_y..max_y {
-                let py = (y as f32 + 0.5) - sc.y;
-                let py_term = (py * py) / ry_sq;
-                let gy = 2.0 * py / ry_sq;
+        for y in min_y..max_y {
+            let py = (y as f32 + 0.5) - sc.y;
+            let py_term = (py * py) / ry_sq;
+            let gy = 2.0 * py / ry_sq;
 
-                for x in min_x..max_x {
-                    let px = (x as f32 + 0.5) - sc.x;
-                    let px_term = (px * px) / rx_sq;
-                    let gx = 2.0 * px / rx_sq;
+            for x in min_x..max_x {
+                let px = (x as f32 + 0.5) - sc.x;
+                let px_term = (px * px) / rx_sq;
+                let gx = 2.0 * px / rx_sq;
 
-                    let d_norm = px_term + py_term;
-                    let grad_len = (gx * gx + gy * gy).sqrt().max(1e-6);
-                    let dist_to_boundary = (d_norm - 1.0) / grad_len;
+                let d_norm = px_term + py_term;
+                let grad_len = (gx * gx + gy * gy).sqrt().max(1e-6);
+                let dist_to_boundary = (d_norm - 1.0) / grad_len;
 
-                    let (should_paint, color, alpha) = match mode {
-                        ShapeFillMode::Fill => {
-                            let aa = (0.5 - dist_to_boundary).clamp(0.0, 1.0);
-                            (aa > 0.001, brush.secondary_color, aa * brush.opacity)
-                        }
-                        ShapeFillMode::Stroke => {
-                            let d_stroke = dist_to_boundary.abs() - half_w;
-                            let aa = (0.5 - d_stroke).clamp(0.0, 1.0);
-                            (aa > 0.001, brush.primary_color, aa * brush.opacity)
-                        }
-                        ShapeFillMode::Both => {
-                            let fill_aa = (0.5 - dist_to_boundary).clamp(0.0, 1.0);
-                            let d_stroke = dist_to_boundary.abs() - half_w;
-                            let stroke_aa = (0.5 - d_stroke).clamp(0.0, 1.0);
-
-                            if stroke_aa > 0.001 {
-                                (true, brush.primary_color, stroke_aa * brush.opacity)
-                            } else if fill_aa > 0.001 {
-                                (true, brush.secondary_color, fill_aa * brush.opacity)
-                            } else {
-                                (false, brush.primary_color, 0.0)
-                            }
-                        }
-                    };
-
-                    if should_paint && alpha > 0.001 {
-                        if let Some(mask) = active_mask {
-                            if mask.get_value(x, y) < 8 {
-                                continue;
-                            }
-                        }
-
-                        let idx = ((y * doc_w + x) * 4) as usize;
-                        let dst = Self::read_px(pixels, idx);
-                        let blended = blend_mode.composite_working(dst, Self::u8_px(color.to_rgba8()), alpha);
-                        Self::store_px(pixels, idx, blended);
+                let (should_paint, color, alpha) = match mode {
+                    ShapeFillMode::Fill => {
+                        let aa = (0.5 - dist_to_boundary).clamp(0.0, 1.0);
+                        (aa > 0.001, brush.secondary_color, aa * brush.opacity)
                     }
+                    ShapeFillMode::Stroke => {
+                        let d_stroke = dist_to_boundary.abs() - half_w;
+                        let aa = (0.5 - d_stroke).clamp(0.0, 1.0);
+                        (aa > 0.001, brush.primary_color, aa * brush.opacity)
+                    }
+                    ShapeFillMode::Both => {
+                        let fill_aa = (0.5 - dist_to_boundary).clamp(0.0, 1.0);
+                        let d_stroke = dist_to_boundary.abs() - half_w;
+                        let stroke_aa = (0.5 - d_stroke).clamp(0.0, 1.0);
+
+                        if stroke_aa > 0.001 {
+                            (true, brush.primary_color, stroke_aa * brush.opacity)
+                        } else if fill_aa > 0.001 {
+                            (true, brush.secondary_color, fill_aa * brush.opacity)
+                        } else {
+                            (false, brush.primary_color, 0.0)
+                        }
+                    }
+                };
+
+                if should_paint && alpha > 0.001 {
+                    if let Some(mask) = active_mask {
+                        if mask.get_value(x, y) < 8 {
+                            continue;
+                        }
+                    }
+
+                    let idx = ((y * doc_w + x) * 4) as usize;
+                    let dst = Self::read_px(pixels, idx);
+                    let blended =
+                        blend_mode.composite_working(dst, Self::u8_px(color.to_rgba8()), alpha);
+                    Self::store_px(pixels, idx, blended);
                 }
             }
+        }
     }
 
     pub fn rasterize_ellipse(
@@ -890,12 +989,36 @@ impl StrokeRasterizer {
             let blend_mode = layer.blend_mode;
             match layer.buffer_mut() {
                 LayerBuffer::Srgb8(pixels) => Self::ellipse_impl(
-                    pixels, doc_w, min_x, max_x, min_y, max_y, sc, rx_sq, ry_sq,
-                    half_w, mode, brush, active_mask, blend_mode,
+                    pixels,
+                    doc_w,
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    sc,
+                    rx_sq,
+                    ry_sq,
+                    half_w,
+                    mode,
+                    brush,
+                    active_mask,
+                    blend_mode,
                 ),
                 LayerBuffer::Srgb16(pixels) => Self::ellipse_impl(
-                    pixels, doc_w, min_x, max_x, min_y, max_y, sc, rx_sq, ry_sq,
-                    half_w, mode, brush, active_mask, blend_mode,
+                    pixels,
+                    doc_w,
+                    min_x,
+                    max_x,
+                    min_y,
+                    max_y,
+                    sc,
+                    rx_sq,
+                    ry_sq,
+                    half_w,
+                    mode,
+                    brush,
+                    active_mask,
+                    blend_mode,
                 ),
             }
         }
@@ -915,21 +1038,21 @@ impl StrokeRasterizer {
         opacity: f32,
     ) {
         let fill_working = Self::u8_px(fill_col);
-            for y in 0..doc_h {
-                for x in 0..doc_w {
-                    if shape.get_value(x, y) > 8 {
-                        if let Some(sel) = active_mask {
-                            if sel.get_value(x, y) < 8 {
-                                continue;
-                            }
+        for y in 0..doc_h {
+            for x in 0..doc_w {
+                if shape.get_value(x, y) > 8 {
+                    if let Some(sel) = active_mask {
+                        if sel.get_value(x, y) < 8 {
+                            continue;
                         }
-                        let idx = ((y * doc_w + x) * 4) as usize;
-                        let dst = Self::read_px(pixels, idx);
-                        let blended = blend_mode.composite_working(dst, fill_working, opacity);
-                        Self::store_px(pixels, idx, blended);
                     }
+                    let idx = ((y * doc_w + x) * 4) as usize;
+                    let dst = Self::read_px(pixels, idx);
+                    let blended = blend_mode.composite_working(dst, fill_working, opacity);
+                    Self::store_px(pixels, idx, blended);
                 }
             }
+        }
     }
 
     pub fn rasterize_polygon(
@@ -957,10 +1080,24 @@ impl StrokeRasterizer {
             let (fill_mode, fill_opacity) = (layer.blend_mode, brush.opacity);
             match layer.buffer_mut() {
                 LayerBuffer::Srgb8(pixels) => Self::polygon_fill_impl(
-                    pixels, doc_w, doc_h, &mask, active_mask, fill_col, fill_mode, fill_opacity,
+                    pixels,
+                    doc_w,
+                    doc_h,
+                    &mask,
+                    active_mask,
+                    fill_col,
+                    fill_mode,
+                    fill_opacity,
                 ),
                 LayerBuffer::Srgb16(pixels) => Self::polygon_fill_impl(
-                    pixels, doc_w, doc_h, &mask, active_mask, fill_col, fill_mode, fill_opacity,
+                    pixels,
+                    doc_w,
+                    doc_h,
+                    &mask,
+                    active_mask,
+                    fill_col,
+                    fill_mode,
+                    fill_opacity,
                 ),
             }
         }
@@ -969,7 +1106,14 @@ impl StrokeRasterizer {
             for i in 0..points.len() {
                 let p0 = points[i];
                 let p1 = points[(i + 1) % points.len()];
-                Self::paint_segment(doc, BrushPoint::new(p0, 1.0), BrushPoint::new(p1, 1.0), brush, symmetry, selection);
+                Self::paint_segment(
+                    doc,
+                    BrushPoint::new(p0, 1.0),
+                    BrushPoint::new(p1, 1.0),
+                    brush,
+                    symmetry,
+                    selection,
+                );
             }
         }
     }
@@ -1011,9 +1155,7 @@ impl StrokeRasterizer {
                         let to_cur = cur - start;
                         (to_cur.dot(diff) / length_sq).clamp(0.0, 1.0)
                     }
-                    GradientType::Radial => {
-                        (cur.distance(start) / length).clamp(0.0, 1.0)
-                    }
+                    GradientType::Radial => (cur.distance(start) / length).clamp(0.0, 1.0),
                 };
 
                 if dither {
@@ -1024,7 +1166,8 @@ impl StrokeRasterizer {
                 let color = col0.lerp(col1, t);
                 let idx = ((y * doc_w + x) * 4) as usize;
                 let dst = Self::read_px(pixels, idx);
-                let blended = blend_mode.composite_working(dst, Self::u8_px(color.to_rgba8()), opacity);
+                let blended =
+                    blend_mode.composite_working(dst, Self::u8_px(color.to_rgba8()), opacity);
                 Self::store_px(pixels, idx, blended);
             }
         }
@@ -1055,12 +1198,36 @@ impl StrokeRasterizer {
         let blend_mode = layer.blend_mode;
         match layer.buffer_mut() {
             LayerBuffer::Srgb8(pixels) => Self::gradient_impl(
-                pixels, doc_w, doc_h, start, diff, length_sq, length, grad_type, dither, col0,
-                col1, active_mask, blend_mode, brush.opacity,
+                pixels,
+                doc_w,
+                doc_h,
+                start,
+                diff,
+                length_sq,
+                length,
+                grad_type,
+                dither,
+                col0,
+                col1,
+                active_mask,
+                blend_mode,
+                brush.opacity,
             ),
             LayerBuffer::Srgb16(pixels) => Self::gradient_impl(
-                pixels, doc_w, doc_h, start, diff, length_sq, length, grad_type, dither, col0,
-                col1, active_mask, blend_mode, brush.opacity,
+                pixels,
+                doc_w,
+                doc_h,
+                start,
+                diff,
+                length_sq,
+                length,
+                grad_type,
+                dither,
+                col0,
+                col1,
+                active_mask,
+                blend_mode,
+                brush.opacity,
             ),
         }
     }
@@ -1213,7 +1380,6 @@ impl StrokeRasterizer {
                 && (px[3] as i32 - target_px[3] as i32).abs() <= tolerance as i32
         };
 
-
         while let Some((x, y)) = queue.pop() {
             let pos = (y * doc_w + x) as usize;
             if visited[pos] {
@@ -1293,12 +1459,28 @@ impl StrokeRasterizer {
         let active_mask = selection.filter(|s| s.has_selection());
         match layer.buffer_mut() {
             LayerBuffer::Srgb8(pixels) => Self::flood_fill_impl(
-                pixels, &source_buffer, doc_w, doc_h, start_x, start_y, tolerance, target_px,
-                active_mask, fill_px,
+                pixels,
+                &source_buffer,
+                doc_w,
+                doc_h,
+                start_x,
+                start_y,
+                tolerance,
+                target_px,
+                active_mask,
+                fill_px,
             ),
             LayerBuffer::Srgb16(pixels) => Self::flood_fill_impl(
-                pixels, &source_buffer, doc_w, doc_h, start_x, start_y, tolerance, target_px,
-                active_mask, fill_px,
+                pixels,
+                &source_buffer,
+                doc_w,
+                doc_h,
+                start_x,
+                start_y,
+                tolerance,
+                target_px,
+                active_mask,
+                fill_px,
             ),
         }
     }
@@ -1360,7 +1542,8 @@ impl StrokeRasterizer {
     ) -> (f32, f32) {
         let scale = PxScale::from(font_size.max(4.0));
         let scaled_font = font.as_scaled(scale);
-        let line_height = (scaled_font.ascent() - scaled_font.descent() + scaled_font.line_gap()) * line_spacing_mult.max(0.5);
+        let line_height = (scaled_font.ascent() - scaled_font.descent() + scaled_font.line_gap())
+            * line_spacing_mult.max(0.5);
 
         let lines: Vec<&str> = text.split('\n').collect();
         let mut max_width: f32 = 0.0;
@@ -1416,7 +1599,11 @@ impl StrokeRasterizer {
 
             for word in paragraph.split(' ') {
                 let word_w = measure_word(word);
-                let space_w = if current_line.is_empty() { 0.0 } else { measure_word(" ") };
+                let space_w = if current_line.is_empty() {
+                    0.0
+                } else {
+                    measure_word(" ")
+                };
 
                 if current_line.is_empty() {
                     if word_w <= max_width {
@@ -1496,7 +1683,8 @@ impl StrokeRasterizer {
     ) -> (f32, f32) {
         let scale = PxScale::from(font_size.max(4.0));
         let scaled_font = font.as_scaled(scale);
-        let line_height = (scaled_font.ascent() - scaled_font.descent() + scaled_font.line_gap()) * line_spacing_mult.max(0.5);
+        let line_height = (scaled_font.ascent() - scaled_font.descent() + scaled_font.line_gap())
+            * line_spacing_mult.max(0.5);
 
         let mut max_width: f32 = 0.0;
         for line in lines {
@@ -1700,7 +1888,9 @@ impl StrokeRasterizer {
         // One dispatch per text draw, not per pixel.
         match layer.buffer_mut() {
             LayerBuffer::Srgb8(pixels) => Self::text_run_impl(pixels, doc_w, doc_h, font_ref, &run),
-            LayerBuffer::Srgb16(pixels) => Self::text_run_impl(pixels, doc_w, doc_h, font_ref, &run),
+            LayerBuffer::Srgb16(pixels) => {
+                Self::text_run_impl(pixels, doc_w, doc_h, font_ref, &run)
+            }
         }
     }
 
@@ -1782,24 +1972,32 @@ impl StrokeRasterizer {
                                 return;
                             }
 
-                            let effective_alpha = coverage * run.opacity * run.color[3] as f32 / 255.0 * mask_factor;
+                            let effective_alpha =
+                                coverage * run.opacity * run.color[3] as f32 / 255.0 * mask_factor;
                             if effective_alpha <= 0.001 {
                                 return;
                             }
 
-                            let mut blended = run
-                                .blend_mode
-                                .composite_working(dst, src, effective_alpha);
+                            let mut blended =
+                                run.blend_mode.composite_working(dst, src, effective_alpha);
                             if run.alpha_locked {
                                 blended[3] = dst[3];
                             }
                             Self::store_px(pixels, idx, blended);
 
                             drawn_any = true;
-                            if (cx as f32) < overall_min_x { overall_min_x = cx as f32; }
-                            if (cx as f32) > overall_max_x { overall_max_x = cx as f32; }
-                            if (cy as f32) < overall_min_y { overall_min_y = cy as f32; }
-                            if (cy as f32) > overall_max_y { overall_max_y = cy as f32; }
+                            if (cx as f32) < overall_min_x {
+                                overall_min_x = cx as f32;
+                            }
+                            if (cx as f32) > overall_max_x {
+                                overall_max_x = cx as f32;
+                            }
+                            if (cy as f32) < overall_min_y {
+                                overall_min_y = cy as f32;
+                            }
+                            if (cy as f32) > overall_max_y {
+                                overall_max_y = cy as f32;
+                            }
                         }
                     });
                 }

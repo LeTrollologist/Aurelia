@@ -18,14 +18,14 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use aurelia_core::animation::AnimationTimeline;
-use aurelia_core::brush::{BrushSettings, BrushPoint};
+use aurelia_core::brush::{BrushPoint, BrushSettings};
 use aurelia_core::document::Document;
 use aurelia_core::filter::filter_gaussian_blur;
 use aurelia_core::history::{HistoryStack, LayerPixelsDeltaCommand};
 use aurelia_core::layer::{LayerBuffer, PixelFormat};
 use aurelia_core::rasterizer::StrokeRasterizer;
 use aurelia_core::symmetry::SymmetryConfig;
-use aurelia_core::transform::{InterpolationMode, RenderMode, AffineTransform2D, TransformPatch};
+use aurelia_core::transform::{AffineTransform2D, InterpolationMode, RenderMode, TransformPatch};
 use glam::Vec2;
 
 struct CountingAllocator;
@@ -113,10 +113,28 @@ fn sixteen_bit_editing_session_stays_bounded() {
         let t = cycle as f32 / CYCLES as f32;
         let from = Vec2::new(20.0 + t * 120.0, 30.0);
         let to = Vec2::new(from.x + 18.0, 150.0);
-        StrokeRasterizer::paint_dot(&mut doc, BrushPoint::new(from, 0.8), &brush, &symmetry, None);
-        StrokeRasterizer::paint_segment(&mut doc, BrushPoint::new(from, 0.8), BrushPoint::new(to, 0.9), &brush, &symmetry, None);
+        StrokeRasterizer::paint_dot(
+            &mut doc,
+            BrushPoint::new(from, 0.8),
+            &brush,
+            &symmetry,
+            None,
+        );
+        StrokeRasterizer::paint_segment(
+            &mut doc,
+            BrushPoint::new(from, 0.8),
+            BrushPoint::new(to, 0.9),
+            &brush,
+            &symmetry,
+            None,
+        );
         let after = doc.get_layer(id).expect("layer").storage_bytes();
-        history.push(Box::new(LayerPixelsDeltaCommand::new(id, "soak stroke", before, after)));
+        history.push(Box::new(LayerPixelsDeltaCommand::new(
+            id,
+            "soak stroke",
+            before,
+            after,
+        )));
 
         // Filter the active layer natively.
         let before_filter = doc.get_layer(id).expect("layer").storage_bytes();
@@ -124,7 +142,12 @@ fn sixteen_bit_editing_session_stays_bounded() {
             filter_gaussian_blur::<u16>(channels, SIDE, SIDE, 1.2, None);
         }
         let after_filter = doc.get_layer(id).expect("layer").storage_bytes();
-        history.push(Box::new(LayerPixelsDeltaCommand::new(id, "soak blur", before_filter, after_filter)));
+        history.push(Box::new(LayerPixelsDeltaCommand::new(
+            id,
+            "soak blur",
+            before_filter,
+            after_filter,
+        )));
 
         // Transform a patch and put it back (the free-transform retention shape).
         if let Some(layer) = doc.get_layer(id) {

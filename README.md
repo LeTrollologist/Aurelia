@@ -11,7 +11,7 @@
 <!-- Tier 1: Project Metadata & Quality Assurance Badges -->
 <p align="center">
   <a href="https://github.com/LeTrollologist/Aurelia/releases">
-    <img src="https://img.shields.io/badge/Release-3.13.0_beta.3-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
+    <img src="https://img.shields.io/badge/Release-3.13.0_beta.4-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
   </a>
   <a href="crates/">
     <img src="https://img.shields.io/badge/Engine-Rust_%2B_Win32_FFI-E8963F?style=for-the-badge&logo=rust&logoColor=1A120B&labelColor=1A120B" alt="Engine: Rust with Win32 FFI" />
@@ -37,7 +37,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Windows_10_%2F_11_x86__64-F6C45A?style=flat-square&labelColor=1A120B" alt="Windows 10/11 x86_64" />
   &nbsp;
-  <img src="https://img.shields.io/badge/Toolchain-Rust_1.80%2B-C9527F?style=flat-square&logo=rust&logoColor=1A120B&labelColor=1A120B" alt="Rust 1.80+" />
+  <img src="https://img.shields.io/badge/Toolchain-Rust_1.87%2B-C9527F?style=flat-square&logo=rust&logoColor=1A120B&labelColor=1A120B" alt="Rust 1.87+" />
   &nbsp;
   <img src="https://img.shields.io/badge/Undo-Bounded_Memory-3FA796?style=flat-square&labelColor=1A120B" alt="Bounded undo memory" />
 </p>
@@ -180,7 +180,7 @@ Aurelia/
 | Project files | AUR v3 (`.aur`), legacy HCV v2–v5 (`.hcv`) | AUR v1/v2 are read-only compatibility formats; saves always write v3 |
 | Pixel formats | 8-bit and 16-bit sRGB documents; native 16-bit editing and compositing | Viewport presents an 8-bit image; mixed-format documents round-trip but are not created by the editor |
 | Layer features | Raster, groups, masks, adjustment layers, text, clipping | Animation is timeline-only; no video export |
-| Exports | PNG, JPEG, WebP, GIF, sprite sheets, frame sequences | PNG is 16-bit for 16-bit/mixed documents and 8-bit for 8-bit documents; Aurelia's JPEG/WebP encoders are 8-bit; color profiles are not embedded yet; no ICC/Display P3 workflow |
+| Exports | PNG, JPEG, WebP, GIF, sprite sheets, frame sequences | PNG is 16-bit for 16-bit/mixed documents and 8-bit for 8-bit documents; JPEG/WebP encoders are 8-bit; document ICC profiles are embedded in PNG, JPEG and WebP; Display P3 and CMYK workflows are not implemented |
 | Rich Presence | Optional Discord IPC | Off by default; no artwork previews; Windows Discord desktop only |
 | Distribution | Portable zip + per-user Inno installer | Unsigned by policy (no Authenticode path); artifacts are Ed25519-signed and SHA-256 verified |
 
@@ -193,7 +193,7 @@ Authoritative details: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`do
 Aurelia ships as a **per-user Windows installer**, a portable zip, or a pure-Rust source build.
 Full details, silent-install switches and verification steps live in [`INSTALL.md`](INSTALL.md).
 
-> **v3.13.0-beta.3 is a prerelease.** GitHub's "latest" link still points at stable v3.12.0; use the
+> **v3.13.0-beta.4 is a prerelease.** GitHub's "latest" link still points at stable v3.12.0; use the
 > explicit beta links below.
 
 ### Option 1: Installer (Recommended)
@@ -261,7 +261,7 @@ is not proof of safety; a matching Ed25519 signature is the integrity boundary. 
 If you prefer building from source with full compiler optimizations:
 
 **Prerequisites:**
-- [Rust Toolchain](https://www.rust-lang.org/tools/install) — 1.80+ recommended (this release was built and verified with `rustc 1.98.0`)
+- [Rust Toolchain](https://www.rust-lang.org/tools/install) — 1.87+ required (the workspace declares `rust-version = "1.87"`)
 - **Windows 10 / 11 (64-bit)** — the host layer is Win32 + GDI, so there is no Linux/macOS build yet (tracked in [`ROADMAP.md`](ROADMAP.md))
 
 1. Clone the repository:

@@ -133,4 +133,3 @@ fn animation_export_does_not_retain_the_whole_animation() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
-

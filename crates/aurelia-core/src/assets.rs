@@ -67,7 +67,10 @@ mod tests {
 
     #[test]
     fn read_returns_the_bundled_bytes_and_missing_files_do_not_panic() {
-        assert_eq!(read(&AssetSource::Bundled(bundled_font())), Some(bundled_font().to_vec()));
+        assert_eq!(
+            read(&AssetSource::Bundled(bundled_font())),
+            Some(bundled_font().to_vec())
+        );
 
         let missing = std::path::Path::new("definitely/not/a/file.ttf");
         assert_eq!(read(&AssetSource::File(missing)), None);

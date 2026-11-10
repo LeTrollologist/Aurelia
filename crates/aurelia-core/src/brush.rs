@@ -107,10 +107,7 @@ impl ToolType {
     }
 
     pub fn is_shape_tool(&self) -> bool {
-        matches!(
-            self,
-            Self::Line | Self::Rect | Self::Ellipse
-        )
+        matches!(self, Self::Line | Self::Rect | Self::Ellipse)
     }
 
     pub fn is_selection_tool(&self) -> bool {
@@ -269,18 +266,18 @@ pub struct BrushSettings {
     // ── Velocity Dynamics & Calligraphy ──
     pub velocity_dynamics: bool,
     pub velocity_taper_strength: f32, // 0.0 ..= 1.0 (how sharply fast strokes thin out)
-    pub velocity_min_size: f32,        // 0.05 ..= 1.0 (minimum tip ratio under max speed)
-    pub calligraphy_angle: f32,        // 0.0 ..= 180.0 degrees (chisel nib orientation)
+    pub velocity_min_size: f32,       // 0.05 ..= 1.0 (minimum tip ratio under max speed)
+    pub calligraphy_angle: f32,       // 0.0 ..= 180.0 degrees (chisel nib orientation)
     /// How strongly stylus tilt widens the stroke (0 disables tilt response).
     /// Real pens lay flatter as they tilt, spreading the tip over more pixels.
     #[serde(default)]
     pub tilt_size_gain: f32,
-    pub calligraphy_weight: f32,       // 0.0 ..= 1.0 (0.0 = round, 1.0 = sharp flat chisel)
+    pub calligraphy_weight: f32, // 0.0 ..= 1.0 (0.0 = round, 1.0 = sharp flat chisel)
     // ── Wet Edge Watercolor Effect ──
-    pub wet_edge_strength: f32,        // 0.0 ..= 1.0 (dark pigment pooling at stroke boundaries)
-    pub wet_edge_fringe_width: f32,    // 0.05 ..= 0.5 (fringe band thickness ratio)
+    pub wet_edge_strength: f32, // 0.0 ..= 1.0 (dark pigment pooling at stroke boundaries)
+    pub wet_edge_fringe_width: f32, // 0.05 ..= 0.5 (fringe band thickness ratio)
     // ── Global Stroke Stabilization (S-Levels: 0..=7) ──
-    pub stabilization_level: u32,       // 0 = Off (Realtime Raw), 1..=7 (SAI style lazy rope / tremor filter)
+    pub stabilization_level: u32, // 0 = Off (Realtime Raw), 1..=7 (SAI style lazy rope / tremor filter)
 }
 
 impl Default for BrushSettings {
@@ -507,7 +504,8 @@ impl BrushPreset {
                 name: "G-Pen Inker".to_string(),
                 icon: "✒".to_string(),
                 category: "Inking".to_string(),
-                description: "Crisp manga & comic lineart pen with sharp velocity tapering".to_string(),
+                description: "Crisp manga & comic lineart pen with sharp velocity tapering"
+                    .to_string(),
                 settings: BrushSettings {
                     tool: ToolType::Brush,
                     size: 6.0,
@@ -518,7 +516,6 @@ impl BrushPreset {
                     velocity_dynamics: true,
                     velocity_taper_strength: 0.85,
                     velocity_min_size: 0.1,
-
 
                     wet_edge_strength: 0.0,
                     ..Default::default()
@@ -546,7 +543,8 @@ impl BrushPreset {
                 name: "Calligraphy Nib".to_string(),
                 icon: "🖋".to_string(),
                 category: "Calligraphy".to_string(),
-                description: "45° Chisel ribbon nib with velocity-sensitive stroke width".to_string(),
+                description: "45° Chisel ribbon nib with velocity-sensitive stroke width"
+                    .to_string(),
                 settings: BrushSettings {
                     tool: ToolType::Brush,
                     size: 14.0,
@@ -622,7 +620,8 @@ impl BrushPreset {
                 name: "Rough Charcoal".to_string(),
                 icon: "░".to_string(),
                 category: "Sketching".to_string(),
-                description: "Heavy grainy charcoal texture with expressive velocity response".to_string(),
+                description: "Heavy grainy charcoal texture with expressive velocity response"
+                    .to_string(),
                 settings: BrushSettings {
                     tool: ToolType::Chalk,
                     size: 16.0,
@@ -640,7 +639,8 @@ impl BrushPreset {
                 name: "Copic Marker".to_string(),
                 icon: "🖊".to_string(),
                 category: "Design".to_string(),
-                description: "Semi-transparent layering marker with slight wet edge fringe".to_string(),
+                description: "Semi-transparent layering marker with slight wet edge fringe"
+                    .to_string(),
                 settings: BrushSettings {
                     tool: ToolType::Brush,
                     size: 18.0,
@@ -720,10 +720,21 @@ mod reset_tests {
         assert_eq!(brush.stabilization_level, default.stabilization_level);
         assert_eq!(brush.wet_edge_strength, default.wet_edge_strength);
 
-        assert_eq!(brush.tool, ToolType::Gradient, "the active tool must not change");
-        assert_eq!(brush.primary_color, primary, "reset must not change the paint colour");
+        assert_eq!(
+            brush.tool,
+            ToolType::Gradient,
+            "the active tool must not change"
+        );
+        assert_eq!(
+            brush.primary_color, primary,
+            "reset must not change the paint colour"
+        );
         assert_eq!(brush.secondary_color, secondary);
-        assert_eq!(brush.gradient_type, GradientType::Radial, "tool settings are not brush settings");
+        assert_eq!(
+            brush.gradient_type,
+            GradientType::Radial,
+            "tool settings are not brush settings"
+        );
         assert!(!brush.gradient_dither);
     }
 
@@ -743,17 +754,28 @@ mod reset_tests {
         };
         assert!(brush.reset_tool());
         assert_eq!(brush.eraser_mode, EraserMode::Soft);
-        assert_eq!(brush.color_erase_tolerance, BrushSettings::default().color_erase_tolerance);
+        assert_eq!(
+            brush.color_erase_tolerance,
+            BrushSettings::default().color_erase_tolerance
+        );
         assert!(!brush.eraser_to_background);
         assert_eq!(brush.size, BrushSettings::default().size);
-        assert_eq!(brush.gradient_type, GradientType::Radial, "unrelated tool untouched");
+        assert_eq!(
+            brush.gradient_type,
+            GradientType::Radial,
+            "unrelated tool untouched"
+        );
         assert_eq!(brush.spray_density, 1.9, "unrelated tool untouched");
 
         brush.tool = ToolType::Gradient;
         assert!(brush.reset_tool());
         assert_eq!(brush.gradient_type, GradientType::Linear);
         assert!(brush.gradient_dither);
-        assert_eq!(brush.eraser_mode, EraserMode::Soft, "eraser stays as it was");
+        assert_eq!(
+            brush.eraser_mode,
+            EraserMode::Soft,
+            "eraser stays as it was"
+        );
 
         brush.tool = ToolType::Move;
         assert!(!brush.reset_tool(), "a tool with no settings must say so");

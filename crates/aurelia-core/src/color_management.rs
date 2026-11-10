@@ -157,7 +157,10 @@ mod tests {
 
     #[test]
     fn empty_and_garbage_profiles_are_rejected() {
-        assert_eq!(IccProfile::from_icc(Vec::new()).unwrap_err(), ColorProfileError::Empty);
+        assert_eq!(
+            IccProfile::from_icc(Vec::new()).unwrap_err(),
+            ColorProfileError::Empty
+        );
         assert!(matches!(
             IccProfile::from_icc(vec![0u8; 128]),
             Err(ColorProfileError::Invalid(_))
@@ -170,7 +173,10 @@ mod tests {
         let mut rgba8 = vec![0u8, 1, 127, 255, 255, 128, 64, 0, 10, 20, 30, 40];
         let original8 = rgba8.clone();
         srgb.convert_rgba8(&srgb, &mut rgba8).expect("convert8");
-        assert_eq!(rgba8, original8, "untagged/sRGB path must not move 8-bit bytes");
+        assert_eq!(
+            rgba8, original8,
+            "untagged/sRGB path must not move 8-bit bytes"
+        );
 
         let mut rgba16 = vec![0u16, 257, 32768, 65535, 300, 1000, 40000, 12345];
         let original16 = rgba16.clone();
@@ -195,7 +201,9 @@ mod document_profile_tests {
     use crate::layer::LayerBuffer;
 
     fn srgb_icc() -> Vec<u8> {
-        moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB")
+        moxcms::ColorProfile::new_srgb()
+            .encode()
+            .expect("encode sRGB")
     }
 
     #[test]
@@ -208,15 +216,21 @@ mod document_profile_tests {
         assert_eq!(doc.icc_profile(), Some(icc.as_slice()));
         assert_eq!(doc.layers[0].as_srgb8_exact(), before);
 
-        doc.convert_to_profile(&IccProfile::from_icc(icc).expect("parse")).expect("convert");
-        assert_eq!(doc.layers[0].as_srgb8_exact(), before, "same-profile conversion is a no-op");
+        doc.convert_to_profile(&IccProfile::from_icc(icc).expect("parse"))
+            .expect("convert");
+        assert_eq!(
+            doc.layers[0].as_srgb8_exact(),
+            before,
+            "same-profile conversion is a no-op"
+        );
     }
 
     #[test]
     fn untagged_conversion_to_srgb_is_a_no_op() {
         let mut doc = Document::new(2, 2);
         let before = doc.layers[0].as_srgb8_exact().to_vec();
-        doc.convert_to_profile(&IccProfile::srgb()).expect("convert");
+        doc.convert_to_profile(&IccProfile::srgb())
+            .expect("convert");
         assert_eq!(doc.layers[0].as_srgb8_exact(), before);
         assert!(doc.icc_profile().is_none());
     }
@@ -255,8 +269,12 @@ mod profile_undo_tests {
         assert_ne!(before_pixels, after_pixels, "P3 conversion must move red");
         assert_eq!(doc.icc_profile(), Some(p3_bytes.as_slice()));
 
-        let delta =
-            LayerPixelsDeltaCommand::new(layer_id, "Convert", before_pixels.clone(), after_pixels.clone());
+        let delta = LayerPixelsDeltaCommand::new(
+            layer_id,
+            "Convert",
+            before_pixels.clone(),
+            after_pixels.clone(),
+        );
         let mut cmd = ProfileConversionCommand::new(
             "Convert to ICC",
             before_profile.clone(),
@@ -280,10 +298,8 @@ mod soft_proof_tests {
     #[test]
     fn soft_proof_routes_through_the_proof_profile_and_back() {
         let srgb = IccProfile::srgb();
-        let p3 = IccProfile::from_icc(
-            moxcms::ColorProfile::new_display_p3().encode().expect("P3"),
-        )
-        .expect("parse P3");
+        let p3 = IccProfile::from_icc(moxcms::ColorProfile::new_display_p3().encode().expect("P3"))
+            .expect("parse P3");
         let mut pixels = vec![255u8, 0, 0, 255, 0, 255, 0, 128];
         let original = pixels.clone();
         srgb.simulate_proof_rgba8(&p3, &srgb, &mut pixels)

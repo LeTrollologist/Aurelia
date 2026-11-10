@@ -14,11 +14,7 @@ use aurelia_io::export::{
 use std::path::{Path, PathBuf};
 
 fn temp_dir(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "aurelia-export-{}-{}",
-        tag,
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir().join(format!("aurelia-export-{}-{}", tag, std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create temp dir");
     dir
@@ -53,7 +49,8 @@ fn wrong_frame_length_is_rejected_with_numbers() {
     let dir = temp_dir("bad-len");
     let path = dir.join("a.gif");
 
-    let error = export_animated_gif(&[vec![0u8; 10]], 4, 4, 12, true, &path).expect_err("short frame");
+    let error =
+        export_animated_gif(&[vec![0u8; 10]], 4, 4, 12, true, &path).expect_err("short frame");
 
     match error {
         ExportError::FrameSizeMismatch {

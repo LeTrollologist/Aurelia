@@ -113,14 +113,7 @@ mod tests {
         assert_eq!(px[3], 255);
 
         // Flood fill from (0, 0) with blue
-        StrokeRasterizer::flood_fill(
-            &mut doc,
-            0,
-            0,
-            Color::new(0.0, 0.0, 1.0, 1.0),
-            None,
-            28,
-        );
+        StrokeRasterizer::flood_fill(&mut doc, 0, 0, Color::new(0.0, 0.0, 1.0, 1.0), None, 28);
         let corner_px = doc.layers[0].get_pixel(0, 0).unwrap();
         assert_eq!(corner_px[2], 255);
         assert_eq!(corner_px[3], 255);
@@ -139,15 +132,36 @@ mod tests {
         };
 
         // Rasterize line
-        StrokeRasterizer::rasterize_line(&mut doc, Vec2::new(5.0, 5.0), Vec2::new(25.0, 5.0), &brush, &SymmetryConfig::default(), None);
+        StrokeRasterizer::rasterize_line(
+            &mut doc,
+            Vec2::new(5.0, 5.0),
+            Vec2::new(25.0, 5.0),
+            &brush,
+            &SymmetryConfig::default(),
+            None,
+        );
         assert!(doc.layers[0].get_pixel(15, 5).unwrap()[3] > 0);
 
         // Rasterize rect
-        StrokeRasterizer::rasterize_rect(&mut doc, Vec2::new(30.0, 30.0), Vec2::new(50.0, 50.0), &brush, &SymmetryConfig::default(), None);
+        StrokeRasterizer::rasterize_rect(
+            &mut doc,
+            Vec2::new(30.0, 30.0),
+            Vec2::new(50.0, 50.0),
+            &brush,
+            &SymmetryConfig::default(),
+            None,
+        );
         assert!(doc.layers[0].get_pixel(40, 40).unwrap()[3] > 0);
 
         // Rasterize ellipse
-        StrokeRasterizer::rasterize_ellipse(&mut doc, Vec2::new(10.0, 30.0), Vec2::new(25.0, 45.0), &brush, &SymmetryConfig::default(), None);
+        StrokeRasterizer::rasterize_ellipse(
+            &mut doc,
+            Vec2::new(10.0, 30.0),
+            Vec2::new(25.0, 45.0),
+            &brush,
+            &SymmetryConfig::default(),
+            None,
+        );
         assert!(doc.layers[0].get_pixel(17, 37).unwrap()[3] > 0);
     }
 
@@ -162,7 +176,14 @@ mod tests {
             primary_color: Color::BLACK,
             ..Default::default()
         };
-        StrokeRasterizer::rasterize_rect(&mut doc, Vec2::new(10.0, 10.0), Vec2::new(40.0, 40.0), &line_brush, &SymmetryConfig::default(), None);
+        StrokeRasterizer::rasterize_rect(
+            &mut doc,
+            Vec2::new(10.0, 10.0),
+            Vec2::new(40.0, 40.0),
+            &line_brush,
+            &SymmetryConfig::default(),
+            None,
+        );
 
         // Add Layer 2 as active color layer
         let id2 = doc.add_layer(Some("Color Layer".to_string()));
@@ -193,7 +214,14 @@ mod tests {
             shape_fill_mode: crate::brush::ShapeFillMode::Fill,
             ..Default::default()
         };
-        StrokeRasterizer::rasterize_rect(&mut doc, Vec2::new(15.0, 15.0), Vec2::new(35.0, 35.0), &rect_brush, &SymmetryConfig::default(), None);
+        StrokeRasterizer::rasterize_rect(
+            &mut doc,
+            Vec2::new(15.0, 15.0),
+            Vec2::new(35.0, 35.0),
+            &rect_brush,
+            &SymmetryConfig::default(),
+            None,
+        );
 
         // Wand selection at (25, 25)
         let mask = StrokeRasterizer::rasterize_magic_wand(&doc, 25, 25, 10, true, false);
@@ -214,7 +242,13 @@ mod tests {
             ..Default::default()
         };
 
-        StrokeRasterizer::rasterize_gradient(&mut doc, Vec2::new(0.0, 25.0), Vec2::new(50.0, 25.0), &brush, None);
+        StrokeRasterizer::rasterize_gradient(
+            &mut doc,
+            Vec2::new(0.0, 25.0),
+            Vec2::new(50.0, 25.0),
+            &brush,
+            None,
+        );
 
         let layer = doc.active_layer().unwrap();
         let left_px = layer.get_pixel(0, 25).unwrap();
@@ -293,7 +327,9 @@ mod tests {
         let id2 = doc.add_layer(Some("Clipped Layer".to_string()));
         if let Some(l2) = doc.get_layer_mut(id2) {
             l2.clipping_mask = true;
-            l2.as_srgb8_exact_mut().chunks_exact_mut(4).for_each(|px| px.copy_from_slice(&[0, 0, 255, 255]));
+            l2.as_srgb8_exact_mut()
+                .chunks_exact_mut(4)
+                .for_each(|px| px.copy_from_slice(&[0, 0, 255, 255]));
         }
 
         let flat = doc.composite_layers(false);
@@ -503,8 +539,11 @@ mod tests {
         let h = 2;
         let mut pixels = vec![0u8; 16];
         // (0,0) = Red, (1,0) = Blue
-        pixels[0] = 255; pixels[3] = 255; // Red
-        pixels[4] = 0; pixels[6] = 255; pixels[7] = 255; // Blue
+        pixels[0] = 255;
+        pixels[3] = 255; // Red
+        pixels[4] = 0;
+        pixels[6] = 255;
+        pixels[7] = 255; // Blue
 
         let mid = crate::rasterizer::sample_bilinear_rgba(&pixels, w, h, 0.5, 0.0);
         // Halfway between Red and Blue
@@ -545,7 +584,10 @@ mod tests {
         // Pixel at (33, 20) should now have smudged red paint
         if let Some(layer) = doc.active_layer() {
             let idx = (20 * 50 + 33) * 4;
-            assert!(layer.as_srgb8_exact()[idx] > 0, "Smudge should push red pixels to (33, 20)");
+            assert!(
+                layer.as_srgb8_exact()[idx] > 0,
+                "Smudge should push red pixels to (33, 20)"
+            );
         }
     }
 
@@ -572,7 +614,10 @@ mod tests {
         let perp_tangent = Some(Vec2::new(-1.0, 1.0));
         let broad_factor = brush.calligraphy_factor(perp_tangent);
 
-        assert!(thin_factor < broad_factor, "Parallel stroke should be thinner than perpendicular");
+        assert!(
+            thin_factor < broad_factor,
+            "Parallel stroke should be thinner than perpendicular"
+        );
         assert!(thin_factor < 0.6);
         assert!(broad_factor > 0.8);
     }
@@ -947,7 +992,6 @@ mod tests {
     fn test_non_destructive_adjustment_layers() {
         use crate::layer::AdjustmentType;
 
-
         let mut doc = Document::new(10, 10);
         // Base drawing layer filled with gray (128, 128, 128, 255)
         for y in 0..10 {
@@ -973,7 +1017,10 @@ mod tests {
         // 3. Replace with Brightness/Contrast (+50 brightness)
         doc.delete_layer(inv_id);
         let _bright_id = doc.add_adjustment_layer(
-            AdjustmentType::BrightnessContrast { brightness: 50.0, contrast: 0.0 },
+            AdjustmentType::BrightnessContrast {
+                brightness: 50.0,
+                contrast: 0.0,
+            },
             None,
         );
         let comp3 = doc.composite_layers(false);
@@ -1121,10 +1168,16 @@ mod tests {
         let mut doc = Document::new(4, 4);
         let bottom = doc.active_layer_id;
         let top = doc.add_layer(Some("Top".into()));
-        assert_eq!(doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(), vec![bottom, top]);
+        assert_eq!(
+            doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(),
+            vec![bottom, top]
+        );
 
         doc.move_layer(top, -1);
-        assert_eq!(doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(), vec![top, bottom]);
+        assert_eq!(
+            doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(),
+            vec![top, bottom]
+        );
         let mut history = crate::history::HistoryStack::new(10);
         history.push(Box::new(crate::history::MoveLayerCommand {
             layer_id: top,
@@ -1132,9 +1185,15 @@ mod tests {
             to_index: 0,
         }));
         history.undo(&mut doc);
-        assert_eq!(doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(), vec![bottom, top]);
+        assert_eq!(
+            doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(),
+            vec![bottom, top]
+        );
         history.redo(&mut doc);
-        assert_eq!(doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(), vec![top, bottom]);
+        assert_eq!(
+            doc.layers.iter().map(|l| l.id).collect::<Vec<_>>(),
+            vec![top, bottom]
+        );
     }
 
     #[test]
@@ -1215,7 +1274,10 @@ mod tests {
 
         for id in [c, b, a] {
             assert!(doc.delete_layer(id).is_some(), "layer {id} should delete");
-            assert!(!doc.layers.is_empty(), "the document must keep at least one layer");
+            assert!(
+                !doc.layers.is_empty(),
+                "the document must keep at least one layer"
+            );
             assert!(
                 doc.layers.iter().any(|l| l.id == doc.active_layer_id),
                 "active layer {} dangles after deleting {id}",
@@ -1243,7 +1305,10 @@ mod tests {
 
         let removed = doc.delete_layer(group).expect("the group should delete");
         assert_eq!(removed.id, group);
-        assert!(doc.get_layer(child).is_none(), "children die with their group");
+        assert!(
+            doc.get_layer(child).is_none(),
+            "children die with their group"
+        );
         assert!(doc.get_layer(base).is_some());
         assert!(doc.layers.iter().any(|l| l.id == doc.active_layer_id));
         assert_eq!(doc.layers.len(), 1);
@@ -1260,7 +1325,10 @@ mod tests {
         assert!(doc.ungroup(group));
         assert!(doc.get_layer(group).is_none(), "the group itself is gone");
         let released = doc.get_layer(child).expect("the child survives ungrouping");
-        assert_eq!(released.parent_id, None, "the child is re-parented to the root");
+        assert_eq!(
+            released.parent_id, None,
+            "the child is re-parented to the root"
+        );
         assert!(doc.layers.iter().any(|l| l.id == doc.active_layer_id));
         assert!(doc.get_layer(base).is_some());
     }
@@ -1277,19 +1345,35 @@ mod tests {
         }
 
         assert!(doc.add_layer_mask(id, None), "a mask can be created");
-        assert_eq!(doc.composite_layers(false)[3], 255, "a fresh mask is fully visible");
+        assert_eq!(
+            doc.composite_layers(false)[3],
+            255,
+            "a fresh mask is fully visible"
+        );
 
         assert!(doc.invert_layer_mask(id));
         let flat = doc.composite_layers(false);
-        assert_eq!(&flat[0..4], &[0, 0, 0, 0], "an inverted mask hides the layer");
+        assert_eq!(
+            &flat[0..4],
+            &[0, 0, 0, 0],
+            "an inverted mask hides the layer"
+        );
 
         // Disabling keeps the mask but ignores it.
         assert!(doc.set_layer_mask_enabled(id, false));
-        assert_eq!(doc.composite_layers(false)[3], 255, "a disabled mask is ignored");
+        assert_eq!(
+            doc.composite_layers(false)[3],
+            255,
+            "a disabled mask is ignored"
+        );
 
         assert!(doc.remove_layer_mask(id));
         assert!(doc.get_layer(id).unwrap().mask.is_none());
-        assert_eq!(doc.composite_layers(false)[3], 255, "the layer itself was never altered");
+        assert_eq!(
+            doc.composite_layers(false)[3],
+            255,
+            "the layer itself was never altered"
+        );
     }
 
     #[test]
@@ -1301,7 +1385,12 @@ mod tests {
                 px.copy_from_slice(&[255, 0, 0, 255]);
             }
         }
-        let sel = crate::selection::SelectionMask::from_rect(4, 4, glam::vec2(0.0, 0.0), glam::vec2(2.0, 2.0));
+        let sel = crate::selection::SelectionMask::from_rect(
+            4,
+            4,
+            glam::vec2(0.0, 0.0),
+            glam::vec2(2.0, 2.0),
+        );
         assert!(doc.add_layer_mask(id, Some(&sel)));
 
         let flat = doc.composite_layers(false);
@@ -1320,24 +1409,46 @@ mod tests {
         let copy = doc.get_layer(dup).unwrap();
         assert_eq!(copy.mask.as_ref().map(|m| m.pixels[0]), Some(0));
         // The original is untouched.
-        assert_eq!(doc.get_layer(id).unwrap().mask.as_ref().map(|m| m.pixels[0]), Some(0));
+        assert_eq!(
+            doc.get_layer(id)
+                .unwrap()
+                .mask
+                .as_ref()
+                .map(|m| m.pixels[0]),
+            Some(0)
+        );
     }
-
 
     #[test]
     fn tilt_widens_the_stroke_up_to_the_gain() {
         use crate::brush::tilt_size_scale;
-        assert_eq!(tilt_size_scale(0.0, 0.0, 1.0), 1.0, "an upright pen is unaffected");
-        assert_eq!(tilt_size_scale(80.0, 40.0, 0.0), 1.0, "gain 0 disables tilt response");
-        assert!((tilt_size_scale(90.0, 0.0, 1.0) - 2.0).abs() < 1e-3, "full tilt doubles the width");
+        assert_eq!(
+            tilt_size_scale(0.0, 0.0, 1.0),
+            1.0,
+            "an upright pen is unaffected"
+        );
+        assert_eq!(
+            tilt_size_scale(80.0, 40.0, 0.0),
+            1.0,
+            "gain 0 disables tilt response"
+        );
+        assert!(
+            (tilt_size_scale(90.0, 0.0, 1.0) - 2.0).abs() < 1e-3,
+            "full tilt doubles the width"
+        );
         let half = tilt_size_scale(45.0, 0.0, 1.0);
-        assert!(half > 1.2 && half < 1.8, "half tilt lands in between: {half}");
+        assert!(
+            half > 1.2 && half < 1.8,
+            "half tilt lands in between: {half}"
+        );
         let x = tilt_size_scale(60.0, 0.0, 0.5);
         let y = tilt_size_scale(0.0, 60.0, 0.5);
         assert!((x - y).abs() < 1e-4, "both axes are equivalent");
-        assert!(tilt_size_scale(f32::NAN, 10.0, 1.0) == 1.0, "garbage tilt is ignored");
+        assert!(
+            tilt_size_scale(f32::NAN, 10.0, 1.0) == 1.0,
+            "garbage tilt is ignored"
+        );
     }
-
 
     /// The compositor as it stood before the v2.6.0 rewrite, kept verbatim as the
     /// correctness oracle. The rewritten path must produce byte-identical output:
@@ -1414,9 +1525,12 @@ mod tests {
                         let inv_sa = 255 - sa;
                         let out_a = sa + (da * inv_sa + 127) / 255;
                         if out_a > 0 {
-                            let r = (src[0] as u32 * sa * 255 + dst[0] as u32 * da * inv_sa) / (out_a * 255);
-                            let g = (src[1] as u32 * sa * 255 + dst[1] as u32 * da * inv_sa) / (out_a * 255);
-                            let b = (src[2] as u32 * sa * 255 + dst[2] as u32 * da * inv_sa) / (out_a * 255);
+                            let r = (src[0] as u32 * sa * 255 + dst[0] as u32 * da * inv_sa)
+                                / (out_a * 255);
+                            let g = (src[1] as u32 * sa * 255 + dst[1] as u32 * da * inv_sa)
+                                / (out_a * 255);
+                            let b = (src[2] as u32 * sa * 255 + dst[2] as u32 * da * inv_sa)
+                                / (out_a * 255);
                             dst[0] = r.min(255) as u8;
                             dst[1] = g.min(255) as u8;
                             dst[2] = b.min(255) as u8;
@@ -1433,8 +1547,14 @@ mod tests {
                     let dst_idx = ((y * doc.width + x) * 4) as usize;
                     let src_x = x as i32 - layer.offset_x;
                     let src_y = y as i32 - layer.offset_y;
-                    let src_px = if src_x >= 0 && src_x < doc.width as i32 && src_y >= 0 && src_y < doc.height as i32 {
-                        layer.get_pixel(src_x as u32, src_y as u32).unwrap_or([0, 0, 0, 0])
+                    let src_px = if src_x >= 0
+                        && src_x < doc.width as i32
+                        && src_y >= 0
+                        && src_y < doc.height as i32
+                    {
+                        layer
+                            .get_pixel(src_x as u32, src_y as u32)
+                            .unwrap_or([0, 0, 0, 0])
                     } else {
                         [0, 0, 0, 0]
                     };
@@ -1445,8 +1565,14 @@ mod tests {
                     if let Some(base) = prev_layer {
                         let bx = x as i32 - base.offset_x;
                         let by = y as i32 - base.offset_y;
-                        let base_a = if bx >= 0 && bx < doc.width as i32 && by >= 0 && by < doc.height as i32 {
-                            base.get_pixel(bx as u32, by as u32).map(|p| p[3] as f32 / 255.0).unwrap_or(0.0)
+                        let base_a = if bx >= 0
+                            && bx < doc.width as i32
+                            && by >= 0
+                            && by < doc.height as i32
+                        {
+                            base.get_pixel(bx as u32, by as u32)
+                                .map(|p| p[3] as f32 / 255.0)
+                                .unwrap_or(0.0)
                         } else {
                             0.0
                         };
@@ -1455,7 +1581,12 @@ mod tests {
                     if opacity <= 0.001 {
                         continue;
                     }
-                    let dst_px = [out[dst_idx], out[dst_idx + 1], out[dst_idx + 2], out[dst_idx + 3]];
+                    let dst_px = [
+                        out[dst_idx],
+                        out[dst_idx + 1],
+                        out[dst_idx + 2],
+                        out[dst_idx + 3],
+                    ];
                     let blended = layer.blend_mode.composite_pixel(dst_px, src_px, opacity);
                     out[dst_idx] = blended[0];
                     out[dst_idx + 1] = blended[1];
@@ -1499,8 +1630,8 @@ mod tests {
             for (i, px) in layer.as_srgb8_exact_mut().chunks_exact_mut(4).enumerate() {
                 let x = (i as u32) % W;
                 let y = (i as u32) / W;
-                let covered = coverage >= 1.0
-                    || ((x * 3 + y * 5) as f32 / ((W + H) as f32)) < coverage;
+                let covered =
+                    coverage >= 1.0 || ((x * 3 + y * 5) as f32 / ((W + H) as f32)) < coverage;
                 px[0] = (200 - (x * 5) as u8) as u8;
                 px[1] = (120 + (y * 11) as u8) as u8;
                 px[2] = (60 + ((x + y) * 9) as u8) as u8;
@@ -1567,7 +1698,8 @@ mod tests {
                 for mask_case in 0..3u8 {
                     for clipping in [false, true] {
                         for coverage in [1.0f32, 0.5, 0.15] {
-                            let doc = coverage_fixture(mode, offset, mask_case, clipping, coverage, 0);
+                            let doc =
+                                coverage_fixture(mode, offset, mask_case, clipping, coverage, 0);
                             let got = doc.composite_layers(false);
                             let want = reference_composite(&doc, false);
                             assert_eq!(
@@ -1697,7 +1829,11 @@ mod tests {
             let want = reference_composite(&doc, false);
             assert_eq!(got, want, "parallel output differs for {mode:?}");
             for run in 1..4 {
-                assert_eq!(got, doc.composite_layers(false), "{mode:?} differed on run {run}");
+                assert_eq!(
+                    got,
+                    doc.composite_layers(false),
+                    "{mode:?} differed on run {run}"
+                );
             }
         }
     }
@@ -1753,10 +1889,11 @@ mod tests {
                             // be identical.
                             let mut single = Document::new(doc.width, doc.height);
                             single.is_transparent = true;
-                            let subject = coverage_fixture(mode, offset, mask_case, false, coverage, 0)
-                                .layers
-                                .pop()
-                                .expect("subject layer");
+                            let subject =
+                                coverage_fixture(mode, offset, mask_case, false, coverage, 0)
+                                    .layers
+                                    .pop()
+                                    .expect("subject layer");
                             if let Some(slot) = single.layers.first_mut() {
                                 *slot = subject;
                             }
@@ -1817,14 +1954,14 @@ mod tests {
             .iter()
             .map(|&v| crate::pixel::srgb16_to_srgb8(v))
             .collect();
-        assert_eq!(downconverted, eight_bit, "the promotion must not change 8-bit output");
+        assert_eq!(
+            downconverted, eight_bit,
+            "the promotion must not change 8-bit output"
+        );
 
         // A 50% blend of two 8-bit values lands between lattice points for most inputs, so
         // the 16-bit result must contain values that are not multiples of 257.
-        let off_lattice = sixteen
-            .iter()
-            .filter(|&&v| v % 257 != 0)
-            .count();
+        let off_lattice = sixteen.iter().filter(|&&v| v % 257 != 0).count();
         assert!(
             off_lattice > 0,
             "no sub-8-bit detail survived: every channel landed on the lattice"
@@ -1950,7 +2087,9 @@ mod tests {
         }
 
         let megapixels = (W as f64 * H as f64 * ITERS as f64) / 1_000_000.0;
-        println!("gate 2 - {W}x{H}, {LAYERS} layers, all layers general path, {ROUNDS} paired rounds");
+        println!(
+            "gate 2 - {W}x{H}, {LAYERS} layers, all layers general path, {ROUNDS} paired rounds"
+        );
         println!(
             "{:<12} {:>12} {:>12} {:>10} {:>16}",
             "workload", "u8 MPix/s", "Srgb16", "ratio", "ratio spread"
@@ -1978,7 +2117,11 @@ mod tests {
         println!(
             "  sparse regression budget: Srgb16 >= 60% of u8 -> {:.0}% {}",
             sparse_ratio * 100.0,
-            if sparse_ratio >= 0.6 { "PASS (provisional)" } else { "FAIL" }
+            if sparse_ratio >= 0.6 {
+                "PASS (provisional)"
+            } else {
+                "FAIL"
+            }
         );
         println!("  absolute thresholds are recorded as context only, per the approved change");
         assert!(
@@ -1999,10 +2142,26 @@ mod tests {
         let mb = |bytes: usize| bytes as f64 / (1024.0 * 1024.0);
 
         println!("\nMemory:");
-        println!("  one layer              {:>8.1} MB -> {:>8.1} MB", mb(per_layer_8), mb(per_layer_16));
-        println!("  {LAYERS}-layer document        {:>8.1} MB -> {:>8.1} MB", mb(doc_8), mb(doc_16));
-        println!("  history, per-stroke x{steps}  {:>8.1} MB -> {:>8.1} MB", mb(per_stroke_8), mb(per_stroke_16));
-        println!("  history, full doc x{steps}   {:>8.1} MB -> {:>8.1} MB", mb(full_doc_8), mb(full_doc_16));
+        println!(
+            "  one layer              {:>8.1} MB -> {:>8.1} MB",
+            mb(per_layer_8),
+            mb(per_layer_16)
+        );
+        println!(
+            "  {LAYERS}-layer document        {:>8.1} MB -> {:>8.1} MB",
+            mb(doc_8),
+            mb(doc_16)
+        );
+        println!(
+            "  history, per-stroke x{steps}  {:>8.1} MB -> {:>8.1} MB",
+            mb(per_stroke_8),
+            mb(per_stroke_16)
+        );
+        println!(
+            "  history, full doc x{steps}   {:>8.1} MB -> {:>8.1} MB",
+            mb(full_doc_8),
+            mb(full_doc_16)
+        );
         assert_eq!(per_layer_16, per_layer_8 * 2);
         assert_eq!(doc_16, doc_8 * 2);
         assert_eq!(per_stroke_16, per_stroke_8 * 2);
@@ -2016,14 +2175,7 @@ mod tests {
     fn compositing_stages_a_sixteen_bit_layer_at_the_boundary() {
         use crate::layer::LayerBuffer;
 
-        let mut doc = coverage_fixture(
-            crate::blend::BlendMode::Multiply,
-            (3, 2),
-            1,
-            false,
-            0.5,
-            0,
-        );
+        let mut doc = coverage_fixture(crate::blend::BlendMode::Multiply, (3, 2), 1, false, 0.5, 0);
         for layer in doc.layers.iter_mut() {
             layer.offset_x = 1;
             layer.offset_y = 1;
@@ -2059,7 +2211,10 @@ mod tests {
         let layer_id = doc.active_layer_id;
         let low = crate::pixel::srgb8_to_srgb16(100);
         let high = low + 128;
-        assert_eq!(crate::pixel::srgb16_to_srgb8(low), crate::pixel::srgb16_to_srgb8(high));
+        assert_eq!(
+            crate::pixel::srgb16_to_srgb8(low),
+            crate::pixel::srgb16_to_srgb8(high)
+        );
         let mut channels = vec![0u16; 16];
         for pixel in 0..4 {
             channels[pixel * 4 + 3] = 65535;
@@ -2074,11 +2229,17 @@ mod tests {
         let native = crate::document::promote_layers(&doc);
         let mut composed = vec![0u16; 16];
         crate::document::compose_u16_prepared(&doc, &native, &mut composed, false);
-        assert_ne!(composed[0], composed[4], "16-bit compositing collapsed two values");
+        assert_ne!(
+            composed[0], composed[4],
+            "16-bit compositing collapsed two values"
+        );
         assert_eq!(composed[0], low);
         assert_eq!(composed[4], high);
         let eight_bit = doc.composite_layers(false);
-        assert_eq!(eight_bit[0], eight_bit[4], "an 8-bit result cannot carry it");
+        assert_eq!(
+            eight_bit[0], eight_bit[4],
+            "an 8-bit result cannot carry it"
+        );
     }
 
     /// GOLDEN: the alpha-lock and eraser-clamp paths as they behave **today**.
@@ -2134,7 +2295,10 @@ mod tests {
             .take(9)
             .flatten()
             .collect();
-        assert_eq!(painted, expected_locked, "alpha-locked painting changed its bytes");
+        assert_eq!(
+            painted, expected_locked,
+            "alpha-locked painting changed its bytes"
+        );
 
         // 2. Soft eraser over a transparent background: the alpha-clamp path.
         let (mut doc, mut brush) = prepared();
@@ -2148,7 +2312,10 @@ mod tests {
             .take(9)
             .flatten()
             .collect();
-        assert_eq!(erased, expected_erased, "the soft-eraser clamp changed its bytes");
+        assert_eq!(
+            erased, expected_erased,
+            "the soft-eraser clamp changed its bytes"
+        );
 
         // 3. Colour erase: the other alpha-clamp path.
         let (mut doc, mut brush) = prepared();
@@ -2170,14 +2337,16 @@ mod tests {
     #[test]
     fn painting_entry_points_work_on_sixteen_bit_layers() {
         use crate::brush::{BrushPoint, BrushSettings, ToolType};
-        use crate::symmetry::SymmetryConfig;
         use crate::layer::LayerBuffer;
+        use crate::symmetry::SymmetryConfig;
 
         fn wide_layer() -> Document {
             let mut doc = Document::new(8, 8);
             doc.is_transparent = true;
             let id = doc.active_layer_id;
-            let channels: Vec<u16> = (0..(8 * 8 * 4)).map(|i| (i as u16).wrapping_mul(257)).collect();
+            let channels: Vec<u16> = (0..(8 * 8 * 4))
+                .map(|i| (i as u16).wrapping_mul(257))
+                .collect();
             if let Some(layer) = doc.get_layer_mut(id) {
                 *layer.buffer_mut() = LayerBuffer::Srgb16(channels);
             }
@@ -2202,7 +2371,11 @@ mod tests {
         // paint_dot
         let mut doc = wide_layer();
         crate::rasterizer::StrokeRasterizer::paint_dot(
-            &mut doc, point(4.0, 4.0), &brush(), &SymmetryConfig::default(), None,
+            &mut doc,
+            point(4.0, 4.0),
+            &brush(),
+            &SymmetryConfig::default(),
+            None,
         );
         let id = doc.active_layer_id;
         let layer = doc.get_layer(id).expect("layer");
@@ -2215,14 +2388,25 @@ mod tests {
         // paint_segment
         let mut doc = wide_layer();
         crate::rasterizer::StrokeRasterizer::paint_segment(
-            &mut doc, point(1.0, 1.0), point(6.0, 6.0), &brush(), &SymmetryConfig::default(), None,
+            &mut doc,
+            point(1.0, 1.0),
+            point(6.0, 6.0),
+            &brush(),
+            &SymmetryConfig::default(),
+            None,
         );
         let id = doc.active_layer_id;
         assert_eq!(
             doc.get_layer(id).expect("layer").format(),
             crate::layer::PixelFormat::Srgb16
         );
-        assert!(doc.get_layer(id).unwrap().as_srgb16().unwrap().iter().any(|&c| c == 65535));
+        assert!(doc
+            .get_layer(id)
+            .unwrap()
+            .as_srgb16()
+            .unwrap()
+            .iter()
+            .any(|&c| c == 65535));
 
         // paint_spline
         let mut doc = wide_layer();
@@ -2241,7 +2425,13 @@ mod tests {
             doc.get_layer(id).expect("layer").format(),
             crate::layer::PixelFormat::Srgb16
         );
-        assert!(doc.get_layer(id).unwrap().as_srgb16().unwrap().iter().any(|&c| c == 65535));
+        assert!(doc
+            .get_layer(id)
+            .unwrap()
+            .as_srgb16()
+            .unwrap()
+            .iter()
+            .any(|&c| c == 65535));
     }
 
     /// Painting at partial opacity must keep detail below one 8-bit step: the pixel starts
@@ -2249,8 +2439,8 @@ mod tests {
     #[test]
     fn painting_keeps_off_lattice_detail_at_partial_opacity() {
         use crate::brush::{BrushPoint, BrushSettings, ToolType};
-        use crate::symmetry::SymmetryConfig;
         use crate::layer::LayerBuffer;
+        use crate::symmetry::SymmetryConfig;
 
         let mut doc = Document::new(6, 6);
         doc.is_transparent = true;
@@ -2275,14 +2465,25 @@ mod tests {
         brush.primary_color = Color::WHITE;
         crate::rasterizer::StrokeRasterizer::paint_dot(
             &mut doc,
-            BrushPoint { position: glam::Vec2::new(3.0, 3.0), pressure: 1.0 },
+            BrushPoint {
+                position: glam::Vec2::new(3.0, 3.0),
+                pressure: 1.0,
+            },
             &brush,
             &SymmetryConfig::default(),
             None,
         );
 
-        let painted = doc.get_layer(id).expect("layer").as_srgb16().expect("16-bit");
-        let moved: Vec<u16> = painted.iter().copied().filter(|&c| c != mid && c != 65535 && c != 0).collect();
+        let painted = doc
+            .get_layer(id)
+            .expect("layer")
+            .as_srgb16()
+            .expect("16-bit");
+        let moved: Vec<u16> = painted
+            .iter()
+            .copied()
+            .filter(|&c| c != mid && c != 65535 && c != 0)
+            .collect();
         assert!(!moved.is_empty(), "the dab changed nothing");
         assert!(
             moved.iter().any(|&c| c % 257 != 0),
@@ -2321,12 +2522,8 @@ mod tests {
         brush.opacity = 0.5;
 
         // A selection covering the left half only, so coverage is exercised at 16 bits too.
-        let mask = SelectionMask::from_rect(
-            8,
-            8,
-            glam::Vec2::new(0.0, 0.0),
-            glam::Vec2::new(4.0, 8.0),
-        );
+        let mask =
+            SelectionMask::from_rect(8, 8, glam::Vec2::new(0.0, 0.0), glam::Vec2::new(4.0, 8.0));
 
         crate::rasterizer::StrokeRasterizer::rasterize_rect(
             &mut doc,
@@ -2338,7 +2535,11 @@ mod tests {
         );
 
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "the fill must not change storage format");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "the fill must not change storage format"
+        );
         let painted = layer.as_srgb16().expect("16-bit");
 
         let left = painted[(2 * 8 + 1) * 4];
@@ -2390,7 +2591,11 @@ mod tests {
         );
 
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "the ellipse must not change storage");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "the ellipse must not change storage"
+        );
         let painted = layer.as_srgb16().expect("16-bit");
         let centre = painted[(4 * 9 + 4) * 4];
         assert_ne!(centre, mid, "the ellipse centre was not filled");
@@ -2445,10 +2650,18 @@ mod tests {
         let mut doc = wide_doc();
         let id = doc.active_layer_id;
         crate::rasterizer::StrokeRasterizer::rasterize_polygon(
-            &mut doc, &triangle, &brush, &SymmetryConfig::default(), None,
+            &mut doc,
+            &triangle,
+            &brush,
+            &SymmetryConfig::default(),
+            None,
         );
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "polygon fill changed storage format");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "polygon fill changed storage format"
+        );
         let filled = layer.as_srgb16().expect("16-bit")[(4 * 9 + 4) * 4];
         assert_ne!(filled, mid, "the polygon interior was not filled");
         assert!(
@@ -2461,16 +2674,27 @@ mod tests {
         let mut doc = wide_doc();
         let id = doc.active_layer_id;
         crate::rasterizer::StrokeRasterizer::rasterize_polygon(
-            &mut doc, &triangle, &brush, &SymmetryConfig::default(), None,
+            &mut doc,
+            &triangle,
+            &brush,
+            &SymmetryConfig::default(),
+            None,
         );
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "polygon outline changed storage format");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "polygon outline changed storage format"
+        );
         let painted = layer.as_srgb16().expect("16-bit");
         let changed = painted
             .chunks_exact(4)
             .filter(|pixel| pixel[0] != mid)
             .count();
-        assert!(changed > 0, "the polygon outline painted nothing onto the 16-bit layer");
+        assert!(
+            changed > 0,
+            "the polygon outline painted nothing onto the 16-bit layer"
+        );
     }
 
     /// Gradient on 16-bit storage: the interpolation must produce values off the 8-bit lattice,
@@ -2512,7 +2736,11 @@ mod tests {
         );
 
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "the gradient must not change storage");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "the gradient must not change storage"
+        );
         let painted = layer.as_srgb16().expect("16-bit");
 
         let mut off_lattice = 0;
@@ -2571,15 +2799,31 @@ mod tests {
         );
 
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "flood fill changed storage format");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "flood fill changed storage format"
+        );
         let painted = layer.as_srgb16().expect("16-bit");
         let at = |x: usize, y: usize| painted[(y * 8 + x) * 4];
 
         let red = crate::pixel::srgb8_to_srgb16(255);
         assert_eq!(at(0, 0), red, "the seed was not filled");
-        assert_eq!(at(3, 5), red, "the region left of the barrier was not filled");
-        assert_eq!(at(4, 2), 65535, "the barrier itself must not be overwritten");
-        assert_eq!(at(7, 2), mid, "the region right of the barrier must be untouched");
+        assert_eq!(
+            at(3, 5),
+            red,
+            "the region left of the barrier was not filled"
+        );
+        assert_eq!(
+            at(4, 2),
+            65535,
+            "the barrier itself must not be overwritten"
+        );
+        assert_eq!(
+            at(7, 2),
+            mid,
+            "the region right of the barrier must be untouched"
+        );
     }
 
     /// Text on a 16-bit layer renders natively: the loop dispatches once per draw and writes
@@ -2613,7 +2857,11 @@ mod tests {
         );
 
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "text must not change storage");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "text must not change storage"
+        );
         let channels = layer.as_srgb16().expect("16-bit");
         assert!(channels.iter().any(|&c| c > 0), "nothing was rendered");
 
@@ -2643,7 +2891,9 @@ mod tests {
         let mut config = crate::layer::TextLayerConfig::default();
         config.content = String::new();
         let layer = doc.get_layer_mut(id).expect("layer");
-        assert!(crate::rasterizer::StrokeRasterizer::rasterize_text_layer_config(layer, &config, &font));
+        assert!(
+            crate::rasterizer::StrokeRasterizer::rasterize_text_layer_config(layer, &config, &font)
+        );
 
         let layer = doc.get_layer(id).expect("layer");
         assert_eq!(layer.format(), PixelFormat::Srgb16);
@@ -2666,7 +2916,9 @@ mod tests {
         let selection = SelectionMask::from_mask_vec(
             64,
             32,
-            (0..64 * 32).map(|index| if index % 64 < 20 { 255u8 } else { 0 }).collect(),
+            (0..64 * 32)
+                .map(|index| if index % 64 < 20 { 255u8 } else { 0 })
+                .collect(),
         );
 
         let mut results = Vec::new();
@@ -2730,7 +2982,11 @@ mod tests {
         // Grow: the original 4x3 region must be copied verbatim, the rest zero.
         doc.get_layer_mut(id).expect("layer").resize(6, 5);
         let layer = doc.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "resize changed storage format");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "resize changed storage format"
+        );
         let grown = layer.as_srgb16().expect("16-bit");
         assert_eq!(grown.len(), 6 * 5 * 4);
         for y in 0..3usize {
@@ -2743,9 +2999,16 @@ mod tests {
 
         // Shrink: the surviving region is the top-left corner, still exact.
         doc.get_layer_mut(id).expect("layer").resize(2, 2);
-        let shrunk = doc.get_layer(id).expect("layer").as_srgb16().expect("16-bit");
+        let shrunk = doc
+            .get_layer(id)
+            .expect("layer")
+            .as_srgb16()
+            .expect("16-bit");
         for y in 0..2usize {
-            assert_eq!(&shrunk[y * 2 * 4..(y + 1) * 2 * 4], &channels[y * 4 * 4..y * 4 * 4 + 2 * 4]);
+            assert_eq!(
+                &shrunk[y * 2 * 4..(y + 1) * 2 * 4],
+                &channels[y * 4 * 4..y * 4 * 4 + 2 * 4]
+            );
         }
     }
 
@@ -2797,15 +3060,30 @@ mod tests {
         bilinear_grow.scale_canvas(6, 6, true);
         let bilinear_grow = bilinear_grow.layers[0].as_srgb8_exact().to_vec();
 
-        assert_eq!(digest(&nearest_shrink), 0x234d98dae72e66a5 as u64, "nearest_shrink changed");
-        assert_eq!(digest(&nearest_grow), 0x7690519e02d9cb6d as u64, "nearest_grow changed");
-        assert_eq!(digest(&bilinear_shrink), 0x1c1fe15e642f245 as u64, "bilinear_shrink changed");
-        assert_eq!(digest(&bilinear_grow), 0x5f05b0942ddd53c4 as u64, "bilinear_grow changed");
+        assert_eq!(
+            digest(&nearest_shrink),
+            0x234d98dae72e66a5 as u64,
+            "nearest_shrink changed"
+        );
+        assert_eq!(
+            digest(&nearest_grow),
+            0x7690519e02d9cb6d as u64,
+            "nearest_grow changed"
+        );
+        assert_eq!(
+            digest(&bilinear_shrink),
+            0x1c1fe15e642f245 as u64,
+            "bilinear_shrink changed"
+        );
+        assert_eq!(
+            digest(&bilinear_grow),
+            0x5f05b0942ddd53c4 as u64,
+            "bilinear_grow changed"
+        );
         assert_eq!(nearest_shrink.len(), 16, "nearest_shrink length changed");
         assert_eq!(nearest_grow.len(), 144, "nearest_grow length changed");
         assert_eq!(bilinear_shrink.len(), 16, "bilinear_shrink length changed");
         assert_eq!(bilinear_grow.len(), 144, "bilinear_grow length changed");
-
     }
 
     /// Baseline 3: dimensions and storage format when growing and shrinking.
@@ -2885,18 +3163,46 @@ mod tests {
 
         let quad = PerspectiveQuadTransform::new(corners, corners);
         render_quad_transformed_patch(
-            &patch(), 8, 8, &quad, InterpolationMode::Bilinear, &mut eight, W, H,
+            &patch(),
+            8,
+            8,
+            &quad,
+            InterpolationMode::Bilinear,
+            &mut eight,
+            W,
+            H,
         );
         render_quad_transformed_patch(
-            &patch(), 8, 8, &quad, InterpolationMode::Bilinear, &mut sixteen, W, H,
+            &patch(),
+            8,
+            8,
+            &quad,
+            InterpolationMode::Bilinear,
+            &mut sixteen,
+            W,
+            H,
         );
 
         let mesh = MeshWarpGrid::new(3, 3, glam::Vec2::new(1.0, 1.0), 8.0, 8.0);
         render_mesh_warped_patch(
-            &patch(), 8, 8, &mesh, InterpolationMode::Bilinear, &mut eight, W, H,
+            &patch(),
+            8,
+            8,
+            &mesh,
+            InterpolationMode::Bilinear,
+            &mut eight,
+            W,
+            H,
         );
         render_mesh_warped_patch(
-            &patch(), 8, 8, &mesh, InterpolationMode::Bilinear, &mut sixteen, W, H,
+            &patch(),
+            8,
+            8,
+            &mesh,
+            InterpolationMode::Bilinear,
+            &mut sixteen,
+            W,
+            H,
         );
 
         let downconverted: Vec<u8> = sixteen
@@ -2965,7 +3271,11 @@ mod tests {
         };
 
         let before = doc.get_layer(id).expect("layer").storage_bytes();
-        assert_eq!(before.len(), 12 * 12 * 4 * 2, "16-bit storage is two bytes per channel");
+        assert_eq!(
+            before.len(),
+            12 * 12 * 4 * 2,
+            "16-bit storage is two bytes per channel"
+        );
 
         crate::rasterizer::StrokeRasterizer::paint_segment(
             &mut doc,
@@ -2983,9 +3293,13 @@ mod tests {
             "the stroke must not change storage"
         );
         let after = layer.storage_bytes();
-        assert_ne!(before, after, "the stroke must change the buffer for this test to mean anything");
+        assert_ne!(
+            before, after,
+            "the stroke must change the buffer for this test to mean anything"
+        );
 
-        let mut command = LayerPixelsDeltaCommand::new(id, "16-bit stroke", before.clone(), after.clone());
+        let mut command =
+            LayerPixelsDeltaCommand::new(id, "16-bit stroke", before.clone(), after.clone());
         command.undo(&mut doc);
         assert_eq!(
             doc.get_layer(id).expect("layer").storage_bytes(),
@@ -3024,9 +3338,20 @@ mod tests {
 
         let mask = StrokeRasterizer::rasterize_magic_wand(&doc, 3, 1, 0, true, false);
 
-        assert!(mask.has_selection(), "the wand must select the opaque block");
-        assert_eq!(mask.get_value(3, 1), 255, "a pixel inside the block must be selected");
-        assert_eq!(mask.get_value(0, 0), 0, "a transparent pixel must not be selected");
+        assert!(
+            mask.has_selection(),
+            "the wand must select the opaque block"
+        );
+        assert_eq!(
+            mask.get_value(3, 1),
+            255,
+            "a pixel inside the block must be selected"
+        );
+        assert_eq!(
+            mask.get_value(0, 0),
+            0,
+            "a transparent pixel must not be selected"
+        );
     }
 
     /// Export composites each timeline frame on its own. A frame holding 16-bit layers has to
@@ -3089,14 +3414,16 @@ mod tests {
         let mut narrow = Document::new(3, 1);
         let narrow_id = narrow.active_layer_id;
         if let Some(layer) = narrow.get_layer_mut(narrow_id) {
-            layer.as_srgb8_exact_mut().copy_from_slice(&[
-                0, 0, 0, 0, 9, 9, 9, 255, 9, 9, 9, 128,
-            ]);
+            layer
+                .as_srgb8_exact_mut()
+                .copy_from_slice(&[0, 0, 0, 0, 9, 9, 9, 255, 9, 9, 9, 128]);
         }
         let narrow_mask = SelectionMask::from_layer(narrow.get_layer(narrow_id).expect("layer"), 8);
         assert_eq!(
             (0..3).map(|x| mask.get_value(x, 0)).collect::<Vec<_>>(),
-            (0..3).map(|x| narrow_mask.get_value(x, 0)).collect::<Vec<_>>(),
+            (0..3)
+                .map(|x| narrow_mask.get_value(x, 0))
+                .collect::<Vec<_>>(),
             "8-bit and 16-bit alpha must select identically for lattice values"
         );
     }
@@ -3126,7 +3453,9 @@ mod tests {
             let mut doc = Document::new(2, 1);
             let id = doc.active_layer_id;
             if let Some(layer) = doc.get_layer_mut(id) {
-                layer.as_srgb8_exact_mut().copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+                layer
+                    .as_srgb8_exact_mut()
+                    .copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
             }
             doc
         }
@@ -3167,7 +3496,10 @@ mod tests {
         );
         // (0,0) of the source now sits at (1,1) of a 4-wide canvas.
         let dst = ((1 * 4 + 1) * 4) as usize;
-        assert_eq!(&cropped.layers[0].as_srgb8_exact()[dst..dst + 4], &[1, 2, 3, 4]);
+        assert_eq!(
+            &cropped.layers[0].as_srgb8_exact()[dst..dst + 4],
+            &[1, 2, 3, 4]
+        );
         assert_eq!(&cropped.layers[0].as_srgb8_exact()[0..4], &[0, 0, 0, 0]);
     }
 
@@ -3198,7 +3530,12 @@ mod tests {
         // Flip: mirrored exactly, format kept, and its own inverse.
         let mut doc = wide(4, 3);
         let id = doc.active_layer_id;
-        let original = doc.get_layer(id).expect("layer").as_srgb16().expect("16-bit").to_vec();
+        let original = doc
+            .get_layer(id)
+            .expect("layer")
+            .as_srgb16()
+            .expect("16-bit")
+            .to_vec();
         assert!(
             original.iter().any(|&c| c % 257 != 0),
             "the fixture must contain off-lattice values for this test to mean anything"
@@ -3207,14 +3544,21 @@ mod tests {
         doc.flip(true);
         {
             let layer = doc.get_layer(id).expect("layer");
-            assert_eq!(layer.format(), PixelFormat::Srgb16, "flip must not change storage");
+            assert_eq!(
+                layer.format(),
+                PixelFormat::Srgb16,
+                "flip must not change storage"
+            );
             let values = layer.as_srgb16().expect("16-bit");
             assert_eq!(sample(values, 0, 0, 4), sample(&original, 3, 0, 4));
             assert_eq!(sample(values, 3, 2, 4), sample(&original, 0, 2, 4));
         }
         doc.flip(true);
         assert_eq!(
-            doc.get_layer(id).expect("layer").as_srgb16().expect("16-bit"),
+            doc.get_layer(id)
+                .expect("layer")
+                .as_srgb16()
+                .expect("16-bit"),
             original.as_slice(),
             "flipping twice must restore the exact channels"
         );
@@ -3222,12 +3566,21 @@ mod tests {
         // Rotate: four quarter turns are the identity, and the document follows.
         let mut doc = wide(4, 3);
         let id = doc.active_layer_id;
-        let original = doc.get_layer(id).expect("layer").as_srgb16().expect("16-bit").to_vec();
+        let original = doc
+            .get_layer(id)
+            .expect("layer")
+            .as_srgb16()
+            .expect("16-bit")
+            .to_vec();
         doc.rotate_90(true);
         assert_eq!((doc.width, doc.height), (3, 4));
         {
             let layer = doc.get_layer(id).expect("layer");
-            assert_eq!(layer.format(), PixelFormat::Srgb16, "rotate must not change storage");
+            assert_eq!(
+                layer.format(),
+                PixelFormat::Srgb16,
+                "rotate must not change storage"
+            );
             assert_eq!(layer.as_srgb16().expect("16-bit").len(), 3 * 4 * 4);
         }
         for _ in 0..3 {
@@ -3235,7 +3588,10 @@ mod tests {
         }
         assert_eq!((doc.width, doc.height), (4, 3));
         assert_eq!(
-            doc.get_layer(id).expect("layer").as_srgb16().expect("16-bit"),
+            doc.get_layer(id)
+                .expect("layer")
+                .as_srgb16()
+                .expect("16-bit"),
             original.as_slice(),
             "four quarter turns must restore the exact channels"
         );
@@ -3243,16 +3599,29 @@ mod tests {
         // Crop / extend: the overlap is copied, the new band is zero, the format is kept.
         let mut doc = wide(4, 3);
         let id = doc.active_layer_id;
-        let original = doc.get_layer(id).expect("layer").as_srgb16().expect("16-bit").to_vec();
+        let original = doc
+            .get_layer(id)
+            .expect("layer")
+            .as_srgb16()
+            .expect("16-bit")
+            .to_vec();
         doc.resize_canvas(6, 5, 1, 2);
         assert_eq!((doc.width, doc.height), (6, 5));
         {
             let layer = doc.get_layer(id).expect("layer");
-            assert_eq!(layer.format(), PixelFormat::Srgb16, "crop must not change storage");
+            assert_eq!(
+                layer.format(),
+                PixelFormat::Srgb16,
+                "crop must not change storage"
+            );
             let values = layer.as_srgb16().expect("16-bit");
             assert_eq!(values.len(), 6 * 5 * 4);
             assert_eq!(sample(values, 1, 2, 6), sample(&original, 0, 0, 4));
-            assert_eq!(sample(values, 0, 0, 6), vec![0u16; 4], "new space must be zero-filled");
+            assert_eq!(
+                sample(values, 0, 0, 6),
+                vec![0u16; 4],
+                "new space must be zero-filled"
+            );
         }
     }
 
@@ -3276,7 +3645,10 @@ mod tests {
 
         let native = doc.composite_layers_srgb16(false);
         assert_eq!(native.len(), 4);
-        assert_eq!(native[0], high, "native output must carry the exact channel");
+        assert_eq!(
+            native[0], high,
+            "native output must carry the exact channel"
+        );
         assert_eq!(native[3], 65535);
 
         // The 8-bit API is unchanged and does collapse it - that is the difference the
@@ -3355,7 +3727,10 @@ mod tests {
         doc.add_adjustment_layer(AdjustmentType::Invert, None);
         let after = doc.composite_layers_srgb16(false);
 
-        assert_ne!(after[0], before[0], "the adjustment must reach the composite");
+        assert_ne!(
+            after[0], before[0],
+            "the adjustment must reach the composite"
+        );
         assert_eq!(
             after[0],
             u16::from_f32(1.0 - base.to_f32()),
@@ -3377,7 +3752,10 @@ mod tests {
             }
             other => panic!("expected BufferTooSmall, got {other:?}"),
         }
-        assert!(short.iter().all(|&channel| channel == 0), "a rejected write must not touch the buffer");
+        assert!(
+            short.iter().all(|&channel| channel == 0),
+            "a rejected write must not touch the buffer"
+        );
 
         let mut exact = vec![0u16; 64];
         assert!(doc.composite_layers_into_srgb16(&mut exact, false).is_ok());
@@ -3387,15 +3765,34 @@ mod tests {
     /// on normalised channels. The two can differ by one 8-bit step where a result sits on a
     /// rounding boundary; anything larger means the formulas have diverged.
     #[test]
-    fn adjustment_working_matches_eight_bit() {        use crate::layer::AdjustmentType;
+    fn adjustment_working_matches_eight_bit() {
+        use crate::layer::AdjustmentType;
         use crate::pixel::Channel;
 
         let cases = [
-            AdjustmentType::BrightnessContrast { brightness: 20.0, contrast: 30.0 },
-            AdjustmentType::BrightnessContrast { brightness: -40.0, contrast: -25.0 },
-            AdjustmentType::Hsl { hue_shift: 40.0, saturation: 1.4, lightness: -0.1 },
-            AdjustmentType::Hsl { hue_shift: -120.0, saturation: 0.6, lightness: 0.2 },
-            AdjustmentType::ColorBalance { cyan_red: 30.0, magenta_green: -20.0, yellow_blue: 10.0 },
+            AdjustmentType::BrightnessContrast {
+                brightness: 20.0,
+                contrast: 30.0,
+            },
+            AdjustmentType::BrightnessContrast {
+                brightness: -40.0,
+                contrast: -25.0,
+            },
+            AdjustmentType::Hsl {
+                hue_shift: 40.0,
+                saturation: 1.4,
+                lightness: -0.1,
+            },
+            AdjustmentType::Hsl {
+                hue_shift: -120.0,
+                saturation: 0.6,
+                lightness: 0.2,
+            },
+            AdjustmentType::ColorBalance {
+                cyan_red: 30.0,
+                magenta_green: -20.0,
+                yellow_blue: 10.0,
+            },
             AdjustmentType::Invert,
             AdjustmentType::Posterize { levels: 5 },
             AdjustmentType::Threshold { cutoff: 128 },
@@ -3409,14 +3806,16 @@ mod tests {
                 for &g in &values {
                     for &b in &values {
                         let (er, eg, eb) = adjustment.apply_to_rgb(r, g, b);
-                        let working = adjustment
-                            .apply_to_rgb_working([r.to_f32(), g.to_f32(), b.to_f32()]);
+                        let working =
+                            adjustment.apply_to_rgb_working([r.to_f32(), g.to_f32(), b.to_f32()]);
                         let quantised = [
                             u8::from_f32(working[0]),
                             u8::from_f32(working[1]),
                             u8::from_f32(working[2]),
                         ];
-                        for (expected, actual) in [(er, quantised[0]), (eg, quantised[1]), (eb, quantised[2])] {
+                        for (expected, actual) in
+                            [(er, quantised[0]), (eg, quantised[1]), (eb, quantised[2])]
+                        {
                             worst = worst.max((expected as i32 - actual as i32).abs());
                         }
                     }
@@ -3442,7 +3841,7 @@ mod tests {
         use crate::brush::TextAlign;
         use crate::color::Color;
         use crate::document::Document;
-        use crate::layer::{TextLayerConfig, LayerBuffer};
+        use crate::layer::{LayerBuffer, TextLayerConfig};
         use crate::rasterizer::StrokeRasterizer;
 
         fn font() -> ab_glyph::FontArc {
@@ -3481,7 +3880,11 @@ mod tests {
             let id = doc.active_layer_id;
             if let Some(layer) = doc.get_layer_mut(id) {
                 *layer.buffer_mut() = LayerBuffer::Srgb8(vec![0u8; (width * height * 4) as usize]);
-                assert!(StrokeRasterizer::rasterize_text_layer_config(layer, cfg, &font()));
+                assert!(StrokeRasterizer::rasterize_text_layer_config(
+                    layer,
+                    cfg,
+                    &font()
+                ));
                 return layer.as_srgb8_exact().to_vec();
             }
             unreachable!()
@@ -3490,8 +3893,16 @@ mod tests {
         #[test]
         fn a_single_line_is_unchanged() {
             let bytes = render(96, 48, &config("Aurelia", 32.0));
-            assert_ne!(bytes.iter().filter(|&&byte| byte > 0).count(), 0, "nothing rendered");
-            assert_eq!(digest(&bytes), 10483588990592354726, "a_single_line_is_unchanged");
+            assert_ne!(
+                bytes.iter().filter(|&&byte| byte > 0).count(),
+                0,
+                "nothing rendered"
+            );
+            assert_eq!(
+                digest(&bytes),
+                10483588990592354726,
+                "a_single_line_is_unchanged"
+            );
         }
 
         #[test]
@@ -3500,7 +3911,11 @@ mod tests {
             cfg.box_w = 70.0;
             cfg.align = TextAlign::Center;
             let bytes = render(96, 96, &cfg);
-            assert_eq!(digest(&bytes), 1623966499463724239, "wrapping_and_centering_are_unchanged");
+            assert_eq!(
+                digest(&bytes),
+                1623966499463724239,
+                "wrapping_and_centering_are_unchanged"
+            );
         }
 
         #[test]
@@ -3509,7 +3924,11 @@ mod tests {
             cfg.color = [255, 200, 120, 128];
             cfg.letter_spacing = 2.5;
             let bytes = render(96, 48, &cfg);
-            assert_eq!(digest(&bytes), 9779906792473839393, "alpha_and_letter_spacing_are_unchanged");
+            assert_eq!(
+                digest(&bytes),
+                9779906792473839393,
+                "alpha_and_letter_spacing_are_unchanged"
+            );
         }
 
         #[test]
@@ -3518,7 +3937,11 @@ mod tests {
             cfg.pos_x = -6.0;
             cfg.pos_y = -4.0;
             let bytes = render(32, 32, &cfg);
-            assert_eq!(digest(&bytes), 16401277342387934969, "a_glyph_clipped_at_the_edge_is_unchanged");
+            assert_eq!(
+                digest(&bytes),
+                16401277342387934969,
+                "a_glyph_clipped_at_the_edge_is_unchanged"
+            );
         }
 
         #[test]
@@ -3540,7 +3963,11 @@ mod tests {
             );
             assert!(bounds.is_some(), "the tool path rendered nothing");
             let bytes = doc.layers[0].as_srgb8_exact().to_vec();
-            assert_eq!(digest(&bytes), 2616636973191488769, "the_tool_path_is_unchanged");
+            assert_eq!(
+                digest(&bytes),
+                2616636973191488769,
+                "the_tool_path_is_unchanged"
+            );
         }
 
         #[test]
@@ -3550,7 +3977,9 @@ mod tests {
             let selection = crate::selection::SelectionMask::from_mask_vec(
                 96,
                 48,
-                (0..96 * 48).map(|index| if index % 96 < 40 { 255u8 } else { 0 }).collect(),
+                (0..96 * 48)
+                    .map(|index| if index % 96 < 40 { 255u8 } else { 0 })
+                    .collect(),
             );
             StrokeRasterizer::rasterize_text(
                 &mut doc,
@@ -3566,7 +3995,11 @@ mod tests {
                 Some(&selection),
             );
             let bytes = doc.layers[0].as_srgb8_exact().to_vec();
-            assert_eq!(digest(&bytes), 10656664465313779728, "the_tool_path_with_a_selection_is_unchanged");
+            assert_eq!(
+                digest(&bytes),
+                10656664465313779728,
+                "the_tool_path_with_a_selection_is_unchanged"
+            );
         }
     }
 }
@@ -3582,10 +4015,18 @@ mod document_format {
     fn format_survives_deleting_the_last_sixteen_bit_layer() {
         let mut doc = Document::new_with_format(4, 4, PixelFormat::Srgb16);
         assert_eq!(doc.pixel_format, PixelFormat::Srgb16);
-        assert_eq!(doc.layers[0].format(), PixelFormat::Srgb16, "the base layer follows the document");
+        assert_eq!(
+            doc.layers[0].format(),
+            PixelFormat::Srgb16,
+            "the base layer follows the document"
+        );
 
         doc.delete_layer(doc.active_layer_id);
-        assert_eq!(doc.pixel_format, PixelFormat::Srgb16, "deleting layers must not change the format");
+        assert_eq!(
+            doc.pixel_format,
+            PixelFormat::Srgb16,
+            "deleting layers must not change the format"
+        );
 
         let id = doc.add_layer(None);
         assert_eq!(
@@ -3615,7 +4056,11 @@ mod document_format {
     fn add_layer_does_not_downgrade_a_sixteen_bit_document() {
         let mut doc = Document::new_with_format(3, 3, PixelFormat::Srgb16);
         let raster = doc.add_layer(Some("raster".into()));
-        let text = doc.add_text_layer(Some("text".into()), crate::layer::TextLayerConfig::default(), None);
+        let text = doc.add_text_layer(
+            Some("text".into()),
+            crate::layer::TextLayerConfig::default(),
+            None,
+        );
         for id in [raster, text] {
             assert_eq!(
                 doc.get_layer(id).expect("layer").format(),
@@ -3649,9 +4094,16 @@ mod document_format {
 
         assert_eq!(doc.layers.len(), 1);
         let merged = &doc.layers[0];
-        assert_eq!(merged.format(), PixelFormat::Srgb16, "merge must not downgrade the document");
+        assert_eq!(
+            merged.format(),
+            PixelFormat::Srgb16,
+            "merge must not downgrade the document"
+        );
         let values = merged.as_srgb16().expect("16-bit");
-        assert_eq!(values[0], high, "the merged layer must keep the exact channel");
+        assert_eq!(
+            values[0], high,
+            "the merged layer must keep the exact channel"
+        );
     }
 
     /// Merge-down used to refuse a 16-bit document because it composited through `get_pixel`
@@ -3673,13 +4125,24 @@ mod document_format {
             *layer.buffer_mut() = LayerBuffer::Srgb16(vec![65535, 0, 0, 65535, 65535, 0, 0, 65535]);
         }
 
-        assert!(doc.merge_layer_down(), "merge-down must work on a 16-bit document");
+        assert!(
+            doc.merge_layer_down(),
+            "merge-down must work on a 16-bit document"
+        );
         assert_eq!(doc.layers.len(), 1, "the upper layer is consumed");
 
         let merged = &doc.layers[0];
-        assert_eq!(merged.format(), PixelFormat::Srgb16, "merge must not downgrade storage");
+        assert_eq!(
+            merged.format(),
+            PixelFormat::Srgb16,
+            "merge must not downgrade storage"
+        );
         let values = merged.as_srgb16().expect("16-bit");
-        assert_eq!(&values[0..4], &[65535, 0, 0, 65535], "the opaque upper layer covers the lower");
+        assert_eq!(
+            &values[0..4],
+            &[65535, 0, 0, 65535],
+            "the opaque upper layer covers the lower"
+        );
     }
 
     /// Mixed formats merge through the same path: each layer is read in its own format and the
@@ -3691,12 +4154,13 @@ mod document_format {
         let mut doc = Document::new(2, 1); // 8-bit document
         let base = doc.active_layer_id;
         if let Some(layer) = doc.get_layer_mut(base) {
-            layer.as_srgb8_exact_mut().copy_from_slice(&[0, 0, 255, 255, 0, 0, 255, 255]);
+            layer
+                .as_srgb8_exact_mut()
+                .copy_from_slice(&[0, 0, 255, 255, 0, 0, 255, 255]);
         }
         let upper = doc.add_layer(None);
         if let Some(layer) = doc.get_layer_mut(upper) {
-            *layer.buffer_mut() =
-                LayerBuffer::Srgb16(vec![65535, 0, 0, 65535, 65535, 0, 0, 65535]);
+            *layer.buffer_mut() = LayerBuffer::Srgb16(vec![65535, 0, 0, 65535, 65535, 0, 0, 65535]);
         }
 
         assert!(doc.merge_layer_down());
@@ -3717,11 +4181,15 @@ mod document_format {
         let mut doc = Document::new(2, 1);
         let base = doc.active_layer_id;
         if let Some(layer) = doc.get_layer_mut(base) {
-            layer.as_srgb8_exact_mut().copy_from_slice(&[0, 0, 255, 255, 0, 0, 255, 255]);
+            layer
+                .as_srgb8_exact_mut()
+                .copy_from_slice(&[0, 0, 255, 255, 0, 0, 255, 255]);
         }
         let upper = doc.add_layer(None);
         if let Some(layer) = doc.get_layer_mut(upper) {
-            layer.as_srgb8_exact_mut().copy_from_slice(&[255, 0, 0, 128, 255, 0, 0, 128]);
+            layer
+                .as_srgb8_exact_mut()
+                .copy_from_slice(&[255, 0, 0, 128, 255, 0, 0, 128]);
         }
 
         assert!(doc.merge_layer_down());
@@ -3732,7 +4200,9 @@ mod document_format {
     #[test]
     fn convert_format_round_trips_lattice_values() {
         let mut layer = Layer::new(1, "l", 2, 1);
-        layer.as_srgb8_exact_mut().copy_from_slice(&[1, 2, 3, 4, 255, 128, 0, 64]);
+        layer
+            .as_srgb8_exact_mut()
+            .copy_from_slice(&[1, 2, 3, 4, 255, 128, 0, 64]);
         let original = layer.as_srgb8_exact().to_vec();
 
         layer.convert_format(PixelFormat::Srgb16);
@@ -3763,7 +4233,11 @@ mod filter_baseline {
             px[0] = ((x * 17 + y * 3) % 256) as u8;
             px[1] = ((x * 5 + y * 29) % 256) as u8;
             px[2] = ((x * 11 + y * 7) % 256) as u8;
-            px[3] = if (x + y) % 5 == 0 { 0 } else { 255 - (x * 3 % 64) as u8 };
+            px[3] = if (x + y) % 5 == 0 {
+                0
+            } else {
+                255 - (x * 3 % 64) as u8
+            };
         }
         pixels
     }
@@ -3772,7 +4246,9 @@ mod filter_baseline {
         SelectionMask::from_mask_vec(
             W,
             H,
-            (0..W * H).map(|i| if i % W < W / 2 { 255u8 } else { 0 }).collect(),
+            (0..W * H)
+                .map(|i| if i % W < W / 2 { 255u8 } else { 0 })
+                .collect(),
         )
     }
 
@@ -3787,27 +4263,75 @@ mod filter_baseline {
 
     fn cases() -> Vec<(&'static str, Box<dyn Fn(&mut Vec<u8>)>)> {
         vec![
-            ("adjust_hsl", Box::new(|p| adjust_hsl(p, W, H, 40.0, 1.3, -0.1, None))),
-            ("adjust_brightness_contrast", Box::new(|p| adjust_brightness_contrast(p, W, H, 20.0, 15.0, None))),
-            ("adjust_color_balance", Box::new(|p| adjust_color_balance(p, W, H, 30.0, -20.0, 10.0, None))),
+            (
+                "adjust_hsl",
+                Box::new(|p| adjust_hsl(p, W, H, 40.0, 1.3, -0.1, None)),
+            ),
+            (
+                "adjust_brightness_contrast",
+                Box::new(|p| adjust_brightness_contrast(p, W, H, 20.0, 15.0, None)),
+            ),
+            (
+                "adjust_color_balance",
+                Box::new(|p| adjust_color_balance(p, W, H, 30.0, -20.0, 10.0, None)),
+            ),
             ("invert", Box::new(|p| filter_invert(p, W, H, None))),
-            ("invert_masked", Box::new(|p| filter_invert(p, W, H, Some(&half_selection())))),
-            ("posterize", Box::new(|p| filter_posterize(p, W, H, 5, None))),
+            (
+                "invert_masked",
+                Box::new(|p| filter_invert(p, W, H, Some(&half_selection()))),
+            ),
+            (
+                "posterize",
+                Box::new(|p| filter_posterize(p, W, H, 5, None)),
+            ),
             ("grayscale", Box::new(|p| filter_grayscale(p, W, H, None))),
             ("sepia", Box::new(|p| filter_sepia(p, W, H, None))),
-            ("threshold", Box::new(|p| filter_threshold(p, W, H, 128, None))),
-            ("gaussian_blur", Box::new(|p| filter_gaussian_blur(p, W, H, 2.0, None))),
-            ("gaussian_blur_masked", Box::new(|p| filter_gaussian_blur(p, W, H, 2.0, Some(&half_selection())))),
+            (
+                "threshold",
+                Box::new(|p| filter_threshold(p, W, H, 128, None)),
+            ),
+            (
+                "gaussian_blur",
+                Box::new(|p| filter_gaussian_blur(p, W, H, 2.0, None)),
+            ),
+            (
+                "gaussian_blur_masked",
+                Box::new(|p| filter_gaussian_blur(p, W, H, 2.0, Some(&half_selection()))),
+            ),
             ("sharpen", Box::new(|p| filter_sharpen(p, W, H, 0.6, None))),
-            ("unsharp_mask", Box::new(|p| filter_unsharp_mask(p, W, H, 2.0, 0.8, 4.0, None))),
-            ("film_grain_mono", Box::new(|p| filter_film_grain(p, W, H, 0.4, false, None))),
-            ("film_grain_color", Box::new(|p| filter_film_grain(p, W, H, 0.3, true, None))),
-            ("vignette", Box::new(|p| filter_vignette(p, W, H, 0.9, 0.5, 0.6, None))),
-            ("chromatic_aberration", Box::new(|p| filter_chromatic_aberration(p, W, H, 3.0, 30.0, None))),
-            ("levels", Box::new(|p| filter_levels(p, W, H, 0.1, 0.9, 1.3, None))),
-            ("colorize", Box::new(|p| filter_colorize(p, W, H, 200.0, 0.6, None))),
+            (
+                "unsharp_mask",
+                Box::new(|p| filter_unsharp_mask(p, W, H, 2.0, 0.8, 4.0, None)),
+            ),
+            (
+                "film_grain_mono",
+                Box::new(|p| filter_film_grain(p, W, H, 0.4, false, None)),
+            ),
+            (
+                "film_grain_color",
+                Box::new(|p| filter_film_grain(p, W, H, 0.3, true, None)),
+            ),
+            (
+                "vignette",
+                Box::new(|p| filter_vignette(p, W, H, 0.9, 0.5, 0.6, None)),
+            ),
+            (
+                "chromatic_aberration",
+                Box::new(|p| filter_chromatic_aberration(p, W, H, 3.0, 30.0, None)),
+            ),
+            (
+                "levels",
+                Box::new(|p| filter_levels(p, W, H, 0.1, 0.9, 1.3, None)),
+            ),
+            (
+                "colorize",
+                Box::new(|p| filter_colorize(p, W, H, 200.0, 0.6, None)),
+            ),
             ("pixelate", Box::new(|p| filter_pixelate(p, W, H, 4, None))),
-            ("motion_blur", Box::new(|p| filter_motion_blur(p, W, H, 3, 20.0, None))),
+            (
+                "motion_blur",
+                Box::new(|p| filter_motion_blur(p, W, H, 3, 20.0, None)),
+            ),
         ]
     }
 
@@ -3890,24 +4414,63 @@ mod filter_sixteen_bit {
 
     fn cases() -> Vec<(&'static str, Box<dyn Fn(&mut Layer)>)> {
         vec![
-            ("adjust_hsl", Box::new(|l| adjust_hsl_layer(l, 40.0, 1.3, -0.1, None))),
-            ("brightness_contrast", Box::new(|l| adjust_brightness_contrast_layer(l, 20.0, 15.0, None))),
-            ("color_balance", Box::new(|l| adjust_color_balance_layer(l, 30.0, -20.0, 10.0, None))),
+            (
+                "adjust_hsl",
+                Box::new(|l| adjust_hsl_layer(l, 40.0, 1.3, -0.1, None)),
+            ),
+            (
+                "brightness_contrast",
+                Box::new(|l| adjust_brightness_contrast_layer(l, 20.0, 15.0, None)),
+            ),
+            (
+                "color_balance",
+                Box::new(|l| adjust_color_balance_layer(l, 30.0, -20.0, 10.0, None)),
+            ),
             ("invert", Box::new(|l| filter_invert_layer(l, None))),
-            ("posterize", Box::new(|l| filter_posterize_layer(l, 5, None))),
+            (
+                "posterize",
+                Box::new(|l| filter_posterize_layer(l, 5, None)),
+            ),
             ("grayscale", Box::new(|l| filter_grayscale_layer(l, None))),
             ("sepia", Box::new(|l| filter_sepia_layer(l, None))),
-            ("threshold", Box::new(|l| filter_threshold_layer(l, 128, None))),
-            ("gaussian_blur", Box::new(|l| filter_gaussian_blur_layer(l, 2.0, None))),
+            (
+                "threshold",
+                Box::new(|l| filter_threshold_layer(l, 128, None)),
+            ),
+            (
+                "gaussian_blur",
+                Box::new(|l| filter_gaussian_blur_layer(l, 2.0, None)),
+            ),
             ("sharpen", Box::new(|l| filter_sharpen_layer(l, 0.6, None))),
-            ("unsharp_mask", Box::new(|l| filter_unsharp_mask_layer(l, 2.0, 0.8, 4.0, None))),
-            ("film_grain", Box::new(|l| filter_film_grain_layer(l, 0.4, false, None))),
-            ("vignette", Box::new(|l| filter_vignette_layer(l, 0.9, 0.5, 0.6, None))),
-            ("chromatic_aberration", Box::new(|l| filter_chromatic_aberration_layer(l, 3.0, 30.0, None))),
-            ("levels", Box::new(|l| filter_levels_layer(l, 0.1, 0.9, 1.3, None))),
-            ("colorize", Box::new(|l| filter_colorize_layer(l, 200.0, 0.6, None))),
+            (
+                "unsharp_mask",
+                Box::new(|l| filter_unsharp_mask_layer(l, 2.0, 0.8, 4.0, None)),
+            ),
+            (
+                "film_grain",
+                Box::new(|l| filter_film_grain_layer(l, 0.4, false, None)),
+            ),
+            (
+                "vignette",
+                Box::new(|l| filter_vignette_layer(l, 0.9, 0.5, 0.6, None)),
+            ),
+            (
+                "chromatic_aberration",
+                Box::new(|l| filter_chromatic_aberration_layer(l, 3.0, 30.0, None)),
+            ),
+            (
+                "levels",
+                Box::new(|l| filter_levels_layer(l, 0.1, 0.9, 1.3, None)),
+            ),
+            (
+                "colorize",
+                Box::new(|l| filter_colorize_layer(l, 200.0, 0.6, None)),
+            ),
             ("pixelate", Box::new(|l| filter_pixelate_layer(l, 4, None))),
-            ("motion_blur", Box::new(|l| filter_motion_blur_layer(l, 3, 20.0, None))),
+            (
+                "motion_blur",
+                Box::new(|l| filter_motion_blur_layer(l, 3, 20.0, None)),
+            ),
         ]
     }
 
@@ -3922,7 +4485,11 @@ mod filter_sixteen_bit {
             apply(doc.get_layer_mut(id).expect("layer"));
 
             let layer = doc.get_layer(id).expect("layer");
-            assert_eq!(layer.format(), PixelFormat::Srgb16, "{name} changed the storage format");
+            assert_eq!(
+                layer.format(),
+                PixelFormat::Srgb16,
+                "{name} changed the storage format"
+            );
             assert_ne!(
                 layer.storage_bytes(),
                 before,
@@ -3936,10 +4503,22 @@ mod filter_sixteen_bit {
     #[test]
     fn filters_compute_natively_rather_than_round_tripping_eight_bit() {
         let native_cases: Vec<(&str, Box<dyn Fn(&mut Layer)>)> = vec![
-            ("gaussian_blur", Box::new(|l| filter_gaussian_blur_layer(l, 2.0, None))),
-            ("levels", Box::new(|l| filter_levels_layer(l, 0.1, 0.9, 1.3, None))),
-            ("colorize", Box::new(|l| filter_colorize_layer(l, 200.0, 0.6, None))),
-            ("unsharp_mask", Box::new(|l| filter_unsharp_mask_layer(l, 2.0, 0.8, 4.0, None))),
+            (
+                "gaussian_blur",
+                Box::new(|l| filter_gaussian_blur_layer(l, 2.0, None)),
+            ),
+            (
+                "levels",
+                Box::new(|l| filter_levels_layer(l, 0.1, 0.9, 1.3, None)),
+            ),
+            (
+                "colorize",
+                Box::new(|l| filter_colorize_layer(l, 200.0, 0.6, None)),
+            ),
+            (
+                "unsharp_mask",
+                Box::new(|l| filter_unsharp_mask_layer(l, 2.0, 0.8, 4.0, None)),
+            ),
         ];
 
         for (name, apply) in native_cases {
@@ -3948,7 +4527,11 @@ mod filter_sixteen_bit {
             apply(doc.get_layer_mut(id).expect("layer"));
             let layer = doc.get_layer(id).expect("layer");
             assert!(
-                layer.as_srgb16().expect("16-bit").iter().any(|&c| c % 257 != 0),
+                layer
+                    .as_srgb16()
+                    .expect("16-bit")
+                    .iter()
+                    .any(|&c| c % 257 != 0),
                 "{name} produced only lattice values on a 16-bit layer; it was quantised"
             );
         }
@@ -3963,17 +4546,26 @@ mod filter_sixteen_bit {
             (
                 "invert",
                 |l| filter_invert_layer(l, None),
-                |l| { let (w, h) = (l.width, l.height); filter_invert(l.as_srgb8_exact_mut(), w, h, None) },
+                |l| {
+                    let (w, h) = (l.width, l.height);
+                    filter_invert(l.as_srgb8_exact_mut(), w, h, None)
+                },
             ),
             (
                 "grayscale",
                 |l| filter_grayscale_layer(l, None),
-                |l| { let (w, h) = (l.width, l.height); filter_grayscale(l.as_srgb8_exact_mut(), w, h, None) },
+                |l| {
+                    let (w, h) = (l.width, l.height);
+                    filter_grayscale(l.as_srgb8_exact_mut(), w, h, None)
+                },
             ),
             (
                 "threshold",
                 |l| filter_threshold_layer(l, 128, None),
-                |l| { let (w, h) = (l.width, l.height); filter_threshold(l.as_srgb8_exact_mut(), w, h, 128, None) },
+                |l| {
+                    let (w, h) = (l.width, l.height);
+                    filter_threshold(l.as_srgb8_exact_mut(), w, h, 128, None)
+                },
             ),
         ];
 
@@ -3988,7 +4580,11 @@ mod filter_sixteen_bit {
             let narrow_id = narrow.active_layer_id;
             if let Some(layer) = narrow.get_layer_mut(narrow_id) {
                 for (index, byte) in layer.as_srgb8_exact_mut().iter_mut().enumerate() {
-                    *byte = if index % 4 == 3 { 255 } else { (index as u8).wrapping_mul(7) };
+                    *byte = if index % 4 == 3 {
+                        255
+                    } else {
+                        (index as u8).wrapping_mul(7)
+                    };
                 }
             }
             narrow_op(narrow.get_layer_mut(narrow_id).expect("layer"));
@@ -4018,7 +4614,9 @@ mod filter_sixteen_bit {
         let selection = SelectionMask::from_mask_vec(
             SIDE,
             SIDE,
-            (0..SIDE * SIDE).map(|i| if i % SIDE < SIDE / 2 { 255u8 } else { 0 }).collect(),
+            (0..SIDE * SIDE)
+                .map(|i| if i % SIDE < SIDE / 2 { 255u8 } else { 0 })
+                .collect(),
         );
 
         filter_invert_layer(doc.get_layer_mut(id).expect("layer"), Some(&selection));
@@ -4026,9 +4624,17 @@ mod filter_sixteen_bit {
         let layer = doc.get_layer(id).expect("layer");
         let values = layer.as_srgb16().expect("16-bit");
         // Column 0 is inside the selection (so inverted), the last column is outside.
-        assert_eq!(values[0], 65535 - before_u16(&before, 0), "selected pixel must invert");
+        assert_eq!(
+            values[0],
+            65535 - before_u16(&before, 0),
+            "selected pixel must invert"
+        );
         let last = ((SIDE - 1) * 4) as usize;
-        assert_eq!(values[last], before_u16(&before, last), "unselected pixel must not change");
+        assert_eq!(
+            values[last],
+            before_u16(&before, last),
+            "unselected pixel must not change"
+        );
     }
 
     fn before_u16(bytes: &[u8], channel_index: usize) -> u16 {
@@ -4063,8 +4669,16 @@ mod selection_coverage {
     fn fill_matches_the_expected_eight_bit_values() {
         let mut layer = eight([0, 0, 255, 255, 0, 0, 0, 0]);
         mask([255, 128]).fill_selection_on_layer(&mut layer, [255, 0, 0, 255]);
-        assert_eq!(&layer.as_srgb8_exact()[0..4], &[255, 0, 0, 255], "opaque over opaque");
-        assert_eq!(&layer.as_srgb8_exact()[4..8], &[255, 0, 0, 128], "half coverage over transparent");
+        assert_eq!(
+            &layer.as_srgb8_exact()[0..4],
+            &[255, 0, 0, 255],
+            "opaque over opaque"
+        );
+        assert_eq!(
+            &layer.as_srgb8_exact()[4..8],
+            &[255, 0, 0, 128],
+            "half coverage over transparent"
+        );
 
         let mut untouched = eight([9, 8, 7, 255, 9, 8, 7, 255]);
         mask([0, 0]).fill_selection_on_layer(&mut untouched, [255, 0, 0, 255]);
@@ -4088,11 +4702,22 @@ mod selection_coverage {
         mask([128, 255]).fill_selection_on_layer(&mut layer, [255, 255, 255, 255]);
 
         let values = layer.as_srgb16().expect("16-bit");
-        assert_eq!(layer.format(), crate::layer::PixelFormat::Srgb16, "format preserved");
-        assert_eq!(&values[4..8], &[65535, 65535, 65535, 65535], "second pixel is opaque white");
+        assert_eq!(
+            layer.format(),
+            crate::layer::PixelFormat::Srgb16,
+            "format preserved"
+        );
+        assert_eq!(
+            &values[4..8],
+            &[65535, 65535, 65535, 65535],
+            "second pixel is opaque white"
+        );
         // Half coverage over 78% alpha: a value the 8-bit lattice cannot hold.
         assert!(values[0] > dst, "half coverage must lighten the pixel");
-        assert!(values[0] % 257 != 0, "the result must carry sub-8-bit detail");
+        assert!(
+            values[0] % 257 != 0,
+            "the result must carry sub-8-bit detail"
+        );
         assert_eq!(values[3], 65535, "alpha saturates at the destination's");
     }
 
@@ -4103,7 +4728,12 @@ mod selection_coverage {
         *layer.buffer_mut() = LayerBuffer::Srgb16(vec![0u16; 4 * 4 * 4]);
         let selection = SelectionMask::from_mask_vec(4, 4, vec![255u8; 16]);
 
-        selection.stroke_selection_on_layer(&mut layer, [255, 0, 0, 255], 1, crate::selection::StrokePosition::Inside);
+        selection.stroke_selection_on_layer(
+            &mut layer,
+            [255, 0, 0, 255],
+            1,
+            crate::selection::StrokePosition::Inside,
+        );
 
         assert_eq!(layer.format(), crate::layer::PixelFormat::Srgb16);
         assert!(
@@ -4118,9 +4748,9 @@ mod selection_coverage {
 #[cfg(test)]
 mod transform_baseline {
     use crate::transform::{
-        render_mesh_warped_patch, render_quad_transformed_patch,
-        render_transformed_patch, AffineTransform2D, InterpolationMode, MeshWarpGrid,
-        PerspectiveQuadTransform, ThinPlateSpline2D,
+        render_mesh_warped_patch, render_quad_transformed_patch, render_transformed_patch,
+        AffineTransform2D, InterpolationMode, MeshWarpGrid, PerspectiveQuadTransform,
+        ThinPlateSpline2D,
     };
     use glam::Vec2;
 
@@ -4132,7 +4762,11 @@ mod transform_baseline {
             px[0] = ((index * 13) % 256) as u8;
             px[1] = ((index * 29 + 7) % 256) as u8;
             px[2] = ((index * 47 + 11) % 256) as u8;
-            px[3] = if index % 7 == 0 { 0 } else { 255 - (index % 96) as u8 };
+            px[3] = if index % 7 == 0 {
+                0
+            } else {
+                255 - (index % 96) as u8
+            };
         }
         bytes
     }
@@ -4155,15 +4789,39 @@ mod transform_baseline {
         affine.pivot = Vec2::new(6.0, 7.0);
         let mut affine_out = vec![0u8; (SIDE * SIDE * 4) as usize];
         render_transformed_patch(
-            &source, 8, 8, origin, &affine, InterpolationMode::Bilinear, &mut affine_out, SIDE as u32, SIDE as u32,
+            &source,
+            8,
+            8,
+            origin,
+            &affine,
+            InterpolationMode::Bilinear,
+            &mut affine_out,
+            SIDE as u32,
+            SIDE as u32,
         );
-        assert_eq!(digest(&affine_out), 14413423169143296575u64, "transform_affine");
+        assert_eq!(
+            digest(&affine_out),
+            14413423169143296575u64,
+            "transform_affine"
+        );
 
         let mut bicubic_out = vec![0u8; (SIDE * SIDE * 4) as usize];
         render_transformed_patch(
-            &source, 8, 8, origin, &affine, InterpolationMode::Bicubic, &mut bicubic_out, SIDE as u32, SIDE as u32,
+            &source,
+            8,
+            8,
+            origin,
+            &affine,
+            InterpolationMode::Bicubic,
+            &mut bicubic_out,
+            SIDE as u32,
+            SIDE as u32,
         );
-        assert_eq!(digest(&bicubic_out), 15576127485438065549u64, "transform_affine_bicubic");
+        assert_eq!(
+            digest(&bicubic_out),
+            15576127485438065549u64,
+            "transform_affine_bicubic"
+        );
 
         let quad_src = [
             origin,
@@ -4173,12 +4831,30 @@ mod transform_baseline {
         ];
         let quad = PerspectiveQuadTransform::new(quad_src, quad_src);
         let mut quad_out = vec![0u8; (SIDE * SIDE * 4) as usize];
-        render_quad_transformed_patch(&source, 8, 8, &quad, InterpolationMode::Bilinear, &mut quad_out, SIDE as u32, SIDE as u32);
+        render_quad_transformed_patch(
+            &source,
+            8,
+            8,
+            &quad,
+            InterpolationMode::Bilinear,
+            &mut quad_out,
+            SIDE as u32,
+            SIDE as u32,
+        );
         assert_eq!(digest(&quad_out), 14413423169143296575u64, "transform_quad");
 
         let mesh = MeshWarpGrid::new(3, 3, origin, 8.0, 8.0);
         let mut mesh_out = vec![0u8; (SIDE * SIDE * 4) as usize];
-        render_mesh_warped_patch(&source, 8, 8, &mesh, InterpolationMode::Bilinear, &mut mesh_out, SIDE as u32, SIDE as u32);
+        render_mesh_warped_patch(
+            &source,
+            8,
+            8,
+            &mesh,
+            InterpolationMode::Bilinear,
+            &mut mesh_out,
+            SIDE as u32,
+            SIDE as u32,
+        );
         assert_eq!(digest(&mesh_out), 14413423169143296575u64, "transform_mesh");
 
         let pins = vec![
@@ -4190,9 +4866,18 @@ mod transform_baseline {
         ];
         let tps = ThinPlateSpline2D::solve(&pins, &pins);
         let mut tps_out = vec![0u8; (SIDE * SIDE * 4) as usize];
-        crate::transform::render_tps_warped_patch(&source, 8, 8, origin, &tps, InterpolationMode::Bilinear, &mut tps_out, SIDE as u32, SIDE as u32);
+        crate::transform::render_tps_warped_patch(
+            &source,
+            8,
+            8,
+            origin,
+            &tps,
+            InterpolationMode::Bilinear,
+            &mut tps_out,
+            SIDE as u32,
+            SIDE as u32,
+        );
         assert_eq!(digest(&tps_out), 14413423169143296575u64, "transform_tps");
-
     }
 }
 
@@ -4200,11 +4885,11 @@ mod transform_baseline {
 /// existing `&[u8]` samplers **exactly**, over a deterministic grid rather than a few points.
 #[cfg(test)]
 mod generic_sampling {
+    use crate::transform::InterpolationMode;
     use crate::transform::{
         sample_bicubic, sample_bilinear, sample_interpolated, sample_interpolated_scaled,
         sample_nearest,
     };
-    use crate::transform::InterpolationMode;
 
     const W: u32 = 8;
     const H: u32 = 8;
@@ -4216,7 +4901,11 @@ mod generic_sampling {
             px[1] = ((index * 11 + 5) % 256) as u8;
             px[2] = ((index * 53 + 19) % 256) as u8;
             // Some fully transparent pixels, so the alpha path is exercised too.
-            px[3] = if index % 5 == 0 { 0 } else { 255 - (index % 128) as u8 };
+            px[3] = if index % 5 == 0 {
+                0
+            } else {
+                255 - (index % 128) as u8
+            };
         }
         bytes
     }
@@ -4247,7 +4936,12 @@ mod generic_sampling {
                 ] {
                     let (r, g, b, a) = sample_interpolated(&src, W, H, x, y, mode);
                     let scaled = sample_interpolated_scaled::<u8>(&src, W, H, x, y, mode);
-                    let quantised = [scaled[0] as u8, scaled[1] as u8, scaled[2] as u8, scaled[3] as u8];
+                    let quantised = [
+                        scaled[0] as u8,
+                        scaled[1] as u8,
+                        scaled[2] as u8,
+                        scaled[3] as u8,
+                    ];
                     assert_eq!(
                         [r, g, b, a],
                         quantised,
@@ -4270,15 +4964,39 @@ mod generic_sampling {
             for &y in &[0.5f32, 2.75, 7.0, 9.0] {
                 let nearest = crate::transform::sample_nearest_scaled::<u8>(&src, W, H, x, y);
                 let (r, g, b, a) = sample_nearest(&src, W, H, x, y);
-                assert_eq!([nearest[0] as u8, nearest[1] as u8, nearest[2] as u8, nearest[3] as u8], [r, g, b, a]);
+                assert_eq!(
+                    [
+                        nearest[0] as u8,
+                        nearest[1] as u8,
+                        nearest[2] as u8,
+                        nearest[3] as u8
+                    ],
+                    [r, g, b, a]
+                );
 
                 let bilinear = crate::transform::sample_bilinear_scaled::<u8>(&src, W, H, x, y);
                 let (r, g, b, a) = sample_bilinear(&src, W, H, x, y);
-                assert_eq!([bilinear[0] as u8, bilinear[1] as u8, bilinear[2] as u8, bilinear[3] as u8], [r, g, b, a]);
+                assert_eq!(
+                    [
+                        bilinear[0] as u8,
+                        bilinear[1] as u8,
+                        bilinear[2] as u8,
+                        bilinear[3] as u8
+                    ],
+                    [r, g, b, a]
+                );
 
                 let bicubic = crate::transform::sample_bicubic_scaled::<u8>(&src, W, H, x, y);
                 let (r, g, b, a) = sample_bicubic(&src, W, H, x, y);
-                assert_eq!([bicubic[0] as u8, bicubic[1] as u8, bicubic[2] as u8, bicubic[3] as u8], [r, g, b, a]);
+                assert_eq!(
+                    [
+                        bicubic[0] as u8,
+                        bicubic[1] as u8,
+                        bicubic[2] as u8,
+                        bicubic[3] as u8
+                    ],
+                    [r, g, b, a]
+                );
             }
         }
     }
@@ -4297,7 +5015,11 @@ mod generic_sampling {
         // Nearest: exact, off-lattice, no round trip through 8 bits.
         let nearest = crate::transform::sample_nearest_scaled::<u16>(&channels, W, H, 0.0, 0.0);
         assert_eq!(nearest[0], dst as f32);
-        assert_ne!(nearest[0] as u16 % 257, 0, "the sample must stay off-lattice");
+        assert_ne!(
+            nearest[0] as u16 % 257,
+            0,
+            "the sample must stay off-lattice"
+        );
 
         // Bilinear between an off-lattice pixel and a high-value neighbour.
         let bilinear = crate::transform::sample_bilinear_scaled::<u16>(&channels, W, H, 0.5, 0.0);
@@ -4310,7 +5032,11 @@ mod generic_sampling {
 
         // Bicubic over the same neighbourhood also stays above 8 bits.
         let bicubic = crate::transform::sample_bicubic_scaled::<u16>(&channels, W, H, 0.5, 0.0);
-        assert!(bicubic[0] > 255.0, "bicubic collapsed towards 8 bits: {}", bicubic[0]);
+        assert!(
+            bicubic[0] > 255.0,
+            "bicubic collapsed towards 8 bits: {}",
+            bicubic[0]
+        );
     }
 }
 
@@ -4352,8 +5078,15 @@ mod transform_precision {
         let mut dst = vec![0u16; (SIDE * SIDE * 4) as usize];
 
         render_transformed_patch(
-            &patch, PATCH, PATCH, origin, &identity_transform(),
-            InterpolationMode::Nearest, &mut dst, SIDE, SIDE,
+            &patch,
+            PATCH,
+            PATCH,
+            origin,
+            &identity_transform(),
+            InterpolationMode::Nearest,
+            &mut dst,
+            SIDE,
+            SIDE,
         );
 
         for sy in 0..PATCH as usize {
@@ -4380,8 +5113,15 @@ mod transform_precision {
         let mut dst = vec![0u8; (SIDE * SIDE * 4) as usize];
 
         render_transformed_patch(
-            &patch, PATCH, PATCH, origin, &identity_transform(),
-            InterpolationMode::Nearest, &mut dst, SIDE, SIDE,
+            &patch,
+            PATCH,
+            PATCH,
+            origin,
+            &identity_transform(),
+            InterpolationMode::Nearest,
+            &mut dst,
+            SIDE,
+            SIDE,
         );
 
         for sy in 0..PATCH as usize {
@@ -4426,7 +5166,11 @@ mod transform_patch {
         let layer = doc.active_layer().expect("layer");
         let patch = TransformPatch::extract_from_layer(layer, 1, 1, 3, 2, &|_, _| true);
 
-        assert_eq!(patch.format(), PixelFormat::Srgb16, "the patch carries the format itself");
+        assert_eq!(
+            patch.format(),
+            PixelFormat::Srgb16,
+            "the patch carries the format itself"
+        );
         assert_eq!(patch.pixels(), 6);
         let TransformPatch::Srgb16(channels) = &patch else {
             panic!("expected 16-bit patch");
@@ -4434,7 +5178,10 @@ mod transform_patch {
         let source = layer.as_srgb16().expect("16-bit");
         let source_index = (1 * 6 + 1) * 4;
         assert_eq!(&channels[0..4], &source[source_index..source_index + 4]);
-        assert!(channels.iter().any(|&c| c % 257 != 0), "off-lattice values must survive");
+        assert!(
+            channels.iter().any(|&c| c % 257 != 0),
+            "off-lattice values must survive"
+        );
     }
 
     /// Pixels the predicate rejects stay zeroed, which is how a selection-shaped patch keeps
@@ -4448,8 +5195,14 @@ mod transform_patch {
             panic!("expected 16-bit patch");
         };
         let source_index = (2 * 6 + 4) * 4;
-        assert_eq!(&channels[0..4], &layer.as_srgb16().unwrap()[source_index..source_index + 4]);
-        assert!(channels[4..].iter().all(|&c| c == 0), "rejected and out-of-bounds pixels are zero");
+        assert_eq!(
+            &channels[0..4],
+            &layer.as_srgb16().unwrap()[source_index..source_index + 4]
+        );
+        assert!(
+            channels[4..].iter().all(|&c| c == 0),
+            "rejected and out-of-bounds pixels are zero"
+        );
     }
 
     #[test]
@@ -4457,7 +5210,9 @@ mod transform_patch {
         let mut doc = Document::new(4, 4);
         let id = doc.active_layer_id;
         if let Some(layer) = doc.get_layer_mut(id) {
-            layer.as_srgb8_exact_mut().copy_from_slice(&[7u8; 4 * 4 * 4]);
+            layer
+                .as_srgb8_exact_mut()
+                .copy_from_slice(&[7u8; 4 * 4 * 4]);
         }
         let layer = doc.get_layer(id).expect("layer");
         let patch = TransformPatch::extract_from_layer(layer, 0, 0, 2, 2, &|_, _| true);
@@ -4493,8 +5248,15 @@ mod transform_matrix {
         let mut dst = vec![0u16; (SIDE * SIDE * 4) as usize];
 
         render_transformed_patch(
-            &patch, SIDE, SIDE, Vec2::new(1.0, 1.0), &identity(SIDE),
-            InterpolationMode::Nearest, &mut dst, SIDE, SIDE,
+            &patch,
+            SIDE,
+            SIDE,
+            Vec2::new(1.0, 1.0),
+            &identity(SIDE),
+            InterpolationMode::Nearest,
+            &mut dst,
+            SIDE,
+            SIDE,
         );
 
         let index = ((2 * SIDE + 2) * 4) as usize;
@@ -4516,17 +5278,37 @@ mod transform_matrix {
                 // Opaque red with alpha 0: colour is present, coverage is not.
                 let patch = vec![65535u16, 0, 0, 0].repeat((SIDE * SIDE) as usize);
                 render_transformed_patch(
-                    &patch, SIDE, SIDE, Vec2::new(1.0, 1.0), &identity(SIDE),
-                    InterpolationMode::Nearest, &mut wide_dst, SIDE, SIDE,
+                    &patch,
+                    SIDE,
+                    SIDE,
+                    Vec2::new(1.0, 1.0),
+                    &identity(SIDE),
+                    InterpolationMode::Nearest,
+                    &mut wide_dst,
+                    SIDE,
+                    SIDE,
                 );
-                assert!(wide_dst.iter().all(|&c| c == 0), "a zero-alpha 16-bit source must paint nothing");
+                assert!(
+                    wide_dst.iter().all(|&c| c == 0),
+                    "a zero-alpha 16-bit source must paint nothing"
+                );
             } else {
                 let patch = vec![255u8, 0, 0, 0].repeat((SIDE * SIDE) as usize);
                 render_transformed_patch(
-                    &patch, SIDE, SIDE, Vec2::new(1.0, 1.0), &identity(SIDE),
-                    InterpolationMode::Nearest, &mut eight_dst, SIDE, SIDE,
+                    &patch,
+                    SIDE,
+                    SIDE,
+                    Vec2::new(1.0, 1.0),
+                    &identity(SIDE),
+                    InterpolationMode::Nearest,
+                    &mut eight_dst,
+                    SIDE,
+                    SIDE,
                 );
-                assert!(eight_dst.iter().all(|&c| c == 0), "a zero-alpha 8-bit source must paint nothing");
+                assert!(
+                    eight_dst.iter().all(|&c| c == 0),
+                    "a zero-alpha 8-bit source must paint nothing"
+                );
             }
         }
     }
@@ -4564,7 +5346,10 @@ mod transform_matrix {
         // Same contract at 16 bits, in the source channel's own scale.
         let wide = [65535u16, 0, 0, 65535, 0, 65535, 0, 0];
         let half = crate::transform::sample_bilinear_scaled(&wide, 2, 1, 0.5, 0.0);
-        assert_eq!(half[0], 65535.0, "16-bit colour survives the transparent neighbour");
+        assert_eq!(
+            half[0], 65535.0,
+            "16-bit colour survives the transparent neighbour"
+        );
         assert_eq!(half[1], 0.0, "no green bleed at 16 bits");
         assert_eq!(half[3], 32768.0, "alpha carries the coverage");
     }
@@ -4576,21 +5361,41 @@ mod transform_matrix {
         let patch = vec![255u8, 0, 0, 128].repeat((SIDE * SIDE) as usize);
         let mut dst = vec![0u8; (SIDE * SIDE * 4) as usize];
         render_transformed_patch(
-            &patch, SIDE, SIDE, Vec2::new(1.0, 1.0), &identity(SIDE),
-            InterpolationMode::Nearest, &mut dst, SIDE, SIDE,
+            &patch,
+            SIDE,
+            SIDE,
+            Vec2::new(1.0, 1.0),
+            &identity(SIDE),
+            InterpolationMode::Nearest,
+            &mut dst,
+            SIDE,
+            SIDE,
         );
         let index = ((2 * SIDE + 2) * 4) as usize;
-        assert_eq!(dst[index], 255, "colour must not be dimmed by its own coverage");
+        assert_eq!(
+            dst[index], 255,
+            "colour must not be dimmed by its own coverage"
+        );
         assert_eq!(dst[index + 3], 128, "alpha carries the coverage");
 
         // The same in 16 bits: alpha scales, colour does not.
         let wide_patch = vec![65535u16, 0, 0, 128 * 257].repeat((SIDE * SIDE) as usize);
         let mut wide_dst = vec![0u16; (SIDE * SIDE * 4) as usize];
         render_transformed_patch(
-            &wide_patch, SIDE, SIDE, Vec2::new(1.0, 1.0), &identity(SIDE),
-            InterpolationMode::Nearest, &mut wide_dst, SIDE, SIDE,
+            &wide_patch,
+            SIDE,
+            SIDE,
+            Vec2::new(1.0, 1.0),
+            &identity(SIDE),
+            InterpolationMode::Nearest,
+            &mut wide_dst,
+            SIDE,
+            SIDE,
         );
-        assert_eq!(wide_dst[index], 65535, "16-bit colour survives at full value");
+        assert_eq!(
+            wide_dst[index], 65535,
+            "16-bit colour survives at full value"
+        );
         assert_eq!(wide_dst[index + 3], 128 * 257);
     }
 
@@ -4607,8 +5412,15 @@ mod transform_matrix {
         let patch = vec![65535u16, 0, 0, 32768].repeat((SIDE * SIDE) as usize); // half red
 
         render_transformed_patch(
-            &patch, SIDE, SIDE, Vec2::new(1.0, 1.0), &identity(SIDE),
-            InterpolationMode::Nearest, &mut dst, SIDE, SIDE,
+            &patch,
+            SIDE,
+            SIDE,
+            Vec2::new(1.0, 1.0),
+            &identity(SIDE),
+            InterpolationMode::Nearest,
+            &mut dst,
+            SIDE,
+            SIDE,
         );
 
         let index = ((2 * SIDE + 2) * 4) as usize;
@@ -4617,7 +5429,10 @@ mod transform_matrix {
         let blue = dst[index + 2];
         assert!(red > 0 && red < 65535, "red must be blended, got {red}");
         assert!(blue > 0 && blue < 65535, "blue must be blended, got {blue}");
-        assert!(red as u32 + blue as u32 > 60000, "the two channels should roughly sum to white");
+        assert!(
+            red as u32 + blue as u32 > 60000,
+            "the two channels should roughly sum to white"
+        );
     }
 }
 
@@ -4717,7 +5532,11 @@ mod layer_style_composite {
         let outside = ((8 * 24 + 6) * 4) as usize;
         let alpha = composed[outside + 3];
         assert!(alpha > 0, "glow must reach outside the square");
-        assert_ne!(alpha % 257, 0, "16-bit glow must not collapse to the 8-bit lattice");
+        assert_ne!(
+            alpha % 257,
+            0,
+            "16-bit glow must not collapse to the 8-bit lattice"
+        );
     }
 
     #[test]
@@ -4733,9 +5552,9 @@ mod layer_style_composite {
 }
 
 mod deferred_style_semantics {
-    use crate::Document;
     use crate::color::Color;
     use crate::layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
+    use crate::Document;
 
     fn glow_style(radius: f32) -> LayerStyles {
         LayerStyles {
@@ -4774,9 +5593,13 @@ mod deferred_style_semantics {
             flat[glow_pixel + 3] > 0,
             "the clipped layer should appear over the base's glow"
         );
-        assert_eq!(flat[glow_pixel + 2], 255, "the clipped blue reaches the glow");
+        assert_eq!(
+            flat[glow_pixel + 2],
+            255,
+            "the clipped blue reaches the glow"
+        );
         assert!(flat[glow_pixel] < 255 && flat[glow_pixel + 1] < 255);
-        let outside = (0 * 20 + 0) * 4;
+        let outside = 0usize;
         assert_eq!(flat[outside + 3], 0, "outside every effect stays clipped");
     }
 
@@ -4785,7 +5608,11 @@ mod deferred_style_semantics {
         let mut doc = Document::new(10, 10);
         let id = doc.active_layer_id;
         doc.get_layer_mut(id).expect("layer").styles = LayerStyles {
-            stroke: Some(StrokeStyle { width: 2.0, color: Color::BLACK, opacity: 0.8 }),
+            stroke: Some(StrokeStyle {
+                width: 2.0,
+                color: Color::BLACK,
+                opacity: 0.8,
+            }),
             drop_shadow: Some(DropShadowStyle {
                 offset_x: 3.0,
                 offset_y: 2.0,
@@ -4793,24 +5620,45 @@ mod deferred_style_semantics {
                 color: Color::BLACK,
                 opacity: 0.5,
             }),
-            outer_glow: Some(OuterGlowStyle { radius: 4.0, color: Color::WHITE, opacity: 0.4 }),
+            outer_glow: Some(OuterGlowStyle {
+                radius: 4.0,
+                color: Color::WHITE,
+                opacity: 0.4,
+            }),
         };
 
         doc.scale_canvas_with_styles(20, 20, true, true);
         let styles = &doc.get_layer(id).expect("layer").styles;
         assert_eq!(styles.stroke.as_ref().unwrap().width, 4.0);
         let shadow = styles.drop_shadow.as_ref().unwrap();
-        assert_eq!((shadow.offset_x, shadow.offset_y, shadow.blur), (6.0, 4.0, 8.0));
+        assert_eq!(
+            (shadow.offset_x, shadow.offset_y, shadow.blur),
+            (6.0, 4.0, 8.0)
+        );
         assert_eq!(styles.outer_glow.as_ref().unwrap().radius, 8.0);
 
         let mut unscaled = Document::new(10, 10);
         let id = unscaled.active_layer_id;
         unscaled.get_layer_mut(id).expect("layer").styles = LayerStyles {
-            stroke: Some(StrokeStyle { width: 2.0, color: Color::BLACK, opacity: 0.8 }),
+            stroke: Some(StrokeStyle {
+                width: 2.0,
+                color: Color::BLACK,
+                opacity: 0.8,
+            }),
             ..LayerStyles::default()
         };
         unscaled.scale_canvas(20, 20, true);
-        assert_eq!(unscaled.get_layer(id).expect("layer").styles.stroke.as_ref().unwrap().width, 2.0);
+        assert_eq!(
+            unscaled
+                .get_layer(id)
+                .expect("layer")
+                .styles
+                .stroke
+                .as_ref()
+                .unwrap()
+                .width,
+            2.0
+        );
     }
 
     #[test]
@@ -4830,7 +5678,10 @@ mod deferred_style_semantics {
 
         assert_eq!(doc.layers.len(), 1);
         let merged = doc.get_layer(lower).expect("merged");
-        assert!(merged.styles.is_empty(), "the baked style must not apply twice");
+        assert!(
+            merged.styles.is_empty(),
+            "the baked style must not apply twice"
+        );
         let flat = doc.composite_layers(false);
         let glow_pixel = (4 * 8 + 6) * 4;
         assert!(

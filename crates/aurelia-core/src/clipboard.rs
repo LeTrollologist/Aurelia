@@ -50,9 +50,12 @@ impl ClipboardImage {
         canvas_height: u32,
         selection: Option<&SelectionMask>,
     ) -> Option<Self> {
-        let bounds = selection
-            .and_then(SelectionMask::bounds)
-            .unwrap_or((0, 0, canvas_width, canvas_height));
+        let bounds = selection.and_then(SelectionMask::bounds).unwrap_or((
+            0,
+            0,
+            canvas_width,
+            canvas_height,
+        ));
         let (x0, y0, x1, y1) = bounds;
         if x1 <= x0 || y1 <= y0 {
             return None;
@@ -122,7 +125,13 @@ impl ClipboardImage {
     /// The layer is deliberately the canvas size and offset zero: a smaller layer with an
     /// offset would be a second coordinate model for every tool that follows, and paste-at-
     /// origin is the behaviour users expect from both references.
-    pub fn to_layer(&self, id: u64, name: impl Into<String>, canvas_width: u32, canvas_height: u32) -> Layer {
+    pub fn to_layer(
+        &self,
+        id: u64,
+        name: impl Into<String>,
+        canvas_width: u32,
+        canvas_height: u32,
+    ) -> Layer {
         let mut layer = Layer::new(id, name, canvas_width, canvas_height);
         if self.format == PixelFormat::Srgb16 {
             layer.convert_format(PixelFormat::Srgb16);
@@ -144,12 +153,10 @@ impl ClipboardImage {
                 };
                 match (&mut layer.buffer_mut(), &self.pixels) {
                     (LayerBuffer::Srgb8(dst), LayerBuffer::Srgb8(src)) => {
-                        dst[destination..destination + 4]
-                            .copy_from_slice(&src[source..source + 4]);
+                        dst[destination..destination + 4].copy_from_slice(&src[source..source + 4]);
                     }
                     (LayerBuffer::Srgb16(dst), LayerBuffer::Srgb16(src)) => {
-                        dst[destination..destination + 4]
-                            .copy_from_slice(&src[source..source + 4]);
+                        dst[destination..destination + 4].copy_from_slice(&src[source..source + 4]);
                     }
                     _ => {}
                 }
@@ -184,7 +191,13 @@ impl ClipboardImage {
     }
 
     /// Wraps an externally supplied 8-bit image, e.g. from another application's clipboard.
-    pub fn from_rgba8(width: u32, height: u32, origin_x: i32, origin_y: i32, rgba: &[u8]) -> Option<Self> {
+    pub fn from_rgba8(
+        width: u32,
+        height: u32,
+        origin_x: i32,
+        origin_y: i32,
+        rgba: &[u8],
+    ) -> Option<Self> {
         let size = (width * height * 4) as usize;
         if rgba.len() < size || width == 0 || height == 0 {
             return None;
@@ -234,7 +247,9 @@ impl ClipboardImage {
 /// is written to the fourth byte with explicit BGRA masks (`BI_BITFIELDS`), so consumers know
 /// the fourth byte carries alpha rather than treating the image as opaque.
 pub fn encode_dibv5(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
-    let pixel_bytes = (width as usize).checked_mul(height as usize)?.checked_mul(4)?;
+    let pixel_bytes = (width as usize)
+        .checked_mul(height as usize)?
+        .checked_mul(4)?;
     if width == 0 || height == 0 || rgba.len() < pixel_bytes {
         return None;
     }
@@ -260,7 +275,7 @@ pub fn encode_dibv5(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
     put_u32(&mut out, 48, 0x000000ff); // blue mask
     put_u32(&mut out, 52, 0xff000000); // alpha mask
     put_u32(&mut out, 56, 0x73524742); // bV5CSType = 'sRGB'
-    // Remaining V5 fields (endpoints, gamma) stay zero, which means "use sRGB defaults".
+                                       // Remaining V5 fields (endpoints, gamma) stay zero, which means "use sRGB defaults".
 
     for y in 0..height as usize {
         let source_row = y * width as usize * 4;
@@ -303,11 +318,7 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     let bit_count = u16::from_le_bytes([*bytes.get(14)?, *bytes.get(15)?]);
     let compression = read_u32(16)?;
     let paletted = matches!(bit_count, 1 | 4 | 8);
-    if planes != 1
-        || width <= 0
-        || height_raw == 0
-        || !(matches!(bit_count, 24 | 32) || paletted)
-    {
+    if planes != 1 || width <= 0 || height_raw == 0 || !(matches!(bit_count, 24 | 32) || paletted) {
         return None;
     }
     // 0 = BI_RGB, 3 = BI_BITFIELDS. Anything else (RLE, JPEG, PNG) is not a plain DIB.
@@ -338,12 +349,7 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     // Where the pixel data starts and, for BI_BITFIELDS, the channel masks.
     let (pixel_offset, masks) = if compression == 3 {
         if header_size >= 52 {
-            let masks = (
-                read_u32(40)?,
-                read_u32(44)?,
-                read_u32(48)?,
-                read_u32(52)?,
-            );
+            let masks = (read_u32(40)?, read_u32(44)?, read_u32(48)?, read_u32(52)?);
             (header_size, Some(masks))
         } else {
             // BITMAPINFOHEADER + BI_BITFIELDS: the three masks follow the header; for a
@@ -352,14 +358,16 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
             if bytes.len() < offset {
                 return None;
             }
-            let masks = (read_u32(header_size)?, read_u32(header_size + 4)?, read_u32(header_size + 8)?, 0);
+            let masks = (
+                read_u32(header_size)?,
+                read_u32(header_size + 4)?,
+                read_u32(header_size + 8)?,
+                0,
+            );
             (offset, Some(masks))
         }
     } else {
-        (
-            header_size.checked_add(palette_bytes)?,
-            None,
-        )
+        (header_size.checked_add(palette_bytes)?, None)
     };
     let palette = if paletted {
         let end = header_size.checked_add(palette_bytes)?;
@@ -453,7 +461,11 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
                     rgba[d] = masked_channel(raw, red);
                     rgba[d + 1] = masked_channel(raw, green);
                     rgba[d + 2] = masked_channel(raw, blue);
-                    rgba[d + 3] = if alpha == 0 { 255 } else { masked_channel(raw, alpha) };
+                    rgba[d + 3] = if alpha == 0 {
+                        255
+                    } else {
+                        masked_channel(raw, alpha)
+                    };
                 }
                 None => {
                     rgba[d] = pixels[s + 2];
@@ -521,7 +533,12 @@ mod tests {
         // 16-bit keeps its storage exactly.
         let mut wide = Layer::new(3, "Wide", 4, 4);
         wide.convert_format(PixelFormat::Srgb16);
-        for (index, px) in wide.as_srgb16_mut().expect("16-bit").chunks_exact_mut(4).enumerate() {
+        for (index, px) in wide
+            .as_srgb16_mut()
+            .expect("16-bit")
+            .chunks_exact_mut(4)
+            .enumerate()
+        {
             px[0] = (index as u16).wrapping_mul(4099);
             px[1] = 1234;
             px[2] = 65535;
@@ -530,7 +547,10 @@ mod tests {
         let clip = ClipboardImage::from_layer(&wide, 4, 4, None).expect("wide copy");
         assert_eq!(clip.format, PixelFormat::Srgb16);
         let pasted = clip.to_layer(4, "Wide paste", 4, 4);
-        assert_eq!(pasted.as_srgb16().expect("16-bit"), wide.as_srgb16().expect("16-bit"));
+        assert_eq!(
+            pasted.as_srgb16().expect("16-bit"),
+            wide.as_srgb16().expect("16-bit")
+        );
     }
 
     #[test]
@@ -540,8 +560,14 @@ mod tests {
         selection.paint_circle(Vec2::new(4.0, 4.0), 2.0, 1.0, 1.0);
         let bounds = selection.bounds().expect("bounds");
         let clip = ClipboardImage::from_layer(&layer, 8, 8, Some(&selection)).expect("copy");
-        assert_eq!((clip.width, clip.height), (bounds.2 - bounds.0, bounds.3 - bounds.1));
-        assert_eq!((clip.origin_x, clip.origin_y), (bounds.0 as i32, bounds.1 as i32));
+        assert_eq!(
+            (clip.width, clip.height),
+            (bounds.2 - bounds.0, bounds.3 - bounds.1)
+        );
+        assert_eq!(
+            (clip.origin_x, clip.origin_y),
+            (bounds.0 as i32, bounds.1 as i32)
+        );
 
         // A pixel inside the dab is opaque; one outside it is transparent in the payload.
         let centre = (4 - bounds.0, 4 - bounds.1);
@@ -630,7 +656,10 @@ mod tests {
         layer.mask = Some(LayerMask::full(8, 8, 0));
         let clip = ClipboardImage::from_layer(&layer, 8, 8, None).expect("copy");
         if let LayerBuffer::Srgb8(px) = &clip.pixels {
-            assert_eq!(px[3], 255, "mask coverage must not leak into the copied alpha");
+            assert_eq!(
+                px[3], 255,
+                "mask coverage must not leak into the copied alpha"
+            );
         }
     }
 }
@@ -734,7 +763,11 @@ mod dib_palette {
         dib.extend_from_slice(&[2, 3, 0, 0]);
         let (w, h, rgba) = decode_dib(&dib).expect("decode");
         assert_eq!((w, h), (2, 2));
-        assert_eq!(&rgba[0..4], &[0, 0, 255, 255], "top-left is palette 2 (blue)");
+        assert_eq!(
+            &rgba[0..4],
+            &[0, 0, 255, 255],
+            "top-left is palette 2 (blue)"
+        );
         assert_eq!(&rgba[4..8], &[255, 255, 255, 255]);
         assert_eq!(&rgba[8..12], &[255, 0, 0, 255], "bottom-left is red");
         assert_eq!(&rgba[12..16], &[0, 255, 0, 255]);

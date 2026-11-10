@@ -32,7 +32,10 @@ pub fn export_image_dialog(extension: &str, filter_label: &str) -> Option<PathBu
 pub fn open_image_dialog() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .set_title("Open Reference Image")
-        .add_filter("Image Files (*.png, *.jpg, *.jpeg, *.webp)", &["png", "jpg", "jpeg", "webp"])
+        .add_filter(
+            "Image Files (*.png, *.jpg, *.jpeg, *.webp)",
+            &["png", "jpg", "jpeg", "webp"],
+        )
         .pick_file()
 }
 

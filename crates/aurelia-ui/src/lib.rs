@@ -17,8 +17,7 @@ pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub use dialogs::{
     export_image_dialog, export_png_dialog, open_brush_dialog, open_icc_dialog, open_image_dialog,
-    open_project_dialog,
-    save_project_dialog,
+    open_project_dialog, save_project_dialog,
 };
 pub use shell::{is_shell_registered, register_shell_associations, unregister_shell_associations};
 pub use state::{AppState, PendingFileAction, WindowAction};
@@ -34,7 +33,11 @@ mod tests {
         assert_eq!(APP_VERSION, env!("CARGO_PKG_VERSION"));
         let core = APP_VERSION.split(['-', '+']).next().unwrap_or_default();
         let parts: Vec<&str> = core.split('.').collect();
-        assert_eq!(parts.len(), 3, "expected MAJOR.MINOR.PATCH, got {APP_VERSION}");
+        assert_eq!(
+            parts.len(),
+            3,
+            "expected MAJOR.MINOR.PATCH, got {APP_VERSION}"
+        );
         for part in parts {
             assert!(
                 part.parse::<u32>().is_ok(),

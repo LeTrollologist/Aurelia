@@ -70,9 +70,9 @@ pub enum AdjustmentType {
         contrast: f32,   // -100.0 to +100.0
     },
     Hsl {
-        hue_shift: f32,   // -180.0 to +180.0
-        saturation: f32,  // 0.0 to 3.0 (1.0 = normal)
-        lightness: f32,   // -1.0 to +1.0 (0.0 = normal)
+        hue_shift: f32,  // -180.0 to +180.0
+        saturation: f32, // 0.0 to 3.0 (1.0 = normal)
+        lightness: f32,  // -1.0 to +1.0 (0.0 = normal)
     },
     ColorBalance {
         cyan_red: f32,      // -100.0 to +100.0
@@ -120,7 +120,10 @@ impl AdjustmentType {
     #[inline]
     pub fn apply_to_rgb(&self, r: u8, g: u8, b: u8) -> (u8, u8, u8) {
         match self {
-            Self::BrightnessContrast { brightness, contrast } => {
+            Self::BrightnessContrast {
+                brightness,
+                contrast,
+            } => {
                 let c_factor = (259.0 * (*contrast + 255.0)) / (255.0 * (259.0 - *contrast));
                 let r_b = (r as f32) + *brightness * 2.55;
                 let g_b = (g as f32) + *brightness * 2.55;
@@ -131,16 +134,26 @@ impl AdjustmentType {
                 let nb = (c_factor * (b_b - 128.0) + 128.0).clamp(0.0, 255.0).round() as u8;
                 (nr, ng, nb)
             }
-            Self::Hsl { hue_shift, saturation, lightness } => {
+            Self::Hsl {
+                hue_shift,
+                saturation,
+                lightness,
+            } => {
                 let (h, s, l) = crate::filter::rgb_to_hsl(r, g, b);
                 let new_h = (h + *hue_shift + 360.0) % 360.0;
                 let new_s = (s * *saturation).clamp(0.0, 1.0);
                 let new_l = (l + *lightness).clamp(0.0, 1.0);
                 crate::filter::hsl_to_rgb(new_h, new_s, new_l)
             }
-            Self::ColorBalance { cyan_red, magenta_green, yellow_blue } => {
+            Self::ColorBalance {
+                cyan_red,
+                magenta_green,
+                yellow_blue,
+            } => {
                 let nr = ((r as f32) + *cyan_red * 1.28).clamp(0.0, 255.0).round() as u8;
-                let ng = ((g as f32) + *magenta_green * 1.28).clamp(0.0, 255.0).round() as u8;
+                let ng = ((g as f32) + *magenta_green * 1.28)
+                    .clamp(0.0, 255.0)
+                    .round() as u8;
                 let nb = ((b as f32) + *yellow_blue * 1.28).clamp(0.0, 255.0).round() as u8;
                 (nr, ng, nb)
             }
@@ -190,21 +203,32 @@ impl AdjustmentType {
     pub fn apply_to_rgb_working(&self, rgb: [f32; 3]) -> [f32; 3] {
         let [r, g, b] = rgb;
         match self {
-            Self::BrightnessContrast { brightness, contrast } => {
+            Self::BrightnessContrast {
+                brightness,
+                contrast,
+            } => {
                 let c_factor = (259.0 * (*contrast + 255.0)) / (255.0 * (259.0 - *contrast));
                 // 2.55 / 255, the 8-bit offset expressed per unit channel.
                 let offset = *brightness * (2.55 / 255.0);
                 let apply = |c: f32| (c_factor * (c + offset - 0.5) + 0.5).clamp(0.0, 1.0);
                 [apply(r), apply(g), apply(b)]
             }
-            Self::Hsl { hue_shift, saturation, lightness } => {
+            Self::Hsl {
+                hue_shift,
+                saturation,
+                lightness,
+            } => {
                 let (h, s, l) = crate::filter::rgb_to_hsl_f32([r, g, b]);
                 let new_h = (h + *hue_shift + 360.0) % 360.0;
                 let new_s = (s * *saturation).clamp(0.0, 1.0);
                 let new_l = (l + *lightness).clamp(0.0, 1.0);
                 crate::filter::hsl_to_rgb_f32(new_h, new_s, new_l)
             }
-            Self::ColorBalance { cyan_red, magenta_green, yellow_blue } => {
+            Self::ColorBalance {
+                cyan_red,
+                magenta_green,
+                yellow_blue,
+            } => {
                 // 1.28 / 255, the 8-bit offset expressed per unit channel.
                 let scale = 1.28 / 255.0;
                 [
@@ -508,7 +532,14 @@ impl LayerMask {
         let steps = ((distance / spacing).ceil() as u32).max(1);
         for step in 0..=steps {
             let t = step as f32 / steps as f32;
-            self.paint_dab(from.lerp(to, t), radius, hardness, opacity, target, selection);
+            self.paint_dab(
+                from.lerp(to, t),
+                radius,
+                hardness,
+                opacity,
+                target,
+                selection,
+            );
         }
     }
 }
@@ -809,7 +840,9 @@ impl Layer {
             id,
             name: name.into(),
             kind: LayerKind::Adjustment,
-            adjustment: Some(AdjustmentConfig { adjustment_type: adj_type }),
+            adjustment: Some(AdjustmentConfig {
+                adjustment_type: adj_type,
+            }),
             text: None,
             parent_id: None,
             is_expanded: true,
@@ -831,7 +864,13 @@ impl Layer {
         }
     }
 
-    pub fn new_text(id: LayerId, name: impl Into<String>, width: u32, height: u32, text_config: TextLayerConfig) -> Self {
+    pub fn new_text(
+        id: LayerId,
+        name: impl Into<String>,
+        width: u32,
+        height: u32,
+        text_config: TextLayerConfig,
+    ) -> Self {
         let size = (width as usize) * (height as usize) * 4;
         Self {
             id,
@@ -1017,12 +1056,7 @@ impl Layer {
         if !self.read_storage_bytes(idx, &mut bytes) {
             return None;
         }
-        Some([
-            bytes[0],
-            bytes[1],
-            bytes[2],
-            bytes[3],
-        ])
+        Some([bytes[0], bytes[1], bytes[2], bytes[3]])
     }
 
     /// Alpha at a layer-local coordinate, in the layer's native channel width.
@@ -1112,8 +1146,16 @@ mod mask_paint_tests {
     fn painting_white_reveals_and_black_conceals_with_hardness_falloff() {
         let mut concealed = mask(9, 9, 0);
         concealed.paint_dab(Vec2::new(4.5, 4.5), 4.0, 1.0, 1.0, 255, None);
-        assert_eq!(concealed.alpha_at(4, 4), 255, "a hard dab is fully opaque at its centre");
-        assert_eq!(concealed.alpha_at(0, 0), 0, "outside the radius is untouched");
+        assert_eq!(
+            concealed.alpha_at(4, 4),
+            255,
+            "a hard dab is fully opaque at its centre"
+        );
+        assert_eq!(
+            concealed.alpha_at(0, 0),
+            0,
+            "outside the radius is untouched"
+        );
 
         let mut revealed = mask(9, 9, 255);
         revealed.paint_dab(Vec2::new(4.5, 4.5), 4.0, 1.0, 1.0, 0, None);
@@ -1123,7 +1165,10 @@ mod mask_paint_tests {
         let mut soft = mask(9, 9, 0);
         soft.paint_dab(Vec2::new(4.5, 4.5), 4.0, 0.3, 1.0, 255, None);
         let edge = soft.alpha_at(7, 4);
-        assert!(edge > 0 && edge < 255, "soft falloff should be partial, got {edge}");
+        assert!(
+            edge > 0 && edge < 255,
+            "soft falloff should be partial, got {edge}"
+        );
     }
 
     #[test]
@@ -1131,13 +1176,20 @@ mod mask_paint_tests {
         let mut half = mask(9, 9, 0);
         half.paint_dab(Vec2::new(4.5, 4.5), 4.0, 1.0, 0.5, 255, None);
         let centre = half.alpha_at(4, 4);
-        assert!(centre > 100 && centre < 160, "50% opacity should land near half, got {centre}");
+        assert!(
+            centre > 100 && centre < 160,
+            "50% opacity should land near half, got {centre}"
+        );
 
         let mut selected = mask(9, 9, 0);
         let mut selection = SelectionMask::new(9, 9);
         selection.paint_circle(Vec2::new(4.5, 4.5), 2.0, 1.0, 1.0);
         selected.paint_dab(Vec2::new(4.5, 4.5), 4.0, 1.0, 1.0, 255, Some(&selection));
-        assert_eq!(selected.alpha_at(4, 4), 255, "inside the selection paints fully");
+        assert_eq!(
+            selected.alpha_at(4, 4),
+            255,
+            "inside the selection paints fully"
+        );
         assert_eq!(selected.alpha_at(0, 0), 0);
         assert_eq!(
             selected.alpha_at(8, 8),
@@ -1149,11 +1201,23 @@ mod mask_paint_tests {
     #[test]
     fn a_segment_covers_the_whole_run_between_endpoints() {
         let mut mask = mask(32, 8, 0);
-        mask.paint_segment(Vec2::new(2.0, 4.0), Vec2::new(30.0, 4.0), 3.0, 1.0, 1.0, 255, None);
+        mask.paint_segment(
+            Vec2::new(2.0, 4.0),
+            Vec2::new(30.0, 4.0),
+            3.0,
+            1.0,
+            1.0,
+            255,
+            None,
+        );
         for x in 2..=30 {
             assert!(mask.alpha_at(x, 4) > 0, "x={x} should be painted");
         }
-        assert_eq!(mask.alpha_at(30, 0), 0, "the stroke stays within its radius");
+        assert_eq!(
+            mask.alpha_at(30, 0),
+            0,
+            "the stroke stays within its radius"
+        );
     }
 
     /// Mask painting must not touch the layer's pixels and must work on a 16-bit layer, whose
@@ -1170,10 +1234,12 @@ mod mask_paint_tests {
         if let Some(mask) = layer.mask.as_mut() {
             mask.paint_dab(Vec2::new(4.0, 4.0), 3.0, 1.0, 1.0, 0, None);
         }
-        assert_eq!(layer.storage_bytes(), before, "pixels are untouched by mask painting");
+        assert_eq!(
+            layer.storage_bytes(),
+            before,
+            "pixels are untouched by mask painting"
+        );
         assert_eq!(layer.format(), PixelFormat::Srgb16);
         assert_eq!(layer.mask.as_ref().map(|m| m.alpha_at(4, 4)), Some(0));
     }
 }
-
-

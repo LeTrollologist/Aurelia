@@ -11,11 +11,7 @@ use aurelia_io::project::{load_project_file, save_project_file};
 use std::path::PathBuf;
 
 fn temp_path(tag: &str) -> PathBuf {
-    std::env::temp_dir().join(format!(
-        "aurelia-styles-{}-{}.aur",
-        tag,
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("aurelia-styles-{}-{}.aur", tag, std::process::id()))
 }
 
 #[test]
@@ -55,10 +51,7 @@ fn styles_round_trip_and_absent_styles_stay_empty() {
     save_project_file(&plain, &path).expect("save plain");
     let loaded = load_project_file(&path).expect("load plain");
     let _ = std::fs::remove_file(&path);
-    assert!(loaded
-        .layers
-        .iter()
-        .all(|layer| layer.styles.is_empty()));
+    assert!(loaded.layers.iter().all(|layer| layer.styles.is_empty()));
 }
 
 #[test]
@@ -79,9 +72,5 @@ fn damaged_optional_section_is_ignored_not_fatal() {
     std::fs::write(&path, &bytes).expect("write truncated");
     let loaded = load_project_file(&path).expect("truncated optional section must not fail");
     let _ = std::fs::remove_file(&path);
-    assert!(loaded
-        .get_layer(id)
-        .expect("layer")
-        .styles
-        .is_empty());
+    assert!(loaded.get_layer(id).expect("layer").styles.is_empty());
 }

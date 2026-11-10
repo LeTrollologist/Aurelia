@@ -15,6 +15,16 @@ colour.
 Malformed files are rejected with a structured error; no decoder path panics on truncation,
 oversized dimensions, invalid magic, unterminated names or truncated pixels.
 
+## Resource limits
+
+- One stamp is at most 4096 x 4096 and one file contributes at most 256 stamps.
+- The aggregate decoded budget is 63 Mi pixels / 252 MiB, charging four bytes per pixel before a
+  stamp's alpha buffer is allocated. A 4096 x 4096 stamp costs about 67 MB, so three full-size
+  stamps fit in one import and a fourth is rejected.
+- The budget is checked before allocation and before the UI clones a stamp into a preset.
+- Gradient presets are fixed enum settings with no file payload, so they have no imported byte
+  allocation and need no separate aggregate budget.
+
 ## Behaviour
 
 - The stamp keeps its aspect ratio: the larger dimension spans the brush diameter, the smaller

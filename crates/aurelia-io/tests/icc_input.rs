@@ -20,7 +20,9 @@ fn decoded_profile(path: &std::path::Path) -> Option<Vec<u8>> {
 
 #[test]
 fn png_jpeg_and_webp_profiles_are_readable_on_import() {
-    let icc = moxcms::ColorProfile::new_srgb().encode().expect("encode sRGB");
+    let icc = moxcms::ColorProfile::new_srgb()
+        .encode()
+        .expect("encode sRGB");
     let mut doc = Document::new(8, 8);
     doc.set_icc_profile(icc.clone()).expect("attach");
 

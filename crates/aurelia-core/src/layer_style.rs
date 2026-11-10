@@ -64,11 +64,12 @@ impl LayerStyles {
 
     /// Styles that would actually draw: present, with non-zero width/radius and opacity.
     pub fn has_visible_effect(&self) -> bool {
-        self.stroke.as_ref().is_some_and(|s| s.width > 0.0 && s.opacity > 0.0)
-            || self
-                .drop_shadow
-                .as_ref()
-                .is_some_and(|s| s.opacity > 0.0 && (s.blur > 0.0 || s.offset_x != 0.0 || s.offset_y != 0.0))
+        self.stroke
+            .as_ref()
+            .is_some_and(|s| s.width > 0.0 && s.opacity > 0.0)
+            || self.drop_shadow.as_ref().is_some_and(|s| {
+                s.opacity > 0.0 && (s.blur > 0.0 || s.offset_x != 0.0 || s.offset_y != 0.0)
+            })
             || self
                 .outer_glow
                 .as_ref()
@@ -140,12 +141,18 @@ impl Default for OuterGlowStyle {
 /// same computation as [`render`] restricted to that rectangle.
 pub fn render_styled(layer: &Layer) -> LayerBuffer {
     match layer.buffer() {
-        LayerBuffer::Srgb8(source) => {
-            LayerBuffer::Srgb8(render_bounded(source, layer.width, layer.height, &layer.styles))
-        }
-        LayerBuffer::Srgb16(source) => {
-            LayerBuffer::Srgb16(render_bounded(source, layer.width, layer.height, &layer.styles))
-        }
+        LayerBuffer::Srgb8(source) => LayerBuffer::Srgb8(render_bounded(
+            source,
+            layer.width,
+            layer.height,
+            &layer.styles,
+        )),
+        LayerBuffer::Srgb16(source) => LayerBuffer::Srgb16(render_bounded(
+            source,
+            layer.width,
+            layer.height,
+            &layer.styles,
+        )),
     }
 }
 
@@ -156,9 +163,14 @@ pub fn render_styled(layer: &Layer) -> LayerBuffer {
 /// before it ever reaches the working-precision path.
 pub fn render_styled_srgb16(layer: &Layer) -> Vec<u16> {
     match layer.buffer() {
-        LayerBuffer::Srgb16(source) => render_bounded(source, layer.width, layer.height, &layer.styles),
+        LayerBuffer::Srgb16(source) => {
+            render_bounded(source, layer.width, layer.height, &layer.styles)
+        }
         LayerBuffer::Srgb8(source) => {
-            let promoted: Vec<u16> = source.iter().map(|&v| crate::pixel::srgb8_to_srgb16(v)).collect();
+            let promoted: Vec<u16> = source
+                .iter()
+                .map(|&v| crate::pixel::srgb8_to_srgb16(v))
+                .collect();
             render_bounded(&promoted, layer.width, layer.height, &layer.styles)
         }
     }
@@ -238,12 +250,10 @@ fn effect_support(styles: &LayerStyles) -> u32 {
         }
     }
     if let Some(shadow) = &styles.drop_shadow {
-        if shadow.opacity > 0.0 && (shadow.blur > 0.0 || shadow.offset_x != 0.0 || shadow.offset_y != 0.0) {
-            let offset = shadow
-                .offset_x
-                .abs()
-                .max(shadow.offset_y.abs())
-                .ceil() as u32;
+        if shadow.opacity > 0.0
+            && (shadow.blur > 0.0 || shadow.offset_x != 0.0 || shadow.offset_y != 0.0)
+        {
+            let offset = shadow.offset_x.abs().max(shadow.offset_y.abs()).ceil() as u32;
             support = support.max(offset + blur_support(shadow.blur));
         }
     }
@@ -301,7 +311,8 @@ fn render_rect<C: Channel>(
         let gy = y0 as usize + ly;
         for lx in 0..sw {
             let gx = x0 as usize + lx;
-            alpha[ly * sw + lx] = source[(gy * w + gx) * 4 + 3].to_scaled_f32() / C::MAX_SCALED as f32;
+            alpha[ly * sw + lx] =
+                source[(gy * w + gx) * 4 + 3].to_scaled_f32() / C::MAX_SCALED as f32;
         }
     }
 
@@ -335,7 +346,12 @@ fn render_rect<C: Channel>(
                 if a > 0.0 {
                     blend_over(
                         &mut canvas[index],
-                        [color[0] as f32 / 255.0, color[1] as f32 / 255.0, color[2] as f32 / 255.0, a],
+                        [
+                            color[0] as f32 / 255.0,
+                            color[1] as f32 / 255.0,
+                            color[2] as f32 / 255.0,
+                            a,
+                        ],
                     );
                 }
             }
@@ -356,7 +372,12 @@ fn render_rect<C: Channel>(
                 if a > 0.0 {
                     blend_over(
                         &mut canvas[index],
-                        [color[0] as f32 / 255.0, color[1] as f32 / 255.0, color[2] as f32 / 255.0, a],
+                        [
+                            color[0] as f32 / 255.0,
+                            color[1] as f32 / 255.0,
+                            color[2] as f32 / 255.0,
+                            a,
+                        ],
                     );
                 }
             }
@@ -377,7 +398,12 @@ fn render_rect<C: Channel>(
                 if a > 0.0 {
                     blend_over(
                         &mut canvas[index],
-                        [color[0] as f32 / 255.0, color[1] as f32 / 255.0, color[2] as f32 / 255.0, a],
+                        [
+                            color[0] as f32 / 255.0,
+                            color[1] as f32 / 255.0,
+                            color[2] as f32 / 255.0,
+                            a,
+                        ],
                     );
                 }
             }
@@ -618,9 +644,21 @@ mod tests {
         let LayerBuffer::Srgb8(out) = render_styled(&layer) else {
             panic!("8-bit");
         };
-        assert_eq!(pixel(&out, 32, 16, 10), [0, 0, 0, 255], "shadow follows the offset");
-        assert_eq!(pixel(&out, 32, 10, 10), [255, 0, 0, 255], "layer paints over its shadow");
-        assert_eq!(pixel(&out, 32, 5, 5)[3], 0, "no shadow where the shifted silhouette is absent");
+        assert_eq!(
+            pixel(&out, 32, 16, 10),
+            [0, 0, 0, 255],
+            "shadow follows the offset"
+        );
+        assert_eq!(
+            pixel(&out, 32, 10, 10),
+            [255, 0, 0, 255],
+            "layer paints over its shadow"
+        );
+        assert_eq!(
+            pixel(&out, 32, 5, 5)[3],
+            0,
+            "no shadow where the shifted silhouette is absent"
+        );
     }
 
     #[test]
@@ -641,8 +679,14 @@ mod tests {
         };
         // The stroke band sits immediately outside the square and is drawn above the glow.
         let edge = pixel(&out, 32, 9, 10);
-        assert!(edge[3] > 0, "stroke must cover the pixel just outside the silhouette");
-        assert!(edge[2] > edge[1], "stroke colour should dominate at the edge: {edge:?}");
+        assert!(
+            edge[3] > 0,
+            "stroke must cover the pixel just outside the silhouette"
+        );
+        assert!(
+            edge[2] > edge[1],
+            "stroke colour should dominate at the edge: {edge:?}"
+        );
         let glow = pixel(&out, 32, 9, 6);
         assert!(glow[3] > 0, "glow reaches a few pixels out");
         assert!(glow[1] > glow[2], "glow is green, not blue: {glow:?}");
@@ -674,7 +718,11 @@ mod tests {
         let outside = ((3 * 16 + 6) * 4) as usize;
         let alpha = out[outside + 3];
         assert!(alpha > 0, "glow must be present");
-        assert_ne!(alpha % 257, 0, "16-bit glow alpha must not collapse to the 8-bit lattice");
+        assert_ne!(
+            alpha % 257,
+            0,
+            "16-bit glow alpha must not collapse to the 8-bit lattice"
+        );
     }
 
     #[test]
@@ -710,16 +758,29 @@ mod blur_policy {
         let at = |x: u32, y: u32| mask[(y * w + x) as usize];
         for y in 18..46 {
             for x in 18..46 {
-                assert!((at(x, y) - 1.0).abs() < 0.002, "interior ({x},{y}) = {}", at(x, y));
+                assert!(
+                    (at(x, y) - 1.0).abs() < 0.002,
+                    "interior ({x},{y}) = {}",
+                    at(x, y)
+                );
             }
         }
         let mid = h / 2;
         let left = at(0, mid);
         let right = at(w - 1, mid);
-        assert!((left - right).abs() < 0.002, "left {left} and right {right} must mirror");
-        assert!(left < 0.9, "the border must fade under transparent extension, got {left}");
+        assert!(
+            (left - right).abs() < 0.002,
+            "left {left} and right {right} must mirror"
+        );
+        assert!(
+            left < 0.9,
+            "the border must fade under transparent extension, got {left}"
+        );
         assert!(at(w / 2, mid) > 0.99, "the centre must not fade");
-        assert!(at(0, 0) <= left + 0.002, "corners fade at least as much as edges");
+        assert!(
+            at(0, 0) <= left + 0.002,
+            "corners fade at least as much as edges"
+        );
     }
 
     /// A dimension smaller than the kernel is legal (thin strips, 1-pixel masks) and must not
@@ -730,7 +791,8 @@ mod blur_policy {
             let mut mask = vec![1.0f32; (w * h) as usize];
             blur(&mut mask, w, h, 8.0);
             assert!(
-                mask.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)),
+                mask.iter()
+                    .all(|v| v.is_finite() && (0.0..=1.0).contains(v)),
                 "{w}x{h} produced an out-of-range value"
             );
         }
@@ -759,7 +821,11 @@ mod bounded_equivalence {
 
     fn styles() -> LayerStyles {
         LayerStyles {
-            stroke: Some(StrokeStyle { width: 4.0, color: Color::BLACK, opacity: 0.8 }),
+            stroke: Some(StrokeStyle {
+                width: 4.0,
+                color: Color::BLACK,
+                opacity: 0.8,
+            }),
             drop_shadow: Some(DropShadowStyle {
                 offset_x: -9.0,
                 offset_y: 7.0,
@@ -767,7 +833,11 @@ mod bounded_equivalence {
                 color: Color::BLACK,
                 opacity: 0.5,
             }),
-            outer_glow: Some(OuterGlowStyle { radius: 10.0, color: Color::WHITE, opacity: 0.4 }),
+            outer_glow: Some(OuterGlowStyle {
+                radius: 10.0,
+                color: Color::WHITE,
+                opacity: 0.4,
+            }),
         }
     }
 
@@ -794,7 +864,10 @@ mod bounded_equivalence {
         assert!(checked > 0);
 
         // The same rectangle at 16-bit must also be exact against the full renderer.
-        let promoted: Vec<u16> = source.iter().map(|&v| crate::pixel::srgb8_to_srgb16(v)).collect();
+        let promoted: Vec<u16> = source
+            .iter()
+            .map(|&v| crate::pixel::srgb8_to_srgb16(v))
+            .collect();
         let reference16 = super::render(&promoted, width, height, &layer.styles);
         let bounded16 = super::render_styled_srgb16(layer);
         for index in 0..width as usize * height as usize {
@@ -818,14 +891,20 @@ mod bounded_equivalence {
             (0..96).map(|x| (x, 0)).collect(),
             (0..96).map(|x| (x, 63)).collect(),
             (0..96).flat_map(|x| (0..64).map(move |y| (x, y))).collect(),
-            (30..50).flat_map(|x| (20..40).map(move |y| (x, y))).collect(),
+            (30..50)
+                .flat_map(|x| (20..40).map(move |y| (x, y)))
+                .collect(),
         ];
         for art in fixtures {
             let mut layer = layer_with(width, height, &art);
             layer.styles = styles();
             assert_equivalent(&layer);
 
-            layer.styles = LayerStyles { stroke: None, drop_shadow: None, outer_glow: None };
+            layer.styles = LayerStyles {
+                stroke: None,
+                drop_shadow: None,
+                outer_glow: None,
+            };
             assert_equivalent(&layer);
         }
     }
@@ -833,13 +912,9 @@ mod bounded_equivalence {
     #[test]
     fn bounds_cover_the_effect_and_stay_inside_the_canvas() {
         let layer = layer_with(96, 64, &[(40, 30), (41, 30), (40, 31)]);
-        let (x0, y0, x1, y1) = super::styled_rect(
-            layer.as_srgb8_exact(),
-            layer.width,
-            layer.height,
-            &styles(),
-        )
-        .expect("content");
+        let (x0, y0, x1, y1) =
+            super::styled_rect(layer.as_srgb8_exact(), layer.width, layer.height, &styles())
+                .expect("content");
         assert!(x0 > 0 && x1 < layer.width, "the horizontal rect is cropped");
         assert!(y0 <= 30 && y1 >= 32);
         assert!(x0 <= 40 && y0 <= 30 && x1 > 41 && y1 > 31);
@@ -853,7 +928,9 @@ mod bounded_equivalence {
         let layer = Layer::new(1, "empty", 32, 32);
         assert!(super::styled_rect(layer.as_srgb8_exact(), 32, 32, &styles()).is_none());
         let rendered = super::render_styled(&layer);
-        let LayerBuffer::Srgb8(pixels) = rendered else { panic!("8-bit") };
+        let LayerBuffer::Srgb8(pixels) = rendered else {
+            panic!("8-bit")
+        };
         assert!(pixels.iter().all(|&v| v == 0));
     }
 }

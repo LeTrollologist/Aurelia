@@ -1,7 +1,7 @@
+use aurelia_core::document::Document;
 use egui::epaint::Primitive;
 use egui::{ClippedPrimitive, ImageData, Rect, TextureId, TexturesDelta};
 use glam::Vec2;
-use aurelia_core::document::Document;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy)]
@@ -96,9 +96,11 @@ impl SoftwareRenderer {
                     for y in 0..h {
                         for x in 0..w {
                             let src_idx = ((y * w + x) * 4) as usize;
-                            let dst_idx = (((y_offset as u32 + y) * *tex_w + (x_offset as u32 + x)) * 4) as usize;
+                            let dst_idx = (((y_offset as u32 + y) * *tex_w + (x_offset as u32 + x))
+                                * 4) as usize;
                             if src_idx + 4 <= rgba.len() && dst_idx + 4 <= target.len() {
-                                target[dst_idx..dst_idx + 4].copy_from_slice(&rgba[src_idx..src_idx + 4]);
+                                target[dst_idx..dst_idx + 4]
+                                    .copy_from_slice(&rgba[src_idx..src_idx + 4]);
                             }
                         }
                     }
@@ -185,10 +187,18 @@ impl SoftwareRenderer {
         // 1. Soft Drop Shadow around canvas boundary (strictly clipped to viewport)
         let shadow_blur = 18isize;
         let shadow_offset_y = 6isize;
-        let s_x0 = (x0 - shadow_blur).max(vp_min_x as isize).min(vp_max_x as isize) as usize;
-        let s_x1 = (x1 + shadow_blur).max(vp_min_x as isize).min(vp_max_x as isize) as usize;
-        let s_y0 = (y0 - shadow_blur + shadow_offset_y).max(vp_min_y as isize).min(vp_max_y as isize) as usize;
-        let s_y1 = (y1 + shadow_blur + shadow_offset_y).max(vp_min_y as isize).min(vp_max_y as isize) as usize;
+        let s_x0 = (x0 - shadow_blur)
+            .max(vp_min_x as isize)
+            .min(vp_max_x as isize) as usize;
+        let s_x1 = (x1 + shadow_blur)
+            .max(vp_min_x as isize)
+            .min(vp_max_x as isize) as usize;
+        let s_y0 = (y0 - shadow_blur + shadow_offset_y)
+            .max(vp_min_y as isize)
+            .min(vp_max_y as isize) as usize;
+        let s_y1 = (y1 + shadow_blur + shadow_offset_y)
+            .max(vp_min_y as isize)
+            .min(vp_max_y as isize) as usize;
 
         let cx0 = x0 as f32;
         let cx1 = x1 as f32;
@@ -200,8 +210,20 @@ impl SoftwareRenderer {
             let sy_f = sy as f32;
             for sx in s_x0..s_x1 {
                 let sx_f = sx as f32;
-                let dx = if sx_f < cx0 { cx0 - sx_f } else if sx_f > cx1 { sx_f - cx1 } else { 0.0 };
-                let dy = if sy_f < cy0 { cy0 - sy_f } else if sy_f > cy1 { sy_f - cy1 } else { 0.0 };
+                let dx = if sx_f < cx0 {
+                    cx0 - sx_f
+                } else if sx_f > cx1 {
+                    sx_f - cx1
+                } else {
+                    0.0
+                };
+                let dy = if sy_f < cy0 {
+                    cy0 - sy_f
+                } else if sy_f > cy1 {
+                    sy_f - cy1
+                } else {
+                    0.0
+                };
                 let dist = (dx * dx + dy * dy).sqrt();
                 if dist > 0.0 && dist <= shadow_blur as f32 {
                     let factor = (1.0 - dist / (shadow_blur as f32)).powi(2);
@@ -236,7 +258,9 @@ impl SoftwareRenderer {
                 proof_hash: hash_bytes(proof.bytes()),
                 document_profile_hash: hash_bytes(doc.icc_profile().unwrap_or(&[])),
             };
-            if self.proof_cache_key != Some(key) || self.proof_cache.len() != self.composite_buffer.len() {
+            if self.proof_cache_key != Some(key)
+                || self.proof_cache.len() != self.composite_buffer.len()
+            {
                 self.proof_cache.clear();
                 self.proof_cache.extend_from_slice(&self.composite_buffer);
                 let source = doc
@@ -246,11 +270,7 @@ impl SoftwareRenderer {
                 let display = aurelia_core::IccProfile::srgb();
                 // A failed proof conversion leaves the normal composite visible rather than a
                 // blank canvas; the UI still badges the mode.
-                let _ = source.simulate_proof_rgba8(
-                    proof,
-                    &display,
-                    &mut self.proof_cache,
-                );
+                let _ = source.simulate_proof_rgba8(proof, &display, &mut self.proof_cache);
                 self.proof_cache_key = Some(key);
                 self.proof_cache_generation = self.proof_cache_generation.wrapping_add(1);
             }
@@ -264,7 +284,9 @@ impl SoftwareRenderer {
             &self.composite_buffer
         };
         let inv_zoom = 1.0 / zoom;
-        let is_exact_1to1 = (zoom - 1.0).abs() < 0.001 && center_x.fract().abs() < 0.01 && center_y.fract().abs() < 0.01;
+        let is_exact_1to1 = (zoom - 1.0).abs() < 0.001
+            && center_x.fract().abs() < 0.01
+            && center_y.fract().abs() < 0.01;
         let use_bilinear = !is_exact_1to1 && zoom < 2.5;
 
         for screen_y in min_y..max_y {
@@ -289,13 +311,24 @@ impl SoftwareRenderer {
                 let src_idx = src_row_offset + (doc_xi as usize) * 4;
 
                 let (lr, lg, lb, la) = if use_bilinear {
-                    let px = aurelia_core::rasterizer::sample_bilinear_rgba(flat_pixels, doc.width, doc.height, doc_xf - 0.5, doc_yf - 0.5);
+                    let px = aurelia_core::rasterizer::sample_bilinear_rgba(
+                        flat_pixels,
+                        doc.width,
+                        doc.height,
+                        doc_xf - 0.5,
+                        doc_yf - 0.5,
+                    );
                     (px[0], px[1], px[2], px[3])
                 } else {
                     if src_idx + 3 >= flat_pixels.len() {
                         continue;
                     }
-                    (flat_pixels[src_idx], flat_pixels[src_idx + 1], flat_pixels[src_idx + 2], flat_pixels[src_idx + 3])
+                    (
+                        flat_pixels[src_idx],
+                        flat_pixels[src_idx + 1],
+                        flat_pixels[src_idx + 2],
+                        flat_pixels[src_idx + 3],
+                    )
                 };
 
                 let pixel_idx = row_offset + screen_x;
@@ -305,8 +338,7 @@ impl SoftwareRenderer {
 
                 // Base paper / background color
                 let (mut base_r, mut base_g, mut base_b) = if doc.is_transparent {
-                    let [r, g, b] =
-                        doc.transparency_checker_rgb8(doc_xi as u32, doc_yi as u32);
+                    let [r, g, b] = doc.transparency_checker_rgb8(doc_xi as u32, doc_yi as u32);
                     (r, g, b)
                 } else {
                     (paper[0], paper[1], paper[2])
@@ -327,7 +359,8 @@ impl SoftwareRenderer {
                             let r = cfg.rgba[idx];
                             let g = cfg.rgba[idx + 1];
                             let b = cfg.rgba[idx + 2];
-                            let a = ((cfg.rgba[idx + 3] as f32) * cfg.opacity).clamp(0.0, 255.0) as u8;
+                            let a =
+                                ((cfg.rgba[idx + 3] as f32) * cfg.opacity).clamp(0.0, 255.0) as u8;
                             return Some((r, g, b, a));
                         }
                     }
@@ -352,9 +385,12 @@ impl SoftwareRenderer {
                         if sa > 0 {
                             let eff_a = ((sa as f32 * skin.opacity).clamp(0.0, 255.0)) as u32;
                             let inv_a = 255 - eff_a;
-                            base_r = ((base_r as u32 * inv_a + skin.tint_r as u32 * eff_a) / 255) as u8;
-                            base_g = ((base_g as u32 * inv_a + skin.tint_g as u32 * eff_a) / 255) as u8;
-                            base_b = ((base_b as u32 * inv_a + skin.tint_b as u32 * eff_a) / 255) as u8;
+                            base_r =
+                                ((base_r as u32 * inv_a + skin.tint_r as u32 * eff_a) / 255) as u8;
+                            base_g =
+                                ((base_g as u32 * inv_a + skin.tint_g as u32 * eff_a) / 255) as u8;
+                            base_b =
+                                ((base_b as u32 * inv_a + skin.tint_b as u32 * eff_a) / 255) as u8;
                         }
                     }
                 }
@@ -381,9 +417,12 @@ impl SoftwareRenderer {
                         if sa > 0 {
                             let eff_a = ((sa as f32 * skin.opacity).clamp(0.0, 255.0)) as u32;
                             let inv_a = 255 - eff_a;
-                            curr_r = ((curr_r as u32 * inv_a + skin.tint_r as u32 * eff_a) / 255) as u8;
-                            curr_g = ((curr_g as u32 * inv_a + skin.tint_g as u32 * eff_a) / 255) as u8;
-                            curr_b = ((curr_b as u32 * inv_a + skin.tint_b as u32 * eff_a) / 255) as u8;
+                            curr_r =
+                                ((curr_r as u32 * inv_a + skin.tint_r as u32 * eff_a) / 255) as u8;
+                            curr_g =
+                                ((curr_g as u32 * inv_a + skin.tint_g as u32 * eff_a) / 255) as u8;
+                            curr_b =
+                                ((curr_b as u32 * inv_a + skin.tint_b as u32 * eff_a) / 255) as u8;
                         }
                     }
                 }
@@ -422,7 +461,8 @@ impl SoftwareRenderer {
                     (final_r, final_g, final_b)
                 };
 
-                buffer[pixel_idx] = 0xFF000000 | ((out_r as u32) << 16) | ((out_g as u32) << 8) | (out_b as u32);
+                buffer[pixel_idx] =
+                    0xFF000000 | ((out_r as u32) << 16) | ((out_g as u32) << 8) | (out_b as u32);
             }
         }
 
@@ -527,10 +567,18 @@ impl SoftwareRenderer {
         let center_y = (win_h as f32) * 0.5 + pan.y + center_offset.y;
 
         // Screen bounds of the canvas strictly clipped to viewport
-        let x_start = (((0.0 - doc_w * 0.5) * zoom + center_x).round() as isize).max(vp_min_x as isize).min(vp_max_x as isize) as usize;
-        let x_end = (((doc_w - doc_w * 0.5) * zoom + center_x).round() as isize).max(vp_min_x as isize).min(vp_max_x as isize) as usize;
-        let y_start = (((0.0 - doc_h * 0.5) * zoom + center_y).round() as isize).max(vp_min_y as isize).min(vp_max_y as isize) as usize;
-        let y_end = (((doc_h - doc_h * 0.5) * zoom + center_y).round() as isize).max(vp_min_y as isize).min(vp_max_y as isize) as usize;
+        let x_start = (((0.0 - doc_w * 0.5) * zoom + center_x).round() as isize)
+            .max(vp_min_x as isize)
+            .min(vp_max_x as isize) as usize;
+        let x_end = (((doc_w - doc_w * 0.5) * zoom + center_x).round() as isize)
+            .max(vp_min_x as isize)
+            .min(vp_max_x as isize) as usize;
+        let y_start = (((0.0 - doc_h * 0.5) * zoom + center_y).round() as isize)
+            .max(vp_min_y as isize)
+            .min(vp_max_y as isize) as usize;
+        let y_end = (((doc_h - doc_h * 0.5) * zoom + center_y).round() as isize)
+            .max(vp_min_y as isize)
+            .min(vp_max_y as isize) as usize;
 
         if x_start >= x_end || y_start >= y_end {
             return;
@@ -610,7 +658,12 @@ impl SoftwareRenderer {
         viewport_clip: [usize; 4],
         perspective: &aurelia_core::perspective::PerspectiveConfig,
     ) {
-        if win_w == 0 || win_h == 0 || !perspective.show_guides || perspective.p_type == aurelia_core::perspective::PerspectiveType::None || perspective.guide_opacity <= 0.001 {
+        if win_w == 0
+            || win_h == 0
+            || !perspective.show_guides
+            || perspective.p_type == aurelia_core::perspective::PerspectiveType::None
+            || perspective.guide_opacity <= 0.001
+        {
             return;
         }
 
@@ -644,12 +697,26 @@ impl SoftwareRenderer {
         let h_p0_screen = canvas_to_screen(h_p0_canvas);
         let h_p1_screen = canvas_to_screen(h_p1_canvas);
 
-        self.draw_screen_line(buffer, win_w, win_h, h_p0_screen, h_p1_screen, horizon_color_u32, false, viewport_clip);
+        self.draw_screen_line(
+            buffer,
+            win_w,
+            win_h,
+            h_p0_screen,
+            h_p1_screen,
+            horizon_color_u32,
+            false,
+            viewport_clip,
+        );
 
         // 2. Draw Radiating Guide Rays from Active Vanishing Points
         let active_vps = perspective.get_active_vps();
         for (vp_idx, &vp_canvas) in active_vps.iter().enumerate() {
-            let rays = perspective.generate_rays_for_vp(vp_canvas, doc_w, doc_h, perspective.guide_density);
+            let rays = perspective.generate_rays_for_vp(
+                vp_canvas,
+                doc_w,
+                doc_h,
+                perspective.guide_density,
+            );
             let vp_color = match vp_idx {
                 0 => 0xFFF6C45A, // Left VP: Aurelia Gold
                 1 => 0xFF3FA796, // Right VP: Aurelia Teal
@@ -660,7 +727,16 @@ impl SoftwareRenderer {
             for (start_canvas, end_canvas) in rays {
                 let start_screen = canvas_to_screen(start_canvas);
                 let end_screen = canvas_to_screen(end_canvas);
-                self.draw_screen_line(buffer, win_w, win_h, start_screen, end_screen, vp_color, true, viewport_clip);
+                self.draw_screen_line(
+                    buffer,
+                    win_w,
+                    win_h,
+                    start_screen,
+                    end_screen,
+                    vp_color,
+                    true,
+                    viewport_clip,
+                );
             }
 
             // Draw Vanishing Point Gizmo Handle
@@ -735,7 +811,13 @@ impl SoftwareRenderer {
 
         // Geometry comes from the pure helpers so placement can be unit-tested
         // without a framebuffer. Numbers are painted by egui on top of the frame.
-        let top_ticks = ruler_ticks(doc_w, zoom, center_x, left_x_start as isize, right_x_end as isize);
+        let top_ticks = ruler_ticks(
+            doc_w,
+            zoom,
+            center_x,
+            left_x_start as isize,
+            right_x_end as isize,
+        );
         let left_ticks = ruler_ticks(
             doc_h,
             zoom,
@@ -795,7 +877,6 @@ impl SoftwareRenderer {
             }
         }
 
-
         // Canvas bounds are emphasised: 0 and the far edge.
         for bound in [0.0_f32, doc_w] {
             let sx = doc_to_screen(bound, doc_w, zoom, center_x).round() as isize;
@@ -825,7 +906,12 @@ impl SoftwareRenderer {
                     if d == 0 {
                         buffer[idx] = ruler_marker;
                     } else {
-                        blend_px(buffer, idx, ruler_marker, if d.abs() == 1 { 96 } else { 40 });
+                        blend_px(
+                            buffer,
+                            idx,
+                            ruler_marker,
+                            if d.abs() == 1 { 96 } else { 40 },
+                        );
                     }
                 }
             }
@@ -872,7 +958,6 @@ impl SoftwareRenderer {
             }
         }
 
-
         // Canvas bounds on the vertical ruler
         for bound in [0.0_f32, doc_h] {
             let sy = doc_to_screen(bound, doc_h, zoom, center_y).round() as isize;
@@ -902,7 +987,12 @@ impl SoftwareRenderer {
                     if d == 0 {
                         buffer[idx] = ruler_marker;
                     } else {
-                        blend_px(buffer, idx, ruler_marker, if d.abs() == 1 { 96 } else { 40 });
+                        blend_px(
+                            buffer,
+                            idx,
+                            ruler_marker,
+                            if d.abs() == 1 { 96 } else { 40 },
+                        );
                     }
                 }
             }
@@ -960,7 +1050,10 @@ impl SoftwareRenderer {
                     let i1 = triangle[1] as usize;
                     let i2 = triangle[2] as usize;
 
-                    if i0 >= mesh.vertices.len() || i1 >= mesh.vertices.len() || i2 >= mesh.vertices.len() {
+                    if i0 >= mesh.vertices.len()
+                        || i1 >= mesh.vertices.len()
+                        || i2 >= mesh.vertices.len()
+                    {
                         continue;
                     }
 
@@ -1006,22 +1099,33 @@ impl SoftwareRenderer {
                         for x in min_tx..max_tx {
                             let xf = x as f32 + 0.5;
 
-                            let w0 = ((p1.y - p2.y) * (xf - p2.x) + (p2.x - p1.x) * (yf - p2.y)) * inv_denom;
-                            let w1 = ((p2.y - p0.y) * (xf - p2.x) + (p0.x - p2.x) * (yf - p2.y)) * inv_denom;
+                            let w0 = ((p1.y - p2.y) * (xf - p2.x) + (p2.x - p1.x) * (yf - p2.y))
+                                * inv_denom;
+                            let w1 = ((p2.y - p0.y) * (xf - p2.x) + (p0.x - p2.x) * (yf - p2.y))
+                                * inv_denom;
                             let w2 = 1.0 - w0 - w1;
 
                             if w0 >= -0.001 && w1 >= -0.001 && w2 >= -0.001 {
-                                let mut r = w0 * c0[0] as f32 + w1 * c1[0] as f32 + w2 * c2[0] as f32;
-                                let mut g = w0 * c0[1] as f32 + w1 * c1[1] as f32 + w2 * c2[1] as f32;
-                                let mut b = w0 * c0[2] as f32 + w1 * c1[2] as f32 + w2 * c2[2] as f32;
-                                let mut a = (w0 * c0[3] as f32 + w1 * c1[3] as f32 + w2 * c2[3] as f32) / 255.0;
+                                let mut r =
+                                    w0 * c0[0] as f32 + w1 * c1[0] as f32 + w2 * c2[0] as f32;
+                                let mut g =
+                                    w0 * c0[1] as f32 + w1 * c1[1] as f32 + w2 * c2[1] as f32;
+                                let mut b =
+                                    w0 * c0[2] as f32 + w1 * c1[2] as f32 + w2 * c2[2] as f32;
+                                let mut a =
+                                    (w0 * c0[3] as f32 + w1 * c1[3] as f32 + w2 * c2[3] as f32)
+                                        / 255.0;
 
                                 if let Some((tw, th, tbytes)) = texture {
-                                    let u = (w0 * v0.uv.x + w1 * v1.uv.x + w2 * v2.uv.x).clamp(0.0, 1.0);
-                                    let v = (w0 * v0.uv.y + w1 * v1.uv.y + w2 * v2.uv.y).clamp(0.0, 1.0);
+                                    let u = (w0 * v0.uv.x + w1 * v1.uv.x + w2 * v2.uv.x)
+                                        .clamp(0.0, 1.0);
+                                    let v = (w0 * v0.uv.y + w1 * v1.uv.y + w2 * v2.uv.y)
+                                        .clamp(0.0, 1.0);
 
-                                    let tx = ((u * ((*tw).max(1) as f32 - 1.0)).round() as usize).min((*tw as usize).saturating_sub(1));
-                                    let ty = ((v * ((*th).max(1) as f32 - 1.0)).round() as usize).min((*th as usize).saturating_sub(1));
+                                    let tx = ((u * ((*tw).max(1) as f32 - 1.0)).round() as usize)
+                                        .min((*tw as usize).saturating_sub(1));
+                                    let ty = ((v * ((*th).max(1) as f32 - 1.0)).round() as usize)
+                                        .min((*th as usize).saturating_sub(1));
                                     let tidx = (ty * *tw as usize + tx) * 4;
 
                                     if tidx + 3 < tbytes.len() {
@@ -1049,7 +1153,8 @@ impl SoftwareRenderer {
                                         let out_g = (g * a + dst_g * (1.0 - a)).round() as u32;
                                         let out_b = (b * a + dst_b * (1.0 - a)).round() as u32;
 
-                                        buffer[pixel_idx] = 0xFF000000 | (out_r << 16) | (out_g << 8) | out_b;
+                                        buffer[pixel_idx] =
+                                            0xFF000000 | (out_r << 16) | (out_g << 8) | out_b;
                                     }
                                 }
                             }
@@ -1060,7 +1165,17 @@ impl SoftwareRenderer {
         }
     }
 
-    pub fn draw_screen_line(&self, buffer: &mut [u32], win_w: usize, win_h: usize, p0: Vec2, p1: Vec2, color: u32, dashed: bool, clip: [usize; 4]) {
+    pub fn draw_screen_line(
+        &self,
+        buffer: &mut [u32],
+        win_w: usize,
+        win_h: usize,
+        p0: Vec2,
+        p1: Vec2,
+        color: u32,
+        dashed: bool,
+        clip: [usize; 4],
+    ) {
         let dist = p0.distance(p1);
         let steps = (dist.ceil() as usize).max(1);
         let [vx0, vy0, vx1, vy1] = clip;
@@ -1078,7 +1193,17 @@ impl SoftwareRenderer {
         }
     }
 
-    pub fn draw_screen_rect(&self, buffer: &mut [u32], win_w: usize, win_h: usize, p0: Vec2, p1: Vec2, color: u32, dashed: bool, clip: [usize; 4]) {
+    pub fn draw_screen_rect(
+        &self,
+        buffer: &mut [u32],
+        win_w: usize,
+        win_h: usize,
+        p0: Vec2,
+        p1: Vec2,
+        color: u32,
+        dashed: bool,
+        clip: [usize; 4],
+    ) {
         let min_x = p0.x.min(p1.x);
         let max_x = p0.x.max(p1.x);
         let min_y = p0.y.min(p1.y);
@@ -1095,7 +1220,17 @@ impl SoftwareRenderer {
         self.draw_screen_line(buffer, win_w, win_h, bl, tl, color, dashed, clip);
     }
 
-    pub fn draw_screen_ellipse(&self, buffer: &mut [u32], win_w: usize, win_h: usize, p0: Vec2, p1: Vec2, color: u32, dashed: bool, clip: [usize; 4]) {
+    pub fn draw_screen_ellipse(
+        &self,
+        buffer: &mut [u32],
+        win_w: usize,
+        win_h: usize,
+        p0: Vec2,
+        p1: Vec2,
+        color: u32,
+        dashed: bool,
+        clip: [usize; 4],
+    ) {
         let center = (p0 + p1) * 0.5;
         let rx = (p1.x - p0.x).abs() * 0.5;
         let ry = (p1.y - p0.y).abs() * 0.5;
@@ -1103,7 +1238,8 @@ impl SoftwareRenderer {
             return;
         }
 
-        let circumference = std::f32::consts::PI * (3.0 * (rx + ry) - ((3.0 * rx + ry) * (rx + 3.0 * ry)).sqrt());
+        let circumference =
+            std::f32::consts::PI * (3.0 * (rx + ry) - ((3.0 * rx + ry) * (rx + 3.0 * ry)).sqrt());
         let steps = (circumference.ceil() as usize).max(12);
         let [vx0, vy0, vx1, vy1] = clip;
 
@@ -1120,7 +1256,15 @@ impl SoftwareRenderer {
         }
     }
 
-    pub fn draw_screen_crosshair(&self, buffer: &mut [u32], win_w: usize, win_h: usize, center: Vec2, color: u32, clip: [usize; 4]) {
+    pub fn draw_screen_crosshair(
+        &self,
+        buffer: &mut [u32],
+        win_w: usize,
+        win_h: usize,
+        center: Vec2,
+        color: u32,
+        clip: [usize; 4],
+    ) {
         let cx = center.x.round() as usize;
         let cy = center.y.round() as usize;
         let [vx0, vy0, vx1, vy1] = clip;
@@ -1216,8 +1360,12 @@ pub fn ruler_ticks(doc_len: f32, zoom: f32, centre: f32, lo: isize, hi: isize) -
         return Vec::new();
     }
 
-    let first = (screen_to_doc(lo as f32, doc_len, zoom, centre) / minor).floor().max(0.0) as i64;
-    let last = (screen_to_doc(hi as f32, doc_len, zoom, centre) / minor).ceil().max(0.0) as i64;
+    let first = (screen_to_doc(lo as f32, doc_len, zoom, centre) / minor)
+        .floor()
+        .max(0.0) as i64;
+    let last = (screen_to_doc(hi as f32, doc_len, zoom, centre) / minor)
+        .ceil()
+        .max(0.0) as i64;
     // Hard ceiling: a pathological zoom must not spin out here.
     let last = last.min(first.saturating_add(8192));
 
@@ -1238,7 +1386,11 @@ pub fn ruler_ticks(doc_len: f32, zoom: f32, centre: f32, lo: isize, hi: isize) -
         } else {
             TickLevel::Minor
         };
-        ticks.push(RulerTick { value, screen, level });
+        ticks.push(RulerTick {
+            value,
+            screen,
+            level,
+        });
     }
     ticks
 }
@@ -1269,12 +1421,24 @@ mod ruler_tests {
     #[test]
     fn ruler_step_keeps_labelled_ticks_apart_at_every_zoom() {
         // Label spacing must stay >= 64 px, using the usual 1/2/5 ladder.
-        for (zoom, expected_major) in [(0.1_f32, 1000.0_f32), (0.41, 200.0), (1.0, 100.0), (2.0, 50.0), (8.0, 10.0)] {
+        for (zoom, expected_major) in [
+            (0.1_f32, 1000.0_f32),
+            (0.41, 200.0),
+            (1.0, 100.0),
+            (2.0, 50.0),
+            (8.0, 10.0),
+        ] {
             let (major, minor, subs) = ruler_steps(zoom);
             assert_eq!(major, expected_major, "major step at zoom {zoom}");
             assert!(major * zoom >= 64.0, "labels collide at zoom {zoom}");
-            assert!(minor > 0.0 && minor <= major, "minor step out of range at zoom {zoom}");
-            assert!(minor * zoom >= 4.0 || subs == 1, "minor ticks too dense at zoom {zoom}");
+            assert!(
+                minor > 0.0 && minor <= major,
+                "minor step out of range at zoom {zoom}"
+            );
+            assert!(
+                minor * zoom >= 4.0 || subs == 1,
+                "minor ticks too dense at zoom {zoom}"
+            );
             assert!(
                 (minor * subs as f32 - major).abs() < 1e-3,
                 "minor x subs must equal major"
@@ -1309,7 +1473,10 @@ mod ruler_tests {
                     a.value,
                     b.value
                 );
-                assert!(b.screen >= a.screen, "screen positions must ascend at zoom {zoom}");
+                assert!(
+                    b.screen >= a.screen,
+                    "screen positions must ascend at zoom {zoom}"
+                );
                 let expected = (b.value - a.value) * zoom;
                 assert!(
                     ((b.screen - a.screen) as f32 - expected).abs() <= 1.01,
@@ -1400,7 +1567,11 @@ mod ruler_tests {
             &[],
             None,
         );
-        assert_eq!(buffer[16 * 32 + 16], 0xFFFF_FFFF, "empty 16-bit document must show white paper");
+        assert_eq!(
+            buffer[16 * 32 + 16],
+            0xFFFF_FFFF,
+            "empty 16-bit document must show white paper"
+        );
     }
 
     #[test]
@@ -1421,7 +1592,11 @@ mod ruler_tests {
             &[],
             None,
         );
-        assert_eq!(buffer[16 * 32 + 16], 0xFFFF_FFFF, "empty new document must show white paper");
+        assert_eq!(
+            buffer[16 * 32 + 16],
+            0xFFFF_FFFF,
+            "empty new document must show white paper"
+        );
     }
 
     #[test]
@@ -1485,11 +1660,7 @@ mod viewport_tests {
     /// viewport is never an acceptable fallback for a format the editor supports.
     #[test]
     fn empty_sixteen_bit_document_renders_paper() {
-        let doc = Document::new_with_format(
-            32,
-            32,
-            aurelia_core::layer::PixelFormat::Srgb16,
-        );
+        let doc = Document::new_with_format(32, 32, aurelia_core::layer::PixelFormat::Srgb16);
         let buffer = render(&doc, 40, Vec2::ZERO, 1.0);
         assert_eq!(px(&buffer, 40, 20, 20), 0xFFFF_FFFF);
     }
@@ -1578,7 +1749,6 @@ mod viewport_tests {
         );
     }
 }
-
 
 #[cfg(test)]
 mod soft_proof_viewport_tests {

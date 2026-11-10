@@ -65,7 +65,13 @@ impl AnimationFrame {
         }
     }
 
-    pub fn composite_layers(&self, width: u32, height: u32, include_background: bool, bg_val: u8) -> Vec<u8> {
+    pub fn composite_layers(
+        &self,
+        width: u32,
+        height: u32,
+        include_background: bool,
+        bg_val: u8,
+    ) -> Vec<u8> {
         // A frame holding any 16-bit layer must be composited at working precision, and that
         // compositor lives on `Document`. Delegating keeps one implementation of the blend
         // maths instead of a second one here; the clone is a single frame, dropped as soon as
@@ -123,7 +129,12 @@ impl AnimationFrame {
                         layer.as_srgb8_exact()[src_idx + 2],
                         layer.as_srgb8_exact()[src_idx + 3],
                     ];
-                    let dst = [out[dst_idx], out[dst_idx + 1], out[dst_idx + 2], out[dst_idx + 3]];
+                    let dst = [
+                        out[dst_idx],
+                        out[dst_idx + 1],
+                        out[dst_idx + 2],
+                        out[dst_idx + 3],
+                    ];
                     let blended = layer.blend_mode.composite_pixel(dst, src, layer_alpha);
                     out[dst_idx..dst_idx + 4].copy_from_slice(&blended);
                 }

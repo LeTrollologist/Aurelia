@@ -214,8 +214,7 @@ impl ThemeMode {
 
 /// Aurelia studio palette: warm ink darks, gold/amber primaries, teal complement.
 pub const DEFAULT_PALETTE: &[&str] = &[
-    "#ffffff", "#f3e7d6", "#e6d3b3", "#d4b483", "#b08d57", "#6b4f32", "#2a201a",
-    "#f6c45a", "#e8963f", "#e4705f", "#c9527f", "#9c3d54", "#6d2b3f", "#3fa796",
-    "#2f7d74", "#1f5c55", "#a8d5c9", "#7fb3a6", "#f7e08a", "#f2b95c", "#d98c4a",
-    "#bf6b3f", "#8c4a2f", "#0b0806",
+    "#ffffff", "#f3e7d6", "#e6d3b3", "#d4b483", "#b08d57", "#6b4f32", "#2a201a", "#f6c45a",
+    "#e8963f", "#e4705f", "#c9527f", "#9c3d54", "#6d2b3f", "#3fa796", "#2f7d74", "#1f5c55",
+    "#a8d5c9", "#7fb3a6", "#f7e08a", "#f2b95c", "#d98c4a", "#bf6b3f", "#8c4a2f", "#0b0806",
 ];

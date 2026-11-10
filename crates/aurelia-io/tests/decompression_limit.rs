@@ -83,8 +83,7 @@ fn decompression_bomb_is_rejected_without_allocating_it() {
 
     let comp_len_at = comp_len_offset(&bytes);
     let data_at = comp_len_at + 4;
-    let original_len =
-        u32::from_le_bytes(bytes[comp_len_at..data_at].try_into().unwrap()) as usize;
+    let original_len = u32::from_le_bytes(bytes[comp_len_at..data_at].try_into().unwrap()) as usize;
     assert!(
         original_len > 0 && original_len < (SIDE * SIDE * 4) as usize,
         "the fixture should carry a small deflate stream for its 4x4 sRGB8 layer"

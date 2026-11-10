@@ -54,7 +54,10 @@ fn session(doc: &mut Document, symmetry: &SymmetryConfig, brush: &BrushSettings)
         let y = (step as f32 * 11.7) % (H as f32 - 40.0) + 20.0;
         StrokeRasterizer::paint_dot(
             doc,
-            BrushPoint { position: glam::Vec2::new(x, y), pressure: 1.0 },
+            BrushPoint {
+                position: glam::Vec2::new(x, y),
+                pressure: 1.0,
+            },
             brush,
             symmetry,
             None,
@@ -64,8 +67,14 @@ fn session(doc: &mut Document, symmetry: &SymmetryConfig, brush: &BrushSettings)
         let y = (step as f32 * 23.0) % (H as f32 - 60.0) + 30.0;
         StrokeRasterizer::paint_segment(
             doc,
-            BrushPoint { position: glam::Vec2::new(30.0, y), pressure: 1.0 },
-            BrushPoint { position: glam::Vec2::new(W as f32 - 30.0, y + 40.0), pressure: 1.0 },
+            BrushPoint {
+                position: glam::Vec2::new(30.0, y),
+                pressure: 1.0,
+            },
+            BrushPoint {
+                position: glam::Vec2::new(W as f32 - 30.0, y + 40.0),
+                pressure: 1.0,
+            },
             brush,
             symmetry,
             None,
@@ -113,10 +122,33 @@ fn main() {
     let m8 = median(s8.clone());
     let m16 = median(s16.clone());
     let ops = (DABS + SEGMENTS) as f64;
-    println!("{:<14} {:>10} {:>14} {:>12}", "layer", "session ms", "operations/s", "vs u8");
-    println!("{:<14} {:>10.1} {:>14.0} {:>12}", "Srgb8", m8 * 1000.0, ops / m8, "-");
-    println!("{:<14} {:>10.1} {:>14.0} {:>11.0}%", "Srgb16", m16 * 1000.0, ops / m16, 100.0 * (m8 / m16 - 1.0));
-    println!("
-spread u8: {:.1}..{:.1} ms", s8.iter().cloned().fold(f64::INFINITY, f64::min) * 1000.0, s8.iter().cloned().fold(0.0, f64::max) * 1000.0);
-    println!("spread u16: {:.1}..{:.1} ms", s16.iter().cloned().fold(f64::INFINITY, f64::min) * 1000.0, s16.iter().cloned().fold(0.0, f64::max) * 1000.0);
+    println!(
+        "{:<14} {:>10} {:>14} {:>12}",
+        "layer", "session ms", "operations/s", "vs u8"
+    );
+    println!(
+        "{:<14} {:>10.1} {:>14.0} {:>12}",
+        "Srgb8",
+        m8 * 1000.0,
+        ops / m8,
+        "-"
+    );
+    println!(
+        "{:<14} {:>10.1} {:>14.0} {:>11.0}%",
+        "Srgb16",
+        m16 * 1000.0,
+        ops / m16,
+        100.0 * (m8 / m16 - 1.0)
+    );
+    println!(
+        "
+spread u8: {:.1}..{:.1} ms",
+        s8.iter().cloned().fold(f64::INFINITY, f64::min) * 1000.0,
+        s8.iter().cloned().fold(0.0, f64::max) * 1000.0
+    );
+    println!(
+        "spread u16: {:.1}..{:.1} ms",
+        s16.iter().cloned().fold(f64::INFINITY, f64::min) * 1000.0,
+        s16.iter().cloned().fold(0.0, f64::max) * 1000.0
+    );
 }

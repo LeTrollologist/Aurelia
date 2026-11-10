@@ -1,7 +1,7 @@
 use crate::blend::BlendMode;
 use crate::color::{Color, ThemeMode};
 use crate::color_management::{ColorProfileError, IccProfile};
-use crate::layer::{Layer, LayerId, LayerBuffer, LayerMask, PixelFormat};
+use crate::layer::{Layer, LayerBuffer, LayerId, LayerMask, PixelFormat};
 use crate::pixel::Channel;
 use crate::selection::SelectionMask;
 use serde::{Deserialize, Serialize};
@@ -200,7 +200,9 @@ impl Document {
     }
 
     pub fn active_layer_mut(&mut self) -> Option<&mut Layer> {
-        self.layers.iter_mut().find(|l| l.id == self.active_layer_id)
+        self.layers
+            .iter_mut()
+            .find(|l| l.id == self.active_layer_id)
     }
 
     pub fn get_layer(&self, id: LayerId) -> Option<&Layer> {
@@ -236,7 +238,11 @@ impl Document {
         id
     }
 
-    pub fn add_adjustment_layer(&mut self, adj_type: crate::layer::AdjustmentType, name: Option<String>) -> LayerId {
+    pub fn add_adjustment_layer(
+        &mut self,
+        adj_type: crate::layer::AdjustmentType,
+        name: Option<String>,
+    ) -> LayerId {
         let id = self.next_layer_id;
         self.next_layer_id += 1;
         let layer_name = name.unwrap_or_else(|| format!("{} {}", adj_type.name(), id));
@@ -246,7 +252,12 @@ impl Document {
         id
     }
 
-    pub fn add_text_layer(&mut self, name: Option<String>, config: crate::layer::TextLayerConfig, parent_id: Option<LayerId>) -> LayerId {
+    pub fn add_text_layer(
+        &mut self,
+        name: Option<String>,
+        config: crate::layer::TextLayerConfig,
+        parent_id: Option<LayerId>,
+    ) -> LayerId {
         let id = self.next_layer_id;
         self.next_layer_id += 1;
         let layer_name = name.unwrap_or_else(|| {
@@ -273,7 +284,9 @@ impl Document {
         if let Some(layer) = self.get_layer_mut(layer_id) {
             if layer.is_text() {
                 layer.text = Some(config.clone());
-                crate::rasterizer::StrokeRasterizer::rasterize_text_layer_config(layer, &config, font_ref);
+                crate::rasterizer::StrokeRasterizer::rasterize_text_layer_config(
+                    layer, &config, font_ref,
+                );
                 return true;
             }
         }
@@ -545,7 +558,12 @@ impl Document {
     }
 
     pub fn invert_layer_mask(&mut self, layer_id: LayerId) -> bool {
-        match self.layers.iter_mut().find(|l| l.id == layer_id).and_then(|l| l.mask.as_mut()) {
+        match self
+            .layers
+            .iter_mut()
+            .find(|l| l.id == layer_id)
+            .and_then(|l| l.mask.as_mut())
+        {
             Some(mask) => {
                 mask.invert();
                 true
@@ -555,7 +573,12 @@ impl Document {
     }
 
     pub fn set_layer_mask_enabled(&mut self, layer_id: LayerId, enabled: bool) -> bool {
-        match self.layers.iter_mut().find(|l| l.id == layer_id).and_then(|l| l.mask.as_mut()) {
+        match self
+            .layers
+            .iter_mut()
+            .find(|l| l.id == layer_id)
+            .and_then(|l| l.mask.as_mut())
+        {
             Some(mask) => {
                 mask.enabled = enabled;
                 true
@@ -588,7 +611,11 @@ impl Document {
     /// its own format). The 8-bit result is unchanged: the same blend maths, the same
     /// quantisation on write.
     pub fn merge_layer_down(&mut self) -> bool {
-        let active_idx = match self.layers.iter().position(|l| l.id == self.active_layer_id) {
+        let active_idx = match self
+            .layers
+            .iter()
+            .position(|l| l.id == self.active_layer_id)
+        {
             Some(i) if i > 0 => i,
             _ => return false,
         };
@@ -604,12 +631,13 @@ impl Document {
                 None
             }
         };
-        let styled_upper =
-            if (upper_owned.is_raster() || upper_owned.is_text()) && upper_owned.styles.has_visible_effect() {
-                Some(upper_owned.with_buffer(crate::layer_style::render_styled(&upper_owned)))
-            } else {
-                None
-            };
+        let styled_upper = if (upper_owned.is_raster() || upper_owned.is_text())
+            && upper_owned.styles.has_visible_effect()
+        {
+            Some(upper_owned.with_buffer(crate::layer_style::render_styled(&upper_owned)))
+        } else {
+            None
+        };
         let upper = match &styled_upper {
             Some(styled) => styled,
             None => &upper_owned,
@@ -651,7 +679,9 @@ impl Document {
                 .unwrap_or([0.0, 0.0, 0.0, 0.0]);
 
                 let blended =
-                    upper.blend_mode.composite_working(lower_baked, upper_px, upper.opacity);
+                    upper
+                        .blend_mode
+                        .composite_working(lower_baked, upper_px, upper.opacity);
 
                 // Store result at the lower layer's local coordinate
                 if lx >= 0 && ly >= 0 {
@@ -683,8 +713,7 @@ impl Document {
         // downconvert the whole canvas.
         let mut merged = Layer::new(id, "Merged", self.width, self.height);
         if self.pixel_format == PixelFormat::Srgb16 {
-            *merged.buffer_mut() =
-                LayerBuffer::Srgb16(self.composite_layers_srgb16(true));
+            *merged.buffer_mut() = LayerBuffer::Srgb16(self.composite_layers_srgb16(true));
         } else {
             merged.set_pixels(self.composite_layers(true));
         }
@@ -749,7 +778,9 @@ impl Document {
         for layer in &mut self.layers {
             layer.map_buffer(
                 |bytes| cropped_channels(bytes, old_w, old_h, new_w, new_h, offset_x, offset_y),
-                |channels| cropped_channels(channels, old_w, old_h, new_w, new_h, offset_x, offset_y),
+                |channels| {
+                    cropped_channels(channels, old_w, old_h, new_w, new_h, offset_x, offset_y)
+                },
             );
             layer.width = new_w;
             layer.height = new_h;
@@ -930,12 +961,13 @@ impl Document {
             // Composite-time layer styles: substitute a styled copy of the layer's pixels. The
             // clone keeps the layer's offset/mask/blend metadata, so only the pixels change.
             let styled_layer;
-            let layer = if (layer.is_raster() || layer.is_text()) && layer.styles.has_visible_effect() {
-                styled_layer = layer.with_buffer(crate::layer_style::render_styled(layer));
-                &styled_layer
-            } else {
-                layer
-            };
+            let layer =
+                if (layer.is_raster() || layer.is_text()) && layer.styles.has_visible_effect() {
+                    styled_layer = layer.with_buffer(crate::layer_style::render_styled(layer));
+                    &styled_layer
+                } else {
+                    layer
+                };
 
             // ── Non-Destructive Adjustment Layer Pass ──
             if layer.is_adjustment() {
@@ -960,8 +992,14 @@ impl Document {
                             if let Some(base) = prev_layer {
                                 let bx = x as i32 - base.offset_x;
                                 let by = y as i32 - base.offset_y;
-                                let base_a = if bx >= 0 && bx < self.width as i32 && by >= 0 && by < self.height as i32 {
-                                    base.get_pixel(bx as u32, by as u32).map(|p| p[3] as f32 / 255.0).unwrap_or(0.0)
+                                let base_a = if bx >= 0
+                                    && bx < self.width as i32
+                                    && by >= 0
+                                    && by < self.height as i32
+                                {
+                                    base.get_pixel(bx as u32, by as u32)
+                                        .map(|p| p[3] as f32 / 255.0)
+                                        .unwrap_or(0.0)
                                 } else {
                                     0.0
                                 };
@@ -975,7 +1013,8 @@ impl Document {
                             let (ar, ag, ab) = adj_type.apply_to_rgb(dr, dg, db);
                             let orig_px = [dr, dg, db, da];
                             let adj_px = [ar, ag, ab, da];
-                            let blended = layer.blend_mode.composite_pixel(orig_px, adj_px, opacity);
+                            let blended =
+                                layer.blend_mode.composite_pixel(orig_px, adj_px, opacity);
                             out[dst_idx] = blended[0];
                             out[dst_idx + 1] = blended[1];
                             out[dst_idx + 2] = blended[2];
@@ -987,14 +1026,18 @@ impl Document {
             }
 
             // ── Fast path for Normal blend mode with 0 offset and no clipping ──
-            if layer.blend_mode == BlendMode::Normal && layer.offset_x == 0 && layer.offset_y == 0 && prev_layer.is_none() && layer.as_srgb8_exact().len() >= total_bytes {
+            if layer.blend_mode == BlendMode::Normal
+                && layer.offset_x == 0
+                && layer.offset_y == 0
+                && prev_layer.is_none()
+                && layer.as_srgb8_exact().len() >= total_bytes
+            {
                 let alpha_mul = (eff_opacity.clamp(0.0, 1.0) * 255.0).round() as u32;
                 // A mask scales the layer's alpha per pixel; a mismatched mask is ignored
                 // rather than silently misaligned.
-                let mask = layer
-                    .mask
-                    .as_ref()
-                    .filter(|m| m.enabled && m.pixels.len() >= (self.width as usize) * (self.height as usize));
+                let mask = layer.mask.as_ref().filter(|m| {
+                    m.enabled && m.pixels.len() >= (self.width as usize) * (self.height as usize)
+                });
                 for (i, (dst, src)) in out[..total_bytes]
                     .chunks_exact_mut(4)
                     .zip(layer.as_srgb8_exact()[..total_bytes].chunks_exact(4))
@@ -1022,9 +1065,12 @@ impl Document {
                         let inv_sa = 255 - sa;
                         let out_a = sa + (da * inv_sa + 127) / 255;
                         if out_a > 0 {
-                            let r = (src[0] as u32 * sa * 255 + dst[0] as u32 * da * inv_sa) / (out_a * 255);
-                            let g = (src[1] as u32 * sa * 255 + dst[1] as u32 * da * inv_sa) / (out_a * 255);
-                            let b = (src[2] as u32 * sa * 255 + dst[2] as u32 * da * inv_sa) / (out_a * 255);
+                            let r = (src[0] as u32 * sa * 255 + dst[0] as u32 * da * inv_sa)
+                                / (out_a * 255);
+                            let g = (src[1] as u32 * sa * 255 + dst[1] as u32 * da * inv_sa)
+                                / (out_a * 255);
+                            let b = (src[2] as u32 * sa * 255 + dst[2] as u32 * da * inv_sa)
+                                / (out_a * 255);
                             dst[0] = r.min(255) as u8;
                             dst[1] = g.min(255) as u8;
                             dst[2] = b.min(255) as u8;
@@ -1054,7 +1100,9 @@ impl Document {
             // stroke/glow/shadow changes the base's visible alpha, and clipping to the raw
             // pixels would cut the clipped layer out of those effect pixels.
             let styled_base = prev_layer
-                .filter(|base| (base.is_raster() || base.is_text()) && base.styles.has_visible_effect())
+                .filter(|base| {
+                    (base.is_raster() || base.is_text()) && base.styles.has_visible_effect()
+                })
                 .map(crate::layer_style::render_styled);
             let base_pixels: &[u8] = match (&styled_base, prev_layer) {
                 (Some(LayerBuffer::Srgb8(pixels)), _) => pixels,
@@ -1077,7 +1125,17 @@ impl Document {
             // hot path while the maths stays single-sourced in `composite_pixel`.
             macro_rules! run {
                 ($compose:path) => {
-                    compose_layer(out, layer, w, h, eff_opacity, mask, base, layer_pixels, $compose)
+                    compose_layer(
+                        out,
+                        layer,
+                        w,
+                        h,
+                        eff_opacity,
+                        mask,
+                        base,
+                        layer_pixels,
+                        $compose,
+                    )
                 };
             }
             match layer.blend_mode {
@@ -1588,7 +1646,10 @@ pub(crate) fn promote_layers(doc: &Document) -> PromotedLayers<'_> {
                 // first would throw away exactly the precision the format exists to carry.
                 LayerBuffer::Srgb16(channels) => std::borrow::Cow::Borrowed(channels.as_slice()),
                 LayerBuffer::Srgb8(bytes) => std::borrow::Cow::Owned(
-                    bytes.iter().map(|&v| crate::pixel::srgb8_to_srgb16(v)).collect(),
+                    bytes
+                        .iter()
+                        .map(|&v| crate::pixel::srgb8_to_srgb16(v))
+                        .collect(),
                 ),
             })
             .collect(),
@@ -1687,9 +1748,7 @@ pub(crate) fn compose_u16_prepared(
         let base = if clipping {
             let b = &doc.layers[index - 1];
             Some(ClipBase {
-                pixels: styled_base
-                    .as_deref()
-                    .unwrap_or(&promoted.0[index - 1]),
+                pixels: styled_base.as_deref().unwrap_or(&promoted.0[index - 1]),
                 offset_x: b.offset_x,
                 offset_y: b.offset_y,
                 width: b.width,
@@ -1709,7 +1768,15 @@ pub(crate) fn compose_u16_prepared(
         macro_rules! run {
             ($compose:path) => {
                 compose_layer(
-                    &mut out[..total], layer, w, h, opacity, mask, base, layer_pixels, $compose,
+                    &mut out[..total],
+                    layer,
+                    w,
+                    h,
+                    opacity,
+                    mask,
+                    base,
+                    layer_pixels,
+                    $compose,
                 )
             };
         }

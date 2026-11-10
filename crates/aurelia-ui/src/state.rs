@@ -1,13 +1,8 @@
-use glam::Vec2;
-use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use aurelia_core::blend::BlendMode;
 use aurelia_core::brush::BrushSettings;
 use aurelia_core::clipboard::ClipboardImage;
 use aurelia_core::color::{Color, DEFAULT_PALETTE};
-use aurelia_core::document::{
-    Document, EditorState, GuideLine, StraightRulerState,
-};
+use aurelia_core::document::{Document, EditorState, GuideLine, StraightRulerState};
 use aurelia_core::history::HistoryStack;
 use aurelia_core::layer::{Layer, LayerBuffer, PixelFormat};
 use aurelia_core::selection::{SelectionCombineMode, SelectionMask, StrokePosition};
@@ -16,6 +11,9 @@ use aurelia_core::transform::{
     AffineTransform2D, InterpolationMode, MeshWarpGrid, PerspectiveQuadTransform, RenderMode,
     ThinPlateSpline2D, TransformMode, TransformPatch,
 };
+use glam::Vec2;
+use std::path::{Path, PathBuf};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// One committed selection change, retained so Ctrl+Z can restore the previous mask (#36).
 #[derive(Debug, Clone)]
@@ -202,28 +200,118 @@ pub struct CanvasPreset {
 impl CanvasPreset {
     pub const ALL: &'static [Self] = &[
         // Digital Art
-        Self { category: "Digital Art", name: "1:1 Square (1024 × 1024)", width: 1024, height: 1024 },
-        Self { category: "Digital Art", name: "2K Square (2048 × 2048)", width: 2048, height: 2048 },
-        Self { category: "Digital Art", name: "4K Master (4096 × 4096)", width: 4096, height: 4096 },
+        Self {
+            category: "Digital Art",
+            name: "1:1 Square (1024 × 1024)",
+            width: 1024,
+            height: 1024,
+        },
+        Self {
+            category: "Digital Art",
+            name: "2K Square (2048 × 2048)",
+            width: 2048,
+            height: 2048,
+        },
+        Self {
+            category: "Digital Art",
+            name: "4K Master (4096 × 4096)",
+            width: 4096,
+            height: 4096,
+        },
         // Screen & Display
-        Self { category: "Screen & Video", name: "1080p FHD (1920 × 1080)", width: 1920, height: 1080 },
-        Self { category: "Screen & Video", name: "1440p QHD (2560 × 1440)", width: 2560, height: 1440 },
-        Self { category: "Screen & Video", name: "4K UHD (3840 × 2160)", width: 3840, height: 2160 },
-        Self { category: "Screen & Video", name: "Ultrawide (3440 × 1440)", width: 3440, height: 1440 },
+        Self {
+            category: "Screen & Video",
+            name: "1080p FHD (1920 × 1080)",
+            width: 1920,
+            height: 1080,
+        },
+        Self {
+            category: "Screen & Video",
+            name: "1440p QHD (2560 × 1440)",
+            width: 2560,
+            height: 1440,
+        },
+        Self {
+            category: "Screen & Video",
+            name: "4K UHD (3840 × 2160)",
+            width: 3840,
+            height: 2160,
+        },
+        Self {
+            category: "Screen & Video",
+            name: "Ultrawide (3440 × 1440)",
+            width: 3440,
+            height: 1440,
+        },
         // Social Media
-        Self { category: "Social Media", name: "Twitter / X Banner (1500 × 500)", width: 1500, height: 500 },
-        Self { category: "Social Media", name: "YouTube Thumb (1280 × 720)", width: 1280, height: 720 },
-        Self { category: "Social Media", name: "Mobile Story (1080 × 1920)", width: 1080, height: 1920 },
-        Self { category: "Social Media", name: "Instagram Portrait (1080 × 1350)", width: 1080, height: 1350 },
+        Self {
+            category: "Social Media",
+            name: "Twitter / X Banner (1500 × 500)",
+            width: 1500,
+            height: 500,
+        },
+        Self {
+            category: "Social Media",
+            name: "YouTube Thumb (1280 × 720)",
+            width: 1280,
+            height: 720,
+        },
+        Self {
+            category: "Social Media",
+            name: "Mobile Story (1080 × 1920)",
+            width: 1080,
+            height: 1920,
+        },
+        Self {
+            category: "Social Media",
+            name: "Instagram Portrait (1080 × 1350)",
+            width: 1080,
+            height: 1350,
+        },
         // Print Documents
-        Self { category: "Print", name: "A4 @ 300 DPI (2480 × 3508)", width: 2480, height: 3508 },
-        Self { category: "Print", name: "A5 @ 300 DPI (1748 × 2480)", width: 1748, height: 2480 },
-        Self { category: "Print", name: "Photo 4×6 (1200 × 1800)", width: 1200, height: 1800 },
+        Self {
+            category: "Print",
+            name: "A4 @ 300 DPI (2480 × 3508)",
+            width: 2480,
+            height: 3508,
+        },
+        Self {
+            category: "Print",
+            name: "A5 @ 300 DPI (1748 × 2480)",
+            width: 1748,
+            height: 2480,
+        },
+        Self {
+            category: "Print",
+            name: "Photo 4×6 (1200 × 1800)",
+            width: 1200,
+            height: 1800,
+        },
         // Pixel Art
-        Self { category: "Pixel Art", name: "Sprite (32 × 32)", width: 32, height: 32 },
-        Self { category: "Pixel Art", name: "Icon (64 × 64)", width: 64, height: 64 },
-        Self { category: "Pixel Art", name: "Scene (128 × 128)", width: 128, height: 128 },
-        Self { category: "Pixel Art", name: "Retro (256 × 256)", width: 256, height: 256 },
+        Self {
+            category: "Pixel Art",
+            name: "Sprite (32 × 32)",
+            width: 32,
+            height: 32,
+        },
+        Self {
+            category: "Pixel Art",
+            name: "Icon (64 × 64)",
+            width: 64,
+            height: 64,
+        },
+        Self {
+            category: "Pixel Art",
+            name: "Scene (128 × 128)",
+            width: 128,
+            height: 128,
+        },
+        Self {
+            category: "Pixel Art",
+            name: "Retro (256 × 256)",
+            width: 256,
+            height: 256,
+        },
     ];
 }
 
@@ -559,9 +647,9 @@ pub struct AppState {
 
     // On-Canvas Tracing Paper Controls
     pub tracing_enabled: bool,
-    pub tracing_opacity: f32, // 0.05..=1.0
-    pub tracing_pos: Vec2,    // Canvas coordinate offset (X, Y)
-    pub tracing_scale: f32,   // Canvas scaling
+    pub tracing_opacity: f32,      // 0.05..=1.0
+    pub tracing_pos: Vec2,         // Canvas coordinate offset (X, Y)
+    pub tracing_scale: f32,        // Canvas scaling
     pub tracing_as_underlay: bool, // true: underlay (light table), false: ghost overlay (tracing sheet)
     pub tracing_locked: bool,
 
@@ -1022,7 +1110,8 @@ impl AppState {
     }
 
     pub fn load_custom_font(&mut self, path: &str) -> bool {
-        if let Some(font) = aurelia_core::rasterizer::StrokeRasterizer::load_font(None, Some(path)) {
+        if let Some(font) = aurelia_core::rasterizer::StrokeRasterizer::load_font(None, Some(path))
+        {
             let filename = std::path::Path::new(path)
                 .file_name()
                 .map(|f| f.to_string_lossy().to_string())
@@ -1061,7 +1150,11 @@ impl AppState {
         }
     }
 
-    pub fn create_text_layer_at(&mut self, pos: Vec2, box_size: Option<Vec2>) -> aurelia_core::layer::LayerId {
+    pub fn create_text_layer_at(
+        &mut self,
+        pos: Vec2,
+        box_size: Option<Vec2>,
+    ) -> aurelia_core::layer::LayerId {
         let (box_w, box_h) = match box_size {
             Some(sz) => (sz.x.max(0.0), sz.y.max(0.0)),
             None => (0.0, 0.0),
@@ -1098,7 +1191,9 @@ impl AppState {
 
     pub fn sync_active_text_layer(&mut self) {
         let active_id = self.active_text_layer_id.or_else(|| {
-            self.document.active_layer().and_then(|l| if l.is_text() { Some(l.id) } else { None })
+            self.document
+                .active_layer()
+                .and_then(|l| if l.is_text() { Some(l.id) } else { None })
         });
         if let Some(id) = active_id {
             self.active_text_layer_id = Some(id);
@@ -1114,7 +1209,9 @@ impl AppState {
 
                     layer.text = Some(config.clone());
                     if let Some(font) = &self.text_font {
-                        aurelia_core::rasterizer::StrokeRasterizer::rasterize_text_layer_config(layer, &config, font);
+                        aurelia_core::rasterizer::StrokeRasterizer::rasterize_text_layer_config(
+                            layer, &config, font,
+                        );
                     }
                     self.mark_canvas_dirty();
                 }
@@ -1178,7 +1275,8 @@ impl AppState {
         self.navigator_revision != self.document_revision
             || self.navigator_size != (self.document.width, self.document.height)
             || self.navigator_history != self.history.generation()
-            || self.navigator_paper != (self.document.background_value, self.document.is_transparent)
+            || self.navigator_paper
+                != (self.document.background_value, self.document.is_transparent)
             || self.navigator_texture_w != self.navigator_target_width()
     }
 
@@ -1222,28 +1320,45 @@ impl AppState {
             self.timeline.sync_from_document(&self.document);
             self.timeline.current_frame_idx = idx;
             self.timeline.sync_to_document(&mut self.document);
-            self.set_status(format!("Frame {} / {}", idx + 1, self.timeline.frames.len()));
+            self.set_status(format!(
+                "Frame {} / {}",
+                idx + 1,
+                self.timeline.frames.len()
+            ));
         }
     }
 
     pub fn add_animation_frame(&mut self) {
         self.timeline.sync_from_document(&self.document);
-        let new_idx = self.timeline.add_frame(self.document.width, self.document.height);
+        let new_idx = self
+            .timeline
+            .add_frame(self.document.width, self.document.height);
         self.timeline.sync_to_document(&mut self.document);
-        self.set_status(format!("Added frame {} / {}", new_idx + 1, self.timeline.frames.len()));
+        self.set_status(format!(
+            "Added frame {} / {}",
+            new_idx + 1,
+            self.timeline.frames.len()
+        ));
     }
 
     pub fn duplicate_animation_frame(&mut self) {
         self.timeline.sync_from_document(&self.document);
         let new_idx = self.timeline.duplicate_current_frame();
         self.timeline.sync_to_document(&mut self.document);
-        self.set_status(format!("Duplicated frame {} / {}", new_idx + 1, self.timeline.frames.len()));
+        self.set_status(format!(
+            "Duplicated frame {} / {}",
+            new_idx + 1,
+            self.timeline.frames.len()
+        ));
     }
 
     pub fn delete_animation_frame(&mut self) {
         if self.timeline.delete_current_frame() {
             self.timeline.sync_to_document(&mut self.document);
-            self.set_status(format!("Frame deleted. ({} frames left)", self.timeline.frames.len()));
+            self.set_status(format!(
+                "Frame deleted. ({} frames left)",
+                self.timeline.frames.len()
+            ));
         }
     }
 
@@ -1268,13 +1383,21 @@ impl AppState {
 
     pub fn toggle_animation_playback(&mut self) {
         self.timeline.is_playing = !self.timeline.is_playing;
-        let state_str = if self.timeline.is_playing { "Playing" } else { "Paused" };
+        let state_str = if self.timeline.is_playing {
+            "Playing"
+        } else {
+            "Paused"
+        };
         self.set_status(format!("Animation {}", state_str));
     }
 
     pub fn toggle_onion_skin(&mut self) {
         self.timeline.onion_skin_enabled = !self.timeline.onion_skin_enabled;
-        let state_str = if self.timeline.onion_skin_enabled { "ON" } else { "OFF" };
+        let state_str = if self.timeline.onion_skin_enabled {
+            "ON"
+        } else {
+            "OFF"
+        };
         self.set_status(format!("Onion Skinning: {}", state_str));
     }
 
@@ -1368,7 +1491,11 @@ impl AppState {
     /// Imported stamps are session-only by design: the brush preferences format does not carry
     /// embedded bitmaps, so `stamp` is skipped during serialization rather than silently turning
     /// an imported shape into a procedural round brush on the next launch.
-    pub fn import_brush_file(&mut self, bytes: &[u8], path: &std::path::Path) -> Result<usize, String> {
+    pub fn import_brush_file(
+        &mut self,
+        bytes: &[u8],
+        path: &std::path::Path,
+    ) -> Result<usize, String> {
         let stamps = aurelia_core::decode_brush_file(bytes, Some(path))
             .map_err(|error| error.to_string())?;
         let imported = stamps.len();
@@ -1386,7 +1513,12 @@ impl AppState {
                 name: stamp.name.clone(),
                 icon: "◉".to_string(),
                 category: "Imported".to_string(),
-                description: format!("Imported {} x {} stamp from {}", stamp.width, stamp.height, path.display()),
+                description: format!(
+                    "Imported {} x {} stamp from {}",
+                    stamp.width,
+                    stamp.height,
+                    path.display()
+                ),
                 settings,
             });
         }
@@ -1487,8 +1619,16 @@ impl AppState {
 
     pub fn viewport_center_offset(&self) -> Vec2 {
         if self.show_ui_panels {
-            let bottom = if self.timeline.is_enabled { 88.0 } else { self.footer_h.max(24.0) };
-            let ruler = if self.show_rulers { crate::design::RULER_PX } else { 0.0 };
+            let bottom = if self.timeline.is_enabled {
+                88.0
+            } else {
+                self.footer_h.max(24.0)
+            };
+            let ruler = if self.show_rulers {
+                crate::design::RULER_PX
+            } else {
+                0.0
+            };
             Vec2::new(
                 (self.left_panel_w - self.right_panel_w + ruler) * 0.5,
                 (self.header_h - bottom + ruler) * 0.5,
@@ -1504,15 +1644,25 @@ impl AppState {
     /// side panel keeps the canvas clip, hit-testing and rulers aligned.
     pub fn viewport_rect(&self, win_w: usize, win_h: usize) -> [usize; 4] {
         if self.show_ui_panels {
-            let bottom = if self.timeline.is_enabled { 88.0 } else { self.footer_h.max(24.0) };
-            let ruler = if self.show_rulers { crate::design::RULER_PX } else { 0.0 };
+            let bottom = if self.timeline.is_enabled {
+                88.0
+            } else {
+                self.footer_h.max(24.0)
+            };
+            let ruler = if self.show_rulers {
+                crate::design::RULER_PX
+            } else {
+                0.0
+            };
             // The ruler strips are drawn *inside* this rect, along its top and left
             // edges, so the rect itself starts at the panel edge. Adding the ruler
             // here as well left a dead ruler-wide gap beside the left panel and header.
             let _ = ruler;
             let vx0 = (self.left_panel_w.max(0.0) as usize).min(win_w);
             let vy0 = (self.header_h.max(0.0) as usize).min(win_h);
-            let vx1 = win_w.saturating_sub(self.right_panel_w.max(0.0) as usize).max(vx0);
+            let vx1 = win_w
+                .saturating_sub(self.right_panel_w.max(0.0) as usize)
+                .max(vx0);
             let vy1 = win_h.saturating_sub(bottom as usize).max(vy0);
             [vx0, vy0, vx1, vy1]
         } else {
@@ -1560,7 +1710,9 @@ impl AppState {
         let available_h = (y1.saturating_sub(y0)).max(1) as f32;
         let doc_w = (self.document.width.max(1)) as f32;
         let doc_h = (self.document.height.max(1)) as f32;
-        (available_w / doc_w).min(available_h / doc_h).clamp(0.05, 8.0)
+        (available_w / doc_w)
+            .min(available_h / doc_h)
+            .clamp(0.05, 8.0)
     }
 
     pub fn reset_view_centered(&mut self, win_w: f32, win_h: f32) {
@@ -1610,7 +1762,10 @@ impl AppState {
     }
 
     pub fn swap_colors(&mut self) {
-        std::mem::swap(&mut self.brush.primary_color, &mut self.brush.secondary_color);
+        std::mem::swap(
+            &mut self.brush.primary_color,
+            &mut self.brush.secondary_color,
+        );
         self.set_status("Swapped primary and secondary colors");
     }
 
@@ -1628,7 +1783,8 @@ impl AppState {
         let tool = self.brush.tool;
         let resettable = self.brush.reset_tool();
         match tool {
-            aurelia_core::brush::ToolType::Wand | aurelia_core::brush::ToolType::Marquee
+            aurelia_core::brush::ToolType::Wand
+            | aurelia_core::brush::ToolType::Marquee
             | aurelia_core::brush::ToolType::Lasso => {
                 self.wand_tolerance = 24;
                 self.wand_contiguous = true;
@@ -1643,7 +1799,10 @@ impl AppState {
                 self.set_status(format!("{} settings reset to defaults", tool.label()));
             }
             _ => {
-                self.set_status(format!("{} has no adjustable settings to reset", tool.label()));
+                self.set_status(format!(
+                    "{} has no adjustable settings to reset",
+                    tool.label()
+                ));
             }
         }
     }
@@ -1726,7 +1885,8 @@ impl AppState {
         });
     }
 
-    pub fn push_color_history(&mut self, color: Color) {        if self.color_history.first() == Some(&color) {
+    pub fn push_color_history(&mut self, color: Color) {
+        if self.color_history.first() == Some(&color) {
             return;
         }
         self.color_history.retain(|&c| c != color);
@@ -1749,7 +1909,10 @@ impl AppState {
             GuideOrientation::Horizontal => self.document.height as f32 * 0.5,
             GuideOrientation::Vertical => self.document.width as f32 * 0.5,
         };
-        self.guides.push(Guide { orientation, position });
+        self.guides.push(Guide {
+            orientation,
+            position,
+        });
         self.mark_editor_dirty();
     }
 
@@ -1897,7 +2060,12 @@ impl AppState {
             if let Some(layer) = self.document.active_layer() {
                 let after = layer.storage_bytes();
                 if before != after {
-                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, filter_name, before, after));
+                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(
+                        layer.id,
+                        filter_name,
+                        before,
+                        after,
+                    ));
                     self.history.push(cmd);
                     self.set_status(format!("Applied {}", filter_name));
                 }
@@ -1957,9 +2125,8 @@ impl AppState {
             // hole it leaves behind always agree.
             let sel_opt = self.selection.as_ref();
             let keep = |x: u32, y: u32| sel_opt.is_none_or(|s| s.is_selected(x, y));
-            let patch = TransformPatch::extract_from_layer(
-                layer, min_x, min_y, patch_w, patch_h, &keep,
-            );
+            let patch =
+                TransformPatch::extract_from_layer(layer, min_x, min_y, patch_w, patch_h, &keep);
             let original_layer_pixels = layer.storage_bytes();
 
             let patch_origin = Vec2::new(min_x as f32, min_y as f32);
@@ -1978,7 +2145,8 @@ impl AppState {
 
             let rows = 4;
             let cols = 4;
-            let mesh_grid = MeshWarpGrid::new(rows, cols, patch_origin, patch_w as f32, patch_h as f32);
+            let mesh_grid =
+                MeshWarpGrid::new(rows, cols, patch_origin, patch_w as f32, patch_h as f32);
 
             let tps_source_pins = vec![
                 patch_origin,
@@ -2015,13 +2183,13 @@ impl AppState {
 
             // Clear extracted pixels from active layer so transformed patch replaces them cleanly during preview
             if let Some(layer_mut) = self.document.active_layer_mut() {
-                TransformPatch::clear_region(
-                    layer_mut, min_x, min_y, patch_w, patch_h, &keep,
-                );
+                TransformPatch::clear_region(layer_mut, min_x, min_y, patch_w, patch_h, &keep);
             }
 
             self.update_transform_preview();
-            self.set_status("Free Transform & Warp: Drag handles / mesh pins | Enter to Apply, Esc to Cancel");
+            self.set_status(
+                "Free Transform & Warp: Drag handles / mesh pins | Enter to Apply, Esc to Cancel",
+            );
         }
     }
 
@@ -2053,14 +2221,7 @@ impl AppState {
                 return;
             }
             layer.write_storage_bytes(0, orig);
-            TransformPatch::clear_region(
-                layer,
-                origin.x as u32,
-                origin.y as u32,
-                pw,
-                ph,
-                &keep,
-            );
+            TransformPatch::clear_region(layer, origin.x as u32, origin.y as u32, pw, ph, &keep);
 
             let render_mode = match mode {
                 TransformMode::Affine => RenderMode::Affine(&transform),
@@ -2128,7 +2289,8 @@ impl AppState {
                 self.transform_session.mesh_grid.reset_grid();
             }
             TransformMode::ThinPlateSpline => {
-                self.transform_session.tps_target_pins = self.transform_session.tps_source_pins.clone();
+                self.transform_session.tps_target_pins =
+                    self.transform_session.tps_source_pins.clone();
                 self.transform_session.tps = ThinPlateSpline2D::solve(
                     &self.transform_session.tps_target_pins,
                     &self.transform_session.tps_source_pins,
@@ -2151,7 +2313,10 @@ impl AppState {
             &self.transform_session.tps_source_pins,
         );
         self.update_transform_preview();
-        self.set_status(format!("Added TPS pin ({:.0}, {:.0})", canvas_pos.x, canvas_pos.y));
+        self.set_status(format!(
+            "Added TPS pin ({:.0}, {:.0})",
+            canvas_pos.x, canvas_pos.y
+        ));
     }
 
     /// Commits the transformation to layer and registers in history
@@ -2170,7 +2335,9 @@ impl AppState {
                     TransformMode::MeshGrid => "Mesh Grid Warp",
                     TransformMode::ThinPlateSpline => "TPS Landmark Warp",
                 };
-                let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, mode_name, before, after));
+                let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(
+                    layer.id, mode_name, before, after,
+                ));
                 self.history.push(cmd);
                 self.set_status(format!("Committed {}", mode_name));
             }
@@ -2221,11 +2388,7 @@ impl AppState {
 
     /// The mode a pointer gesture uses: an explicit Shift/Alt modifier overrides the menu
     /// mode for that gesture only, and the menu mode is the sticky default.
-    pub fn effective_selection_mode(
-        &self,
-        shift: bool,
-        alt: bool,
-    ) -> SelectionCombineMode {
+    pub fn effective_selection_mode(&self, shift: bool, alt: bool) -> SelectionCombineMode {
         match (shift, alt) {
             (true, true) => SelectionCombineMode::Intersect,
             (true, false) => SelectionCombineMode::Union,
@@ -2260,10 +2423,7 @@ impl AppState {
             _ => false,
         };
         if unchanged {
-            self.set_status(format!(
-                "Selection unchanged ({})",
-                mode.short_label()
-            ));
+            self.set_status(format!("Selection unchanged ({})", mode.short_label()));
             return;
         }
 
@@ -2281,7 +2441,11 @@ impl AppState {
                 ));
             } else {
                 let count = edit_source.mask.iter().filter(|&&v| v > 0).count();
-                self.set_status(format!("Selection {} ({} px selected)", mode.short_label(), count));
+                self.set_status(format!(
+                    "Selection {} ({} px selected)",
+                    mode.short_label(),
+                    count
+                ));
             }
         } else if mode == SelectionCombineMode::Subtract {
             self.set_status("Selection removed (Subtract)");
@@ -2393,10 +2557,24 @@ impl AppState {
         let (offset_x, offset_y) = (layer.offset_x, layer.offset_y);
         match layer.buffer_mut() {
             aurelia_core::layer::LayerBuffer::Srgb8(pixels) => {
-                clear_region_8(pixels, layer_w, layer_h, offset_x, offset_y, selection.as_ref());
+                clear_region_8(
+                    pixels,
+                    layer_w,
+                    layer_h,
+                    offset_x,
+                    offset_y,
+                    selection.as_ref(),
+                );
             }
             aurelia_core::layer::LayerBuffer::Srgb16(pixels) => {
-                clear_region_16(pixels, layer_w, layer_h, offset_x, offset_y, selection.as_ref());
+                clear_region_16(
+                    pixels,
+                    layer_w,
+                    layer_h,
+                    offset_x,
+                    offset_y,
+                    selection.as_ref(),
+                );
             }
         }
         let after = layer.storage_bytes();
@@ -2500,7 +2678,8 @@ impl AppState {
     pub fn paste_external_image(&mut self, width: u32, height: u32, rgba: &[u8]) -> bool {
         let origin_x = ((self.document.width as i32 - width as i32) / 2).max(0);
         let origin_y = ((self.document.height as i32 - height as i32) / 2).max(0);
-        let Some(image) = ClipboardImage::from_rgba8(width, height, origin_x, origin_y, rgba) else {
+        let Some(image) = ClipboardImage::from_rgba8(width, height, origin_x, origin_y, rgba)
+        else {
             self.set_status("Clipboard image is empty or malformed");
             return false;
         };
@@ -2517,10 +2696,11 @@ impl AppState {
         }
         let insert_index = self.document.layers.len().saturating_sub(1);
         if let Some(layer) = self.document.get_layer(id).cloned() {
-            self.history.push(Box::new(aurelia_core::history::AddLayerCommand {
-                layer,
-                insert_index,
-            }));
+            self.history
+                .push(Box::new(aurelia_core::history::AddLayerCommand {
+                    layer,
+                    insert_index,
+                }));
         }
         self.set_status(format!(
             "Pasted {} x {} px as a new layer",
@@ -2546,7 +2726,11 @@ impl AppState {
         if self.style_edit.is_some() {
             self.finish_layer_style_edit();
         }
-        if let Some(before) = self.document.get_layer(layer_id).map(|layer| layer.styles.clone()) {
+        if let Some(before) = self
+            .document
+            .get_layer(layer_id)
+            .map(|layer| layer.styles.clone())
+        {
             self.style_edit = Some(StyleEditSession { layer_id, before });
             // The document is visibly modified as soon as a control moves, even though the
             // undo command is only pushed at the end of the gesture. Dirty tracking must see
@@ -2579,11 +2763,12 @@ impl AppState {
             return;
         };
         if after != session.before {
-            self.history.push(Box::new(aurelia_core::history::LayerStyleCommand {
-                layer_id: session.layer_id,
-                before: session.before,
-                after,
-            }));
+            self.history
+                .push(Box::new(aurelia_core::history::LayerStyleCommand {
+                    layer_id: session.layer_id,
+                    before: session.before,
+                    after,
+                }));
         }
     }
 
@@ -2595,7 +2780,12 @@ impl AppState {
                 mask.fill_selection_on_layer(layer, color);
                 let after = layer.storage_bytes();
                 if before != after {
-                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, "Fill Selection", before, after));
+                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(
+                        layer.id,
+                        "Fill Selection",
+                        before,
+                        after,
+                    ));
                     self.history.push(cmd);
                     self.set_status("Filled selection with primary color");
                 }
@@ -2611,14 +2801,18 @@ impl AppState {
                 mask.fill_selection_on_layer(layer, color);
                 let after = layer.storage_bytes();
                 if before != after {
-                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, "Clear Selection", before, after));
+                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(
+                        layer.id,
+                        "Clear Selection",
+                        before,
+                        after,
+                    ));
                     self.history.push(cmd);
                     self.set_status("Cleared selected pixels");
                 }
             }
         }
     }
-
 
     pub fn stroke_selection_active_layer(&mut self, width: u32, position: u8) {
         if let Some(mask) = &self.selection {
@@ -2633,7 +2827,12 @@ impl AppState {
                 mask.stroke_selection_on_layer(layer, color, width, pos);
                 let after = layer.storage_bytes();
                 if before != after {
-                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, "Stroke Selection", before, after));
+                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(
+                        layer.id,
+                        "Stroke Selection",
+                        before,
+                        after,
+                    ));
                     self.history.push(cmd);
                     self.set_status(format!("Stroked selection ({}px)", width));
                 }
@@ -2732,11 +2931,22 @@ impl AppState {
                                 let drag_vec = pt - prev;
                                 let drag_dist = drag_vec.length();
                                 let shift = (drag_dist * 1.5).min(radius * 0.9);
-                                let dir = if drag_dist > 0.001 { drag_vec / drag_dist } else { Vec2::ZERO };
+                                let dir = if drag_dist > 0.001 {
+                                    drag_vec / drag_dist
+                                } else {
+                                    Vec2::ZERO
+                                };
                                 let sx = (x as f32 - dir.x * shift).clamp(0.0, w as f32 - 1.0);
                                 let sy = (y as f32 - dir.y * shift).clamp(0.0, h as f32 - 1.0);
-                                let src = aurelia_core::rasterizer::sample_bilinear_rgba(&self.scratchpad_pixels, w, h, sx, sy);
-                                let blended = BlendMode::Normal.composite_pixel(dst, src, alpha * 0.65);
+                                let src = aurelia_core::rasterizer::sample_bilinear_rgba(
+                                    &self.scratchpad_pixels,
+                                    w,
+                                    h,
+                                    sx,
+                                    sy,
+                                );
+                                let blended =
+                                    BlendMode::Normal.composite_pixel(dst, src, alpha * 0.65);
                                 self.scratchpad_pixels[idx..idx + 4].copy_from_slice(&blended);
                             }
                         }
@@ -2871,10 +3081,7 @@ impl AppState {
             Some(path) => autosave_tag(path),
             None => autosave_tag(Path::new("untitled")),
         };
-        Self::autosave_dir().join(format!(
-            "{}-{tag}-autosave.aur",
-            self.autosave_stem()
-        ))
+        Self::autosave_dir().join(format!("{}-{tag}-autosave.aur", self.autosave_stem()))
     }
 
     fn autosave_stem(&self) -> String {
@@ -2951,8 +3158,9 @@ impl AppState {
         draft.validate()?;
         self.apply_preferences_values();
 
-        self.try_save_preferences()
-            .map_err(|error| format!("Settings applied for this session, but saving failed: {error}"))
+        self.try_save_preferences().map_err(|error| {
+            format!("Settings applied for this session, but saving failed: {error}")
+        })
     }
 
     /// Writes the validated draft into the live state. Split from [`apply_preferences`] so the
@@ -3045,7 +3253,10 @@ impl AppState {
         let mut out = String::new();
         out.push_str(&format!("theme={}\n", theme));
         out.push_str(&format!("jpeg_quality={}\n", self.jpeg_quality));
-        out.push_str(&format!("autosave={}\n", if self.autosave_enabled { 1 } else { 0 }));
+        out.push_str(&format!(
+            "autosave={}\n",
+            if self.autosave_enabled { 1 } else { 0 }
+        ));
         out.push_str(&format!(
             "left_panel_locked={}\n",
             if self.left_panel_locked { 1 } else { 0 }
@@ -3062,7 +3273,10 @@ impl AppState {
             "discord_show_project={}\n",
             if self.discord_show_project_name { 1 } else { 0 }
         ));
-        out.push_str(&format!("autosave_interval={}\n", self.autosave_interval_secs));
+        out.push_str(&format!(
+            "autosave_interval={}\n",
+            self.autosave_interval_secs
+        ));
         out.push_str(&format!("undo_budget_mb={}\n", self.undo_budget_mb));
         for recent in &self.recent_files {
             out.push_str(&format!("recent={}\n", recent.display()));
@@ -3120,8 +3334,14 @@ mod viewport_geometry {
         state.zoom = 2.0;
         state.pan = glam::Vec2::ZERO;
         let (x0, y0, x1, y1) = state.viewport_canvas_fraction(200, 200);
-        assert!((x0 - 0.0).abs() < 1e-4 && (y0 - 0.0).abs() < 1e-4, "top-left: {x0},{y0}");
-        assert!((x1 - 1.0).abs() < 1e-4 && (y1 - 1.0).abs() < 1e-4, "bottom-right: {x1},{y1}");
+        assert!(
+            (x0 - 0.0).abs() < 1e-4 && (y0 - 0.0).abs() < 1e-4,
+            "top-left: {x0},{y0}"
+        );
+        assert!(
+            (x1 - 1.0).abs() < 1e-4 && (y1 - 1.0).abs() < 1e-4,
+            "bottom-right: {x1},{y1}"
+        );
 
         // 1x zoom: the window shows twice the canvas, centred, so it extends half a canvas
         // beyond each edge. The function reports this unclamped; the caller clamps to draw.
@@ -3162,10 +3382,26 @@ mod viewport_geometry {
         let p0 = state.canvas_to_screen(glam::Vec2::new(fx0 * doc_w, fy0 * doc_h), win_w, win_h);
         let p1 = state.canvas_to_screen(glam::Vec2::new(fx1 * doc_w, fy1 * doc_h), win_w, win_h);
 
-        assert!((p0.x - vx0 as f32).abs() < 0.01, "left edge: {} vs {vx0}", p0.x);
-        assert!((p0.y - vy0 as f32).abs() < 0.01, "top edge: {} vs {vy0}", p0.y);
-        assert!((p1.x - vx1 as f32).abs() < 0.01, "right edge: {} vs {vx1}", p1.x);
-        assert!((p1.y - vy1 as f32).abs() < 0.01, "bottom edge: {} vs {vy1}", p1.y);
+        assert!(
+            (p0.x - vx0 as f32).abs() < 0.01,
+            "left edge: {} vs {vx0}",
+            p0.x
+        );
+        assert!(
+            (p0.y - vy0 as f32).abs() < 0.01,
+            "top edge: {} vs {vy0}",
+            p0.y
+        );
+        assert!(
+            (p1.x - vx1 as f32).abs() < 0.01,
+            "right edge: {} vs {vx1}",
+            p1.x
+        );
+        assert!(
+            (p1.y - vy1 as f32).abs() < 0.01,
+            "bottom edge: {} vs {vy1}",
+            p1.y
+        );
     }
 
     /// Overlay coordinates are in egui points; the renderer and hit-testing are in physical
@@ -3188,8 +3424,18 @@ mod viewport_geometry {
         let screen = state.canvas_to_screen(canvas, win_w, win_h);
         let ui = state.canvas_to_ui(canvas, win_w / ppp, win_h / ppp);
 
-        assert!((ui.x * ppp - screen.x).abs() < 0.01, "x: {} vs {}", ui.x * ppp, screen.x);
-        assert!((ui.y * ppp - screen.y).abs() < 0.01, "y: {} vs {}", ui.y * ppp, screen.y);
+        assert!(
+            (ui.x * ppp - screen.x).abs() < 0.01,
+            "x: {} vs {}",
+            ui.x * ppp,
+            screen.x
+        );
+        assert!(
+            (ui.y * ppp - screen.y).abs() < 0.01,
+            "y: {} vs {}",
+            ui.y * ppp,
+            screen.y
+        );
     }
 
     /// Guides and the grid origin are session state, not document state.
@@ -3238,9 +3484,18 @@ mod viewport_geometry {
             angle_rad: 0.0,
             length: 100.0,
         };
-        assert_eq!(ruler.constrain(glam::Vec2::new(60.0, 80.0)), glam::Vec2::new(60.0, 20.0));
-        assert_eq!(ruler.constrain(glam::Vec2::new(500.0, 20.0)), glam::Vec2::new(110.0, 20.0));
-        assert_eq!(ruler.constrain(glam::Vec2::new(-50.0, 20.0)), glam::Vec2::new(10.0, 20.0));
+        assert_eq!(
+            ruler.constrain(glam::Vec2::new(60.0, 80.0)),
+            glam::Vec2::new(60.0, 20.0)
+        );
+        assert_eq!(
+            ruler.constrain(glam::Vec2::new(500.0, 20.0)),
+            glam::Vec2::new(110.0, 20.0)
+        );
+        assert_eq!(
+            ruler.constrain(glam::Vec2::new(-50.0, 20.0)),
+            glam::Vec2::new(10.0, 20.0)
+        );
     }
 
     /// Docks larger than the window must collapse to an empty rect, not invert it.
@@ -3314,9 +3569,17 @@ mod viewport_geometry {
         let after = state.viewport_canvas_fraction(200, 200);
         // 20 screen px at 2x is 0.1 of a 100 px canvas, and dragging the box right moves the
         // visible slice right.
-        assert!((after.0 - before.0 - 0.1).abs() < 1e-4, "{} -> {}", before.0, after.0);
+        assert!(
+            (after.0 - before.0 - 0.1).abs() < 1e-4,
+            "{} -> {}",
+            before.0,
+            after.0
+        );
         assert!((after.2 - before.2 - 0.1).abs() < 1e-4);
-        assert!((state.pan.x + 20.0).abs() < 1e-4, "pan must move opposite the drag");
+        assert!(
+            (state.pan.x + 20.0).abs() < 1e-4,
+            "pan must move opposite the drag"
+        );
     }
 
     /// The thumbnail is rebuilt on content changes only - never on an idle frame, and never
@@ -3324,14 +3587,23 @@ mod viewport_geometry {
     #[test]
     fn idle_frame_rebuilds_nothing() {
         let mut state = full_window(64, 64);
-        assert!(state.navigator_needs_refresh(), "the first frame needs a thumbnail");
+        assert!(
+            state.navigator_needs_refresh(),
+            "the first frame needs a thumbnail"
+        );
 
         state.note_navigator_refreshed();
-        assert!(!state.navigator_needs_refresh(), "an idle frame must not rebuild");
+        assert!(
+            !state.navigator_needs_refresh(),
+            "an idle frame must not rebuild"
+        );
 
         state.pan = glam::Vec2::new(40.0, 12.0);
         state.zoom = 3.0;
-        assert!(!state.navigator_needs_refresh(), "pan and zoom do not change the document");
+        assert!(
+            !state.navigator_needs_refresh(),
+            "pan and zoom do not change the document"
+        );
 
         state.mark_canvas_dirty();
         assert!(state.navigator_needs_refresh(), "an edit must rebuild");
@@ -3356,14 +3628,29 @@ mod viewport_geometry {
         assert!(!state.navigator_needs_refresh());
 
         state.document.background_value = 13;
-        assert!(state.navigator_needs_refresh(), "a paper change must rebuild the thumbnail");
+        assert!(
+            state.navigator_needs_refresh(),
+            "a paper change must rebuild the thumbnail"
+        );
         state.note_navigator_refreshed();
         assert!(!state.navigator_needs_refresh());
 
         let id = state.document.active_layer_id;
-        let bytes = state.document.active_layer().expect("layer").storage_bytes();
-        state.history.push(Box::new(LayerPixelsDeltaCommand::new(id, "paint", bytes.clone(), bytes)));
-        assert!(state.navigator_needs_refresh(), "a committed edit must rebuild the thumbnail");
+        let bytes = state
+            .document
+            .active_layer()
+            .expect("layer")
+            .storage_bytes();
+        state.history.push(Box::new(LayerPixelsDeltaCommand::new(
+            id,
+            "paint",
+            bytes.clone(),
+            bytes,
+        )));
+        assert!(
+            state.navigator_needs_refresh(),
+            "a committed edit must rebuild the thumbnail"
+        );
     }
 
     /// Clicking the navigator puts that canvas point at the viewport's midpoint. The midpoint
@@ -3383,7 +3670,8 @@ mod viewport_geometry {
         state.pan_to_canvas_center(target);
 
         let (win_w, win_h) = (400.0_f32, 300.0_f32);
-        let viewport_midpoint = glam::Vec2::new(win_w * 0.5, win_h * 0.5) + state.viewport_center_offset();
+        let viewport_midpoint =
+            glam::Vec2::new(win_w * 0.5, win_h * 0.5) + state.viewport_center_offset();
         let doc = glam::Vec2::new(100.0, 100.0);
         let canvas_at_midpoint =
             (viewport_midpoint - state.viewport_center(win_w, win_h)) / state.zoom + doc * 0.5;
@@ -3407,7 +3695,6 @@ mod discord_presence_defaults {
         assert!(!state.show_discord_presence_dialog);
     }
 }
-
 
 #[cfg(test)]
 mod document_format_ui {
@@ -3435,8 +3722,14 @@ mod document_format_ui {
         let mut wide = sixteen_bit_state();
         assert!(!wide.require_8bit("Something New"), "the guard must refuse");
         let message = wide.status_message.clone();
-        assert!(message.contains("8-bit only"), "status should explain the refusal: {message}");
-        assert!(message.contains("16-bit"), "status should name the document format: {message}");
+        assert!(
+            message.contains("8-bit only"),
+            "status should explain the refusal: {message}"
+        );
+        assert!(
+            message.contains("16-bit"),
+            "status should name the document format: {message}"
+        );
 
         assert!(AppState::new(4, 4).require_8bit("Something New"));
 
@@ -3445,7 +3738,9 @@ mod document_format_ui {
         wide.begin_filter_modal(ActiveFilterModal::BrightnessContrast);
         assert!(wide.active_filter_modal == ActiveFilterModal::BrightnessContrast);
         assert_eq!(
-            wide.filter_original_pixels.as_ref().map(|bytes| bytes.len()),
+            wide.filter_original_pixels
+                .as_ref()
+                .map(|bytes| bytes.len()),
             Some((4 * 4 * 4 * 2) as usize),
             "the preview buffer must be storage bytes, not an 8-bit view"
         );
@@ -3479,9 +3774,17 @@ mod document_format_ui {
         state.save_project_to(&path).expect("save");
         let loaded = aurelia_io::load_project_file(&path).expect("load");
 
-        assert_eq!(loaded.pixel_format, PixelFormat::Srgb16, "format must survive");
+        assert_eq!(
+            loaded.pixel_format,
+            PixelFormat::Srgb16,
+            "format must survive"
+        );
         let layer = loaded.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "storage must stay 16-bit");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "storage must stay 16-bit"
+        );
         assert_eq!(
             layer.as_srgb16().expect("16-bit")[0],
             high,
@@ -3525,19 +3828,38 @@ mod document_format_ui {
         wide.begin_transform_session();
         assert!(wide.transform_session.is_active, "{}", wide.status_message);
         assert!(
-            matches!(wide.transform_session.extracted_patch, TransformPatch::Srgb16(_)),
+            matches!(
+                wide.transform_session.extracted_patch,
+                TransformPatch::Srgb16(_)
+            ),
             "a 16-bit layer must produce a 16-bit patch"
         );
         assert_eq!(wide.transform_session.extracted_patch.pixels(), 16);
-        assert_eq!(wide.active_layer_format(), PixelFormat::Srgb16, "begin must not convert");
-        assert!(!wide.status_message.contains("8-bit only"), "{}", wide.status_message);
+        assert_eq!(
+            wide.active_layer_format(),
+            PixelFormat::Srgb16,
+            "begin must not convert"
+        );
+        assert!(
+            !wide.status_message.contains("8-bit only"),
+            "{}",
+            wide.status_message
+        );
 
         wide.transform_session.interpolation = InterpolationMode::Nearest;
         wide.update_transform_preview();
-        assert_eq!(wide.active_layer_format(), PixelFormat::Srgb16, "preview must not convert");
+        assert_eq!(
+            wide.active_layer_format(),
+            PixelFormat::Srgb16,
+            "preview must not convert"
+        );
 
         wide.commit_transform_session();
-        assert_eq!(wide.active_layer_format(), PixelFormat::Srgb16, "commit must not convert");
+        assert_eq!(
+            wide.active_layer_format(),
+            PixelFormat::Srgb16,
+            "commit must not convert"
+        );
         assert!(!wide.transform_session.is_active);
         assert!(
             wide.document
@@ -3567,11 +3889,21 @@ mod document_format_ui {
         if let Some(layer) = wide.document.get_layer_mut(id) {
             layer.write_storage_bytes(0, &first);
         }
-        wide.history.push(Box::new(LayerPixelsDeltaCommand::new(id, "seed one", base, first.clone())));
+        wide.history.push(Box::new(LayerPixelsDeltaCommand::new(
+            id,
+            "seed one",
+            base,
+            first.clone(),
+        )));
         if let Some(layer) = wide.document.get_layer_mut(id) {
             layer.write_storage_bytes(0, &second);
         }
-        wide.history.push(Box::new(LayerPixelsDeltaCommand::new(id, "seed two", first.clone(), second)));
+        wide.history.push(Box::new(LayerPixelsDeltaCommand::new(
+            id,
+            "seed two",
+            first.clone(),
+            second,
+        )));
         wide.history.undo(&mut wide.document);
 
         let bytes = wide.document.get_layer(id).expect("layer").storage_bytes();
@@ -3582,7 +3914,10 @@ mod document_format_ui {
         let can_redo = wide.history.can_redo();
         let generation = wide.history.generation();
         let dirty = wide.is_dirty();
-        assert!(can_undo && can_redo, "the fixture must populate both stacks");
+        assert!(
+            can_undo && can_redo,
+            "the fixture must populate both stacks"
+        );
 
         wide.begin_transform_session();
         assert!(wide.transform_session.is_active);
@@ -3602,13 +3937,39 @@ mod document_format_ui {
             bytes,
             "cancel must restore the layer's storage bytes exactly"
         );
-        assert_eq!(wide.document.pixel_format, format, "cancel must preserve the document format");
-        assert_eq!(wide.document.active_layer_id, active, "cancel must preserve the active layer");
-        assert_eq!(wide.history.len(), history_len, "cancel must not push or drop history");
-        assert_eq!(wide.history.can_undo(), can_undo, "the undo stack must be untouched");
-        assert_eq!(wide.history.can_redo(), can_redo, "the redo stack must be untouched");
-        assert_eq!(wide.history.generation(), generation, "the history generation must not move");
-        assert_eq!(wide.is_dirty(), dirty, "a cancelled transform must not imply unsaved work");
+        assert_eq!(
+            wide.document.pixel_format, format,
+            "cancel must preserve the document format"
+        );
+        assert_eq!(
+            wide.document.active_layer_id, active,
+            "cancel must preserve the active layer"
+        );
+        assert_eq!(
+            wide.history.len(),
+            history_len,
+            "cancel must not push or drop history"
+        );
+        assert_eq!(
+            wide.history.can_undo(),
+            can_undo,
+            "the undo stack must be untouched"
+        );
+        assert_eq!(
+            wide.history.can_redo(),
+            can_redo,
+            "the redo stack must be untouched"
+        );
+        assert_eq!(
+            wide.history.generation(),
+            generation,
+            "the history generation must not move"
+        );
+        assert_eq!(
+            wide.is_dirty(),
+            dirty,
+            "a cancelled transform must not imply unsaved work"
+        );
         assert!(!wide.transform_session.is_active);
     }
 
@@ -3676,7 +4037,12 @@ mod document_format_ui {
         }
 
         let layer = doc.get_layer(id).expect("layer");
-        for (index, pixel) in layer.as_srgb16().expect("16-bit").chunks_exact(4).enumerate() {
+        for (index, pixel) in layer
+            .as_srgb16()
+            .expect("16-bit")
+            .chunks_exact(4)
+            .enumerate()
+        {
             let x = index % 6;
             let y = index / 6;
             if (1..5).contains(&x) && (1..5).contains(&y) {
@@ -3693,7 +4059,11 @@ mod document_format_ui {
                     );
                 }
             } else {
-                assert_eq!((pixel[0], pixel[2]), (0, 65535), "outside the patch stays blue");
+                assert_eq!(
+                    (pixel[0], pixel[2]),
+                    (0, 65535),
+                    "outside the patch stays blue"
+                );
             }
         }
     }
@@ -3733,7 +4103,11 @@ mod document_format_ui {
     #[test]
     fn selection_fill_works_on_a_sixteen_bit_document() {
         let mut wide = sixteen_bit_state();
-        wide.selection = Some(aurelia_core::selection::SelectionMask::from_mask_vec(4, 4, vec![255u8; 16]));
+        wide.selection = Some(aurelia_core::selection::SelectionMask::from_mask_vec(
+            4,
+            4,
+            vec![255u8; 16],
+        ));
         wide.fill_selection_active_layer();
         assert!(
             !wide.status_message.contains("8-bit only"),
@@ -3741,7 +4115,11 @@ mod document_format_ui {
             wide.status_message
         );
         let layer = wide.document.active_layer().expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "format preserved by fill");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "format preserved by fill"
+        );
     }
 }
 
@@ -3807,7 +4185,10 @@ mod preferences_dialog {
             ..PreferencesDraft::default()
         };
         assert!(state.preferences_draft.validate().is_err());
-        assert!(state.apply_preferences().is_err(), "invalid draft must not be applied");
+        assert!(
+            state.apply_preferences().is_err(),
+            "invalid draft must not be applied"
+        );
         assert_eq!(state.autosave_interval_secs, interval);
 
         for (draft, field) in [
@@ -3851,7 +4232,10 @@ mod preferences_dialog {
         assert_eq!(state.history.max_bytes(), 32 * 1024 * 1024);
         assert_eq!(state.jpeg_quality, 55);
         assert_eq!(state.document.theme, ThemeMode::Dusk);
-        assert!(state.left_panel_locked, "unrelated persisted settings must survive");
+        assert!(
+            state.left_panel_locked,
+            "unrelated persisted settings must survive"
+        );
     }
 
     #[test]
@@ -3893,12 +4277,27 @@ mod selection_modes {
     fn modifiers_override_the_sticky_mode_for_one_gesture() {
         let mut s = state();
         s.selection_mode = SelectionCombineMode::Replace;
-        assert_eq!(s.effective_selection_mode(false, false), SelectionCombineMode::Replace);
-        assert_eq!(s.effective_selection_mode(true, false), SelectionCombineMode::Union);
-        assert_eq!(s.effective_selection_mode(false, true), SelectionCombineMode::Subtract);
-        assert_eq!(s.effective_selection_mode(true, true), SelectionCombineMode::Intersect);
+        assert_eq!(
+            s.effective_selection_mode(false, false),
+            SelectionCombineMode::Replace
+        );
+        assert_eq!(
+            s.effective_selection_mode(true, false),
+            SelectionCombineMode::Union
+        );
+        assert_eq!(
+            s.effective_selection_mode(false, true),
+            SelectionCombineMode::Subtract
+        );
+        assert_eq!(
+            s.effective_selection_mode(true, true),
+            SelectionCombineMode::Intersect
+        );
         s.selection_mode = SelectionCombineMode::Intersect;
-        assert_eq!(s.effective_selection_mode(false, false), SelectionCombineMode::Intersect);
+        assert_eq!(
+            s.effective_selection_mode(false, false),
+            SelectionCombineMode::Intersect
+        );
     }
 
     #[test]
@@ -3909,7 +4308,11 @@ mod selection_modes {
 
         s.commit_selection(rect(8.0, 0.0, 16.0, 8.0), SelectionCombineMode::Union);
         let union = s.selection.clone().expect("union");
-        assert_eq!(union.mask.iter().filter(|&&v| v > 0).count(), 16 * 8, "two halves make a full band");
+        assert_eq!(
+            union.mask.iter().filter(|&&v| v > 0).count(),
+            16 * 8,
+            "two halves make a full band"
+        );
 
         s.commit_selection(rect(8.0, 0.0, 16.0, 8.0), SelectionCombineMode::Subtract);
         let subtracted = s.selection.clone().expect("subtracted");
@@ -3926,7 +4329,10 @@ mod selection_modes {
         s.commit_selection(rect(0.0, 0.0, 8.0, 8.0), SelectionCombineMode::Replace);
         let before = s.selection.clone().expect("initial selection");
         s.commit_selection(rect(0.0, 0.0, 16.0, 16.0), SelectionCombineMode::Subtract);
-        assert!(s.selection.is_none(), "an empty result must clear the selection");
+        assert!(
+            s.selection.is_none(),
+            "an empty result must clear the selection"
+        );
 
         assert_eq!(s.undo_action(), Some("Selection"));
         let restored = s.selection.clone().expect("undo restores the mask");
@@ -3942,7 +4348,11 @@ mod selection_modes {
         s.commit_selection(rect(0.0, 0.0, 8.0, 8.0), SelectionCombineMode::Replace);
         let depth = s.selection_undo.len();
         s.commit_selection(rect(0.0, 0.0, 8.0, 8.0), SelectionCombineMode::Union);
-        assert_eq!(s.selection_undo.len(), depth, "unchanged coverage must not add an undo step");
+        assert_eq!(
+            s.selection_undo.len(),
+            depth,
+            "unchanged coverage must not add an undo step"
+        );
     }
 
     #[test]
@@ -3965,10 +4375,12 @@ mod selection_modes {
 
         // The document edit is newer, so the first undo must go to the document, not the mask.
         assert_eq!(s.undo_action(), Some("Noop"));
-        assert!(s.selection.is_some(), "the selection edit is not undone by a document undo");
+        assert!(
+            s.selection.is_some(),
+            "the selection edit is not undone by a document undo"
+        );
     }
 }
-
 
 #[cfg(test)]
 mod mask_editing {
@@ -4000,10 +4412,22 @@ mod mask_editing {
             state.paint_mask_segment(glam::Vec2::new(2.0, 6.0), glam::Vec2::new(6.0, 6.0));
 
             let layer = state.document.get_layer(id).expect("layer");
-            assert_eq!(layer.format(), format, "mask painting must preserve storage format");
-            assert_eq!(layer.storage_bytes(), pixels_before, "pixels must not be touched");
+            assert_eq!(
+                layer.format(),
+                format,
+                "mask painting must preserve storage format"
+            );
+            assert_eq!(
+                layer.storage_bytes(),
+                pixels_before,
+                "pixels must not be touched"
+            );
             let mask = layer.mask.as_ref().expect("mask");
-            assert_ne!(mask.pixels, vec![255u8; 64], "the stroke must change the mask");
+            assert_ne!(
+                mask.pixels,
+                vec![255u8; 64],
+                "the stroke must change the mask"
+            );
         }
     }
 
@@ -4038,8 +4462,6 @@ mod mask_editing {
     }
 }
 
-
-
 #[cfg(test)]
 mod ruler_snapping {
     use super::{AppState, StraightRuler};
@@ -4061,7 +4483,10 @@ mod ruler_snapping {
         let expected = 20.0 / 2.0_f32.sqrt();
         assert!((ruler.distance_to_line(point) - expected).abs() < 0.01);
         let projected = ruler.constrain(point);
-        assert!((projected.x - projected.y).abs() < 0.01, "projection lands on y = x");
+        assert!(
+            (projected.x - projected.y).abs() < 0.01,
+            "projection lands on y = x"
+        );
         assert!(ruler.covers_projection(point));
         // Past the far endpoint the projection clamps, but the line distance is unchanged.
         let beyond = Vec2::new(200.0, 200.0);
@@ -4073,7 +4498,11 @@ mod ruler_snapping {
     fn guide_intersections_are_exact_points_on_the_span_only() {
         let ruler = diagonal();
         let points = ruler.axis_intersections(&[25.0, -10.0], &[60.0, 500.0]);
-        assert_eq!(points.len(), 2, "one vertical and one horizontal intersect the span");
+        assert_eq!(
+            points.len(),
+            2,
+            "one vertical and one horizontal intersect the span"
+        );
         assert!((points[0].x - 25.0).abs() < 0.01 && (points[0].y - 25.0).abs() < 0.01);
         assert!((points[1].x - 60.0).abs() < 0.01 && (points[1].y - 60.0).abs() < 0.01);
 
@@ -4100,7 +4529,16 @@ mod ruler_snapping {
         // Re-applying the same preset must keep it, not remove it.
         state.apply_ruler_preset(45.0);
         assert!(state.straight_ruler.is_some());
-        assert!((state.straight_ruler.expect("still there").angle_rad.to_degrees() - 45.0).abs() < 0.01);
+        assert!(
+            (state
+                .straight_ruler
+                .expect("still there")
+                .angle_rad
+                .to_degrees()
+                - 45.0)
+                .abs()
+                < 0.01
+        );
 
         state.apply_ruler_preset(90.0);
         assert!((state.straight_ruler.expect("ruler").angle_rad.to_degrees() - 90.0).abs() < 0.01);
@@ -4161,7 +4599,10 @@ mod dpi_transitions {
             state.navigator_target_width() > before_width,
             "a 200% monitor must rebuild the preview at a higher resolution"
         );
-        assert!(state.navigator_needs_refresh(), "the old texture is invalid at the new DPI");
+        assert!(
+            state.navigator_needs_refresh(),
+            "the old texture is invalid at the new DPI"
+        );
 
         state.note_navigator_refreshed();
         assert!(!state.navigator_needs_refresh());
@@ -4245,19 +4686,41 @@ mod clipboard_actions {
         assert_eq!(clip.format, PixelFormat::Srgb16);
         assert_eq!((clip.width, clip.height), (4, 4));
 
-        let source = state.document.active_layer().expect("layer").as_srgb16().expect("16-bit").to_vec();
+        let source = state
+            .document
+            .active_layer()
+            .expect("layer")
+            .as_srgb16()
+            .expect("16-bit")
+            .to_vec();
         assert!(state.paste_clipboard());
         assert_eq!(state.document.layers.len(), 2, "paste adds one layer");
-        let pasted = state.document.active_layer().expect("pasted").as_srgb16().expect("16-bit");
+        let pasted = state
+            .document
+            .active_layer()
+            .expect("pasted")
+            .as_srgb16()
+            .expect("16-bit");
         // The pasted region starts at the copied origin (2,2) in canvas space.
         let at = ((2 * 8 + 2) * 4) as usize;
         assert_eq!(&pasted[at..at + 4], &source[at..at + 4]);
-        assert_eq!(state.document.active_layer().expect("pasted").format(), PixelFormat::Srgb16);
+        assert_eq!(
+            state.document.active_layer().expect("pasted").format(),
+            PixelFormat::Srgb16
+        );
 
         state.undo_action();
-        assert_eq!(state.document.layers.len(), 1, "undo removes the pasted layer");
+        assert_eq!(
+            state.document.layers.len(),
+            1,
+            "undo removes the pasted layer"
+        );
         state.redo_action();
-        assert_eq!(state.document.layers.len(), 2, "redo restores the pasted layer");
+        assert_eq!(
+            state.document.layers.len(),
+            2,
+            "redo restores the pasted layer"
+        );
     }
 
     #[test]
@@ -4269,16 +4732,37 @@ mod clipboard_actions {
             Vec2::new(0.0, 0.0),
             Vec2::new(4.0, 4.0),
         ));
-        let before = state.document.active_layer().expect("layer").storage_bytes();
+        let before = state
+            .document
+            .active_layer()
+            .expect("layer")
+            .storage_bytes();
         assert!(state.cut_active_layer());
-        let after = state.document.active_layer().expect("layer").as_srgb8().expect("8-bit").to_vec();
+        let after = state
+            .document
+            .active_layer()
+            .expect("layer")
+            .as_srgb8()
+            .expect("8-bit")
+            .to_vec();
         assert_eq!(after[3], 0, "cut pixel becomes transparent");
         let outside = (7 * 4) as usize;
-        assert_eq!(after[outside + 3], 255, "outside the selection is untouched");
+        assert_eq!(
+            after[outside + 3],
+            255,
+            "outside the selection is untouched"
+        );
         assert_eq!(state.history.len(), 1, "cut is one undo step");
 
         state.undo_action();
-        assert_eq!(state.document.active_layer().expect("layer").storage_bytes(), before);
+        assert_eq!(
+            state
+                .document
+                .active_layer()
+                .expect("layer")
+                .storage_bytes(),
+            before
+        );
     }
 
     #[test]
@@ -4305,7 +4789,9 @@ mod clipboard_actions {
     fn external_paste_centres_and_adds_a_layer() {
         let mut state = AppState::new(16, 16);
         let mut rgba = vec![200u8; 4 * 4 * 4];
-        for px in rgba.chunks_exact_mut(4) { px[3] = 255; }
+        for px in rgba.chunks_exact_mut(4) {
+            px[3] = 255;
+        }
         assert!(state.paste_external_image(4, 4, &rgba));
         assert_eq!(state.document.layers.len(), 2);
         let layer = state.document.active_layer().expect("layer");
@@ -4325,27 +4811,68 @@ mod layer_styles_ui {
     fn one_gesture_is_one_undo_step_and_undo_restores_the_stack() {
         let mut state = AppState::new(16, 16);
         let id = state.document.active_layer_id;
-        assert!(state.document.get_layer(id).expect("layer").styles.is_empty());
+        assert!(state
+            .document
+            .get_layer(id)
+            .expect("layer")
+            .styles
+            .is_empty());
         let depth = state.history.len();
 
         state.begin_layer_style_edit(id);
-        state.document.get_layer_mut(id).expect("layer").styles.stroke = Some(StrokeStyle::default());
+        state
+            .document
+            .get_layer_mut(id)
+            .expect("layer")
+            .styles
+            .stroke = Some(StrokeStyle::default());
         state.begin_layer_style_edit(id); // joining the same gesture must not reset the baseline
-        state.document.get_layer_mut(id).expect("layer").styles.drop_shadow =
-            Some(DropShadowStyle::default());
+        state
+            .document
+            .get_layer_mut(id)
+            .expect("layer")
+            .styles
+            .drop_shadow = Some(DropShadowStyle::default());
         state.finish_layer_style_edit();
 
-        assert_eq!(state.history.len(), depth + 1, "the whole gesture is one history step");
-        assert!(state.document.get_layer(id).expect("layer").styles.stroke.is_some());
-        assert!(state.document.get_layer(id).expect("layer").styles.drop_shadow.is_some());
+        assert_eq!(
+            state.history.len(),
+            depth + 1,
+            "the whole gesture is one history step"
+        );
+        assert!(state
+            .document
+            .get_layer(id)
+            .expect("layer")
+            .styles
+            .stroke
+            .is_some());
+        assert!(state
+            .document
+            .get_layer(id)
+            .expect("layer")
+            .styles
+            .drop_shadow
+            .is_some());
 
         state.undo_action();
         assert!(
-            state.document.get_layer(id).expect("layer").styles.is_empty(),
+            state
+                .document
+                .get_layer(id)
+                .expect("layer")
+                .styles
+                .is_empty(),
             "undo restores the pre-gesture style stack"
         );
         state.redo_action();
-        assert!(state.document.get_layer(id).expect("layer").styles.stroke.is_some());
+        assert!(state
+            .document
+            .get_layer(id)
+            .expect("layer")
+            .styles
+            .stroke
+            .is_some());
     }
 
     #[test]
@@ -4379,9 +4906,16 @@ mod layer_style_transactions {
         state.mark_saved();
         assert!(!state.is_dirty());
         state.begin_layer_style_edit(first);
-        assert!(state.is_dirty(), "starting a style gesture modifies the document");
-        state.document.get_layer_mut(first).expect("layer").styles.stroke =
-            Some(StrokeStyle::default());
+        assert!(
+            state.is_dirty(),
+            "starting a style gesture modifies the document"
+        );
+        state
+            .document
+            .get_layer_mut(first)
+            .expect("layer")
+            .styles
+            .stroke = Some(StrokeStyle::default());
         state.finish_layer_style_edit();
         assert!(state.is_dirty());
     }
@@ -4392,15 +4926,29 @@ mod layer_style_transactions {
         let (mut state, first, second) = state_with_two_layers();
         let baseline = state.history.len();
         state.begin_layer_style_edit(first);
-        state.document.get_layer_mut(first).expect("layer").styles.stroke =
-            Some(StrokeStyle::default());
+        state
+            .document
+            .get_layer_mut(first)
+            .expect("layer")
+            .styles
+            .stroke = Some(StrokeStyle::default());
         state.begin_layer_style_edit(second);
-        assert_eq!(state.history.len(), baseline + 1, "first gesture is committed");
+        assert_eq!(
+            state.history.len(),
+            baseline + 1,
+            "first gesture is committed"
+        );
         assert_eq!(
             state.history.undo_entries().last().map(|entry| entry.label),
             Some("Layer Style")
         );
-        assert!(state.document.get_layer(first).expect("layer").styles.stroke.is_some());
+        assert!(state
+            .document
+            .get_layer(first)
+            .expect("layer")
+            .styles
+            .stroke
+            .is_some());
         state.finish_layer_style_edit();
     }
 
@@ -4410,16 +4958,21 @@ mod layer_style_transactions {
     fn saving_resolves_the_pending_gesture() {
         let (mut state, first, _) = state_with_two_layers();
         state.begin_layer_style_edit(first);
-        state.document.get_layer_mut(first).expect("layer").styles.stroke =
-            Some(StrokeStyle::default());
-        let path = std::env::temp_dir().join(format!(
-            "aurelia-style-save-{}.aur",
-            std::process::id()
-        ));
+        state
+            .document
+            .get_layer_mut(first)
+            .expect("layer")
+            .styles
+            .stroke = Some(StrokeStyle::default());
+        let path =
+            std::env::temp_dir().join(format!("aurelia-style-save-{}.aur", std::process::id()));
         state.save_project_to(&path).expect("save");
         let _ = std::fs::remove_file(&path);
         assert!(state.style_edit.is_none(), "save commits the open gesture");
-        assert!(!state.is_dirty(), "the just-saved document must not be dirty");
+        assert!(
+            !state.is_dirty(),
+            "the just-saved document must not be dirty"
+        );
         let entries = state.history.undo_entries();
         assert_eq!(entries.last().map(|entry| entry.label), Some("Layer Style"));
     }
@@ -4438,7 +4991,11 @@ mod autosave_paths {
         state.document_path = Some("D:/Archive/poster.aur".into());
         let second = state.autosave_path();
         assert_ne!(first, second, "same stem must not share a recovery file");
-        assert!(first.file_name().unwrap().to_string_lossy().ends_with("-autosave.aur"));
+        assert!(first
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .ends_with("-autosave.aur"));
 
         // Windows paths are case-insensitive: the same file must map to the same snapshot.
         state.document_path = Some("C:/ART/POSTER.AUR".into());
@@ -4451,10 +5008,8 @@ mod autosave_paths {
         let untitled = state.autosave_path();
         assert_eq!(untitled, state.autosave_path());
 
-        let dir = std::env::temp_dir().join(format!(
-            "aurelia-autosave-scan-{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("aurelia-autosave-scan-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
         let snapshot = dir.join("poster-0123456789abcdef-autosave.aur");
@@ -4504,7 +5059,10 @@ mod copy_merged_16bit {
         };
         let at = (1 * 4 + 1) * 4;
         assert_eq!(&channels[at..at + 4], &[300, 1000, 40000, 65535]);
-        assert!(channels.iter().any(|&v| v % 257 != 0), "sub-lattice survives");
+        assert!(
+            channels.iter().any(|&v| v % 257 != 0),
+            "sub-lattice survives"
+        );
     }
 }
 

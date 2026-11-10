@@ -3,10 +3,11 @@
 
 Runs the in-house suites that the plain release pipeline used to skip:
 
-1. the whole cargo workspace (unit, integration, oracles, digests, persistence corpus);
-2. the release tool's own pytest suite;
-3. the ignored sparse-16-bit ratio gate (asserts the 0.60 budget);
-4. the ignored long-session soak (asserts bounded memory and eviction integrity).
+1. formatting and Clippy correctness lints;
+2. the whole cargo workspace (unit, integration, oracles, digests, persistence corpus);
+3. the release tool's own pytest suite;
+4. the ignored sparse-16-bit ratio gate (asserts the 0.60 budget);
+5. the ignored long-session soak (asserts bounded memory and eviction integrity).
 
 The ignored gates are measurements with assertions, so they are run explicitly here rather than
 left to a manual checklist. They are intentionally last: a broken unit test fails fast.
@@ -23,6 +24,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 STEPS: list[tuple[str, list[str]]] = [
+    ("formatting", ["cargo", "fmt", "--all", "--", "--check"]),
+    (
+        "clippy correctness",
+        [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--",
+            "-D",
+            "clippy::correctness",
+        ],
+    ),
     ("cargo workspace (oracles, digests, persistence)", ["cargo", "test", "--release", "--workspace"]),
     ("release tool (pytest)", [sys.executable, "-m", "pytest", "tools/release/tests", "-q"]),
     (

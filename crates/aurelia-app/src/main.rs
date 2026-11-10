@@ -1,4 +1,3 @@
-use glam::Vec2;
 use aurelia_core::brush::{BrushPoint, ToolType};
 use aurelia_core::history::LayerPixelsDeltaCommand;
 use aurelia_core::rasterizer::StrokeRasterizer;
@@ -7,9 +6,8 @@ use aurelia_io::export::{export_flat_image, export_flat_image_with_quality, Expo
 use aurelia_io::project::load_project_file;
 use aurelia_presence::{project_name, PresenceManager, PresenceUpdate};
 use aurelia_render::SoftwareRenderer;
-use aurelia_ui::{
-    configure_aurelia_style, render_ui, AppState, PendingFileAction,
-};
+use aurelia_ui::{configure_aurelia_style, render_ui, AppState, PendingFileAction};
+use glam::Vec2;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -200,7 +198,12 @@ extern "system" {
         fuColorUse: u32,
     ) -> i32;
     fn DragAcceptFiles(hWnd: HWND, fAccept: i32);
-    fn DragQueryFileW(hDrop: *mut std::ffi::c_void, iFile: u32, lpszFile: *mut u16, cch: u32) -> u32;
+    fn DragQueryFileW(
+        hDrop: *mut std::ffi::c_void,
+        iFile: u32,
+        lpszFile: *mut u16,
+        cch: u32,
+    ) -> u32;
     fn DragFinish(hDrop: *mut std::ffi::c_void);
     fn OpenClipboard(hWndNewOwner: HWND) -> i32;
     fn CloseClipboard() -> i32;
@@ -234,7 +237,12 @@ extern "system" {
 
 #[link(name = "dwmapi")]
 extern "system" {
-    fn DwmSetWindowAttribute(hwnd: HWND, attribute: u32, value: *const std::ffi::c_void, size: u32) -> i32;
+    fn DwmSetWindowAttribute(
+        hwnd: HWND,
+        attribute: u32,
+        value: *const std::ffi::c_void,
+        size: u32,
+    ) -> i32;
     fn DwmExtendFrameIntoClientArea(hwnd: HWND, margins: *const MARGINS) -> i32;
 }
 
@@ -621,7 +629,11 @@ fn hit_test_transform_handle(
             }
 
             // 2. Pivot point
-            let pivot_sp = state.canvas_to_screen(session.transform.pivot + session.transform.translation, win_w, win_h);
+            let pivot_sp = state.canvas_to_screen(
+                session.transform.pivot + session.transform.translation,
+                win_w,
+                win_h,
+            );
             if screen_pos.distance(pivot_sp) <= hit_dist_screen {
                 return Some(aurelia_ui::state::TransformHandle::Pivot);
             }
@@ -711,7 +723,10 @@ fn hit_test_text_handle(
     win_h: f32,
 ) -> Option<usize> {
     let active_id = state.active_text_layer_id.or_else(|| {
-        state.document.active_layer().and_then(|l| if l.is_text() { Some(l.id) } else { None })
+        state
+            .document
+            .active_layer()
+            .and_then(|l| if l.is_text() { Some(l.id) } else { None })
     })?;
     let layer = state.document.get_layer(active_id)?;
     let config = layer.text.as_ref()?;
@@ -735,8 +750,16 @@ fn hit_test_text_handle(
         (120.0, config.font_size)
     };
 
-    let text_box_w = if config.box_w > 0.0 { config.box_w } else { measured_w.max(60.0) };
-    let text_box_h = if config.box_h > 0.0 { config.box_h } else { measured_h.max(config.font_size) };
+    let text_box_w = if config.box_w > 0.0 {
+        config.box_w
+    } else {
+        measured_w.max(60.0)
+    };
+    let text_box_h = if config.box_h > 0.0 {
+        config.box_h
+    } else {
+        measured_h.max(config.font_size)
+    };
 
     let top_left = glam::Vec2::new(config.pos_x, config.pos_y);
     let bottom_right = top_left + glam::Vec2::new(text_box_w, text_box_h);
@@ -788,15 +811,27 @@ fn hit_test_text_layer_at(
                 (120.0, config.font_size)
             };
 
-            let text_box_w = if config.box_w > 0.0 { config.box_w } else { measured_w.max(60.0) };
-            let text_box_h = if config.box_h > 0.0 { config.box_h } else { measured_h.max(config.font_size) };
+            let text_box_w = if config.box_w > 0.0 {
+                config.box_w
+            } else {
+                measured_w.max(60.0)
+            };
+            let text_box_h = if config.box_h > 0.0 {
+                config.box_h
+            } else {
+                measured_h.max(config.font_size)
+            };
 
             let min_x = config.pos_x;
             let min_y = config.pos_y;
             let max_x = config.pos_x + text_box_w;
             let max_y = config.pos_y + text_box_h;
 
-            if canvas_pos.x >= min_x && canvas_pos.x <= max_x && canvas_pos.y >= min_y && canvas_pos.y <= max_y {
+            if canvas_pos.x >= min_x
+                && canvas_pos.x <= max_x
+                && canvas_pos.y >= min_y
+                && canvas_pos.y <= max_y
+            {
                 return Some(layer.id);
             }
         }
@@ -824,11 +859,7 @@ impl AureliaDesktopApp {
         let win_h = self.win_h as f32;
         let [vx0, vy0, vx1, vy1] = self.state.viewport_rect(self.win_w, self.win_h);
         let (vx0, vy0, vx1, vy1) = (vx0 as f32, vy0 as f32, vx1 as f32, vy1 as f32);
-        if screen_pos.x < vx0
-            || screen_pos.x > vx1
-            || screen_pos.y < vy0
-            || screen_pos.y > vy1
-        {
+        if screen_pos.x < vx0 || screen_pos.x > vx1 || screen_pos.y < vy0 || screen_pos.y > vy1 {
             return false;
         }
 
@@ -836,19 +867,17 @@ impl AureliaDesktopApp {
         // Keep a minimal resize strip at the panel edge. Dragging the visible ruler should
         // create a guide in any tool; only the first two scaled pixels remain panel-resize.
         let resize_margin = 2.0 * self.state.ui_ppp.max(1.0);
-        let orientation = if screen_pos.y >= vy0 + 1.0
-            && screen_pos.y <= vy0 + ruler
-            && screen_pos.x <= vx1
-        {
-            Some(aurelia_ui::state::GuideOrientation::Horizontal)
-        } else if screen_pos.x >= vx0 + resize_margin
-            && screen_pos.x <= vx0 + ruler
-            && screen_pos.y <= vy1
-        {
-            Some(aurelia_ui::state::GuideOrientation::Vertical)
-        } else {
-            None
-        };
+        let orientation =
+            if screen_pos.y >= vy0 + 1.0 && screen_pos.y <= vy0 + ruler && screen_pos.x <= vx1 {
+                Some(aurelia_ui::state::GuideOrientation::Horizontal)
+            } else if screen_pos.x >= vx0 + resize_margin
+                && screen_pos.x <= vx0 + ruler
+                && screen_pos.y <= vy1
+            {
+                Some(aurelia_ui::state::GuideOrientation::Vertical)
+            } else {
+                None
+            };
         let Some(orientation) = orientation else {
             return false;
         };
@@ -884,7 +913,10 @@ impl AureliaDesktopApp {
             if lx < 0 || ly < 0 || lx >= layer.width as i32 || ly >= layer.height as i32 {
                 continue;
             }
-            if layer.alpha_at(lx as u32, ly as u32).is_some_and(|alpha| alpha > 0) {
+            if layer
+                .alpha_at(lx as u32, ly as u32)
+                .is_some_and(|alpha| alpha > 0)
+            {
                 return Some(layer.id);
             }
         }
@@ -918,8 +950,12 @@ impl AureliaDesktopApp {
                     continue;
                 }
                 match guide.orientation {
-                    aurelia_ui::state::GuideOrientation::Vertical => self.snap_x.push(guide.position),
-                    aurelia_ui::state::GuideOrientation::Horizontal => self.snap_y.push(guide.position),
+                    aurelia_ui::state::GuideOrientation::Vertical => {
+                        self.snap_x.push(guide.position)
+                    }
+                    aurelia_ui::state::GuideOrientation::Horizontal => {
+                        self.snap_y.push(guide.position)
+                    }
                 }
             }
         }
@@ -1161,11 +1197,7 @@ impl AureliaDesktopApp {
         let win_h = self.win_h as f32;
         let [vx0, vy0, vx1, vy1] = self.state.viewport_rect(self.win_w, self.win_h);
         let (vx0, vy0, vx1, vy1) = (vx0 as f32, vy0 as f32, vx1 as f32, vy1 as f32);
-        if screen_pos.x < vx0
-            || screen_pos.x > vx1
-            || screen_pos.y < vy0
-            || screen_pos.y > vy1
-        {
+        if screen_pos.x < vx0 || screen_pos.x > vx1 || screen_pos.y < vy0 || screen_pos.y > vy1 {
             return false;
         }
 
@@ -1199,14 +1231,20 @@ impl AureliaDesktopApp {
             for (index, guide) in self.state.guides.iter().enumerate() {
                 let screen = match guide.orientation {
                     aurelia_ui::state::GuideOrientation::Horizontal => {
-                        self.state.canvas_to_screen(Vec2::new(0.0, guide.position), win_w, win_h).y
+                        self.state
+                            .canvas_to_screen(Vec2::new(0.0, guide.position), win_w, win_h)
+                            .y
                     }
                     aurelia_ui::state::GuideOrientation::Vertical => {
-                        self.state.canvas_to_screen(Vec2::new(guide.position, 0.0), win_w, win_h).x
+                        self.state
+                            .canvas_to_screen(Vec2::new(guide.position, 0.0), win_w, win_h)
+                            .x
                     }
                 };
                 let distance = match guide.orientation {
-                    aurelia_ui::state::GuideOrientation::Horizontal => (screen_pos.y - screen).abs(),
+                    aurelia_ui::state::GuideOrientation::Horizontal => {
+                        (screen_pos.y - screen).abs()
+                    }
                     aurelia_ui::state::GuideOrientation::Vertical => (screen_pos.x - screen).abs(),
                 };
                 if distance <= 5.0 {
@@ -1250,7 +1288,11 @@ impl AureliaDesktopApp {
                 return true;
             }
             // Bottom status bar & animation timeline strip
-            let bottom_h = if self.state.timeline.is_enabled { 88.0 } else { self.state.footer_h.max(24.0) };
+            let bottom_h = if self.state.timeline.is_enabled {
+                88.0
+            } else {
+                self.state.footer_h.max(24.0)
+            };
             if pos.y > (h - bottom_h) {
                 return true;
             }
@@ -1274,29 +1316,30 @@ impl AureliaDesktopApp {
         // before this check.
         if self.state.show_rulers {
             let [vx0, vy0, vx1, vy1] = self.state.viewport_rect(self.win_w, self.win_h);
-            let (vx0, vy0, vx1, vy1) =
-                (vx0 as f32, vy0 as f32, vx1 as f32, vy1 as f32);
+            let (vx0, vy0, vx1, vy1) = (vx0 as f32, vy0 as f32, vx1 as f32, vy1 as f32);
             let ruler = aurelia_ui::design::RULER_PX;
-            let in_top = pos.y >= vy0
-                && pos.y <= vy0 + ruler
-                && pos.x >= vx0
-                && pos.x <= vx1;
-            let in_left = pos.x >= vx0
-                && pos.x <= vx0 + ruler
-                && pos.y >= vy0
-                && pos.y <= vy1;
+            let in_top = pos.y >= vy0 && pos.y <= vy0 + ruler && pos.x >= vx0 && pos.x <= vx1;
+            let in_left = pos.x >= vx0 && pos.x <= vx0 + ruler && pos.y >= vy0 && pos.y <= vy1;
             if in_top || in_left {
                 return true;
             }
         }
 
         // 3. Selection floating HUD bar
-        if self.state.selection.as_ref().map_or(false, |s| s.has_selection()) && !self.state.transform_session.is_active && self.state.show_ui_panels {
+        if self
+            .state
+            .selection
+            .as_ref()
+            .map_or(false, |s| s.has_selection())
+            && !self.state.transform_session.is_active
+            && self.state.show_ui_panels
+        {
             let hud_x_min = (w - 380.0) * 0.5;
             let hud_x_max = (w + 380.0) * 0.5;
             let hud_y_min = h - 70.0;
             let hud_y_max = h - 15.0;
-            if pos.x >= hud_x_min && pos.x <= hud_x_max && pos.y >= hud_y_min && pos.y <= hud_y_max {
+            if pos.x >= hud_x_min && pos.x <= hud_x_max && pos.y >= hud_y_min && pos.y <= hud_y_max
+            {
                 return true;
             }
         }
@@ -1305,7 +1348,12 @@ impl AureliaDesktopApp {
     }
 }
 
-unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+unsafe extern "system" fn window_proc(
+    hwnd: HWND,
+    msg: UINT,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     const WM_DESTROY: UINT = 0x0002;
     const WM_CLOSE: UINT = 0x0010;
     const WM_POINTERUPDATE: UINT = 0x0245;
@@ -1413,7 +1461,6 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lpa
         }
         return 1; // HTCLIENT
     }
-
 
     let app = if !GLOBAL_APP_PTR.is_null() {
         &mut *GLOBAL_APP_PTR
@@ -3757,8 +3804,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Aurelia · Native Windows Graphics Application");
             println!();
             println!("Usage: aurelia [FILE]");
-            println!("       aurelia --register-shell     (Register Windows Explorer context menu)");
-            println!("       aurelia --unregister-shell   (Unregister Windows Explorer context menu)");
+            println!(
+                "       aurelia --register-shell     (Register Windows Explorer context menu)"
+            );
+            println!(
+                "       aurelia --unregister-shell   (Unregister Windows Explorer context menu)"
+            );
             println!("       aurelia export <INPUT> -o <OUTPUT> [--format png|jpg|webp]");
             println!("       aurelia inspect <INPUT>");
             return Ok(());
@@ -3870,8 +3921,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Consume the snapshot: it is now the open document and has been marked
                     // dirty, so it will be re-saved if the user keeps working.
                     let _ = std::fs::remove_file(&recovery_path);
-                    app_state
-                        .set_status("Recovered autosave snapshot - use Save As to keep it");
+                    app_state.set_status("Recovered autosave snapshot - use Save As to keep it");
                     break;
                 }
                 Err(error) => {
@@ -3938,7 +3988,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         has_initialized_view: false,
         has_fit_after_layout: false,
         pen_pressure: None,
-        pen_tilt: (0.0, 0.0), stroke_size_scale: 1.0,
+        pen_tilt: (0.0, 0.0),
+        stroke_size_scale: 1.0,
         last_window_title: String::new(),
         last_autosave_tick: Instant::now(),
     });
@@ -4015,10 +4066,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             0,
         );
         if !h_icon_big.is_null() {
-            SendMessageW(hwnd, 0x0080 /* WM_SETICON */, 1 /* ICON_BIG */, h_icon_big as isize);
+            SendMessageW(
+                hwnd,
+                0x0080, /* WM_SETICON */
+                1,      /* ICON_BIG */
+                h_icon_big as isize,
+            );
         }
         if !h_icon_small.is_null() {
-            SendMessageW(hwnd, 0x0080 /* WM_SETICON */, 0 /* ICON_SMALL */, h_icon_small as isize);
+            SendMessageW(
+                hwnd,
+                0x0080, /* WM_SETICON */
+                0,      /* ICON_SMALL */
+                h_icon_small as isize,
+            );
         }
 
         ShowWindow(hwnd, 5); // SW_SHOW
@@ -4067,5 +4128,3 @@ impl AureliaDesktopApp {
         brush
     }
 }
-
-

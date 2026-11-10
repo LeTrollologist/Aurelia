@@ -2,6 +2,7 @@
 name = "aurelia-app"
 version = "3.13.0-beta.3"
 edition = "2021"
+rust-version = "1.87"
 description = "Aurelia - local-first raster illustration, animation and painting studio (Windows)"
 
 [[bin]]

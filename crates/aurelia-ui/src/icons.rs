@@ -1,8 +1,14 @@
-use egui::{pos2, Color32, Painter, Rect, Stroke, Vec2};
 use aurelia_core::brush::ToolType;
+use egui::{pos2, Color32, Painter, Rect, Stroke, Vec2};
 
 /// Draws a crisp, vector-rendered studio tool icon inside the given bounding rectangle.
-pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Color32, is_active: bool) {
+pub fn draw_tool_icon(
+    painter: &Painter,
+    rect: Rect,
+    tool: ToolType,
+    color: Color32,
+    is_active: bool,
+) {
     let stroke = Stroke::new(1.4_f32, color);
     let fill = if is_active {
         Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 60)
@@ -49,7 +55,8 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
 
         ToolType::Chalk => {
             // Textured chalk rectangle with stippling
-            let chalk_rect = Rect::from_center_size(rect.center(), Vec2::new(r * 1.5_f32, r * 1.0_f32));
+            let chalk_rect =
+                Rect::from_center_size(rect.center(), Vec2::new(r * 1.5_f32, r * 1.0_f32));
             painter.rect(chalk_rect, 2.0_f32, fill, stroke);
             painter.circle_filled(pos2(cx - r * 0.3_f32, cy), 1.0_f32, color);
             painter.circle_filled(pos2(cx + r * 0.3_f32, cy), 1.0_f32, color);
@@ -58,7 +65,10 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
         ToolType::Spray => {
             // Spray nozzle cone + particle dots
             let nozzle = pos2(cx - r * 0.6_f32, cy + r * 0.6_f32);
-            painter.line_segment([nozzle, pos2(cx - r * 0.2_f32, cy + r * 0.2_f32)], Stroke::new(2.5_f32, color));
+            painter.line_segment(
+                [nozzle, pos2(cx - r * 0.2_f32, cy + r * 0.2_f32)],
+                Stroke::new(2.5_f32, color),
+            );
 
             // Radial spray dots
             painter.circle_filled(pos2(cx + r * 0.2_f32, cy - r * 0.1_f32), 1.2_f32, color);
@@ -86,11 +96,7 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
             // Gradient swatch card with diagonal partition
             let g_rect = Rect::from_center_size(rect.center(), Vec2::new(r * 1.5_f32, r * 1.3_f32));
             painter.rect(g_rect, 2.0_f32, Color32::TRANSPARENT, stroke);
-            let p_half = vec![
-                g_rect.left_top(),
-                g_rect.right_top(),
-                g_rect.left_bottom(),
-            ];
+            let p_half = vec![g_rect.left_top(), g_rect.right_top(), g_rect.left_bottom()];
             painter.add(egui::Shape::convex_polygon(p_half, color, Stroke::NONE));
         }
 
@@ -133,7 +139,11 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
             let p1 = pos2(cx + r * 0.2_f32, cy - r * 0.8_f32);
             let p2 = pos2(cx + r * 0.7_f32, cy + r * 0.2_f32);
             let p3 = pos2(cx - r * 0.1_f32, cy + r * 0.5_f32);
-            painter.add(egui::Shape::convex_polygon(vec![p0, p1, p2, p3], fill, stroke));
+            painter.add(egui::Shape::convex_polygon(
+                vec![p0, p1, p2, p3],
+                fill,
+                stroke,
+            ));
             let drip_center = pos2(cx + r * 0.6_f32, cy + r * 0.65_f32);
             painter.circle_filled(drip_center, 1.8_f32, color);
         }
@@ -149,7 +159,8 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
 
         ToolType::Rect => {
             // Rectangle outline
-            let box_rect = Rect::from_center_size(rect.center(), Vec2::new(r * 1.5_f32, r * 1.2_f32));
+            let box_rect =
+                Rect::from_center_size(rect.center(), Vec2::new(r * 1.5_f32, r * 1.2_f32));
             painter.rect(box_rect, 1.5_f32, fill, stroke);
         }
 
@@ -162,8 +173,12 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
             // Pentagon
             let mut poly_pts = Vec::new();
             for i in 0..5 {
-                let angle = -std::f32::consts::FRAC_PI_2 + (i as f32) * (std::f32::consts::TAU / 5.0_f32);
-                poly_pts.push(pos2(cx + angle.cos() * r * 0.8_f32, cy + angle.sin() * r * 0.8_f32));
+                let angle =
+                    -std::f32::consts::FRAC_PI_2 + (i as f32) * (std::f32::consts::TAU / 5.0_f32);
+                poly_pts.push(pos2(
+                    cx + angle.cos() * r * 0.8_f32,
+                    cy + angle.sin() * r * 0.8_f32,
+                ));
             }
             painter.add(egui::Shape::convex_polygon(poly_pts, fill, stroke));
         }
@@ -172,10 +187,19 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
             // Dashed selection rectangle
             let m_rect = Rect::from_center_size(rect.center(), Vec2::new(r * 1.5_f32, r * 1.2_f32));
             let dash_stroke = Stroke::new(1.3_f32, color);
-            painter.line_segment([m_rect.left_top(), pos2(cx - r * 0.1_f32, m_rect.top())], dash_stroke);
-            painter.line_segment([pos2(cx + r * 0.2_f32, m_rect.top()), m_rect.right_top()], dash_stroke);
+            painter.line_segment(
+                [m_rect.left_top(), pos2(cx - r * 0.1_f32, m_rect.top())],
+                dash_stroke,
+            );
+            painter.line_segment(
+                [pos2(cx + r * 0.2_f32, m_rect.top()), m_rect.right_top()],
+                dash_stroke,
+            );
             painter.line_segment([m_rect.right_top(), pos2(m_rect.right(), cy)], dash_stroke);
-            painter.line_segment([m_rect.left_bottom(), pos2(cx, m_rect.bottom())], dash_stroke);
+            painter.line_segment(
+                [m_rect.left_bottom(), pos2(cx, m_rect.bottom())],
+                dash_stroke,
+            );
             painter.line_segment([m_rect.left_top(), pos2(m_rect.left(), cy)], dash_stroke);
         }
 
@@ -205,37 +229,126 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
 
         ToolType::Move => {
             // 4-way arrow crosshair
-            painter.line_segment([pos2(cx - r * 0.75_f32, cy), pos2(cx + r * 0.75_f32, cy)], stroke);
-            painter.line_segment([pos2(cx, cy - r * 0.75_f32), pos2(cx, cy + r * 0.75_f32)], stroke);
-            painter.line_segment([pos2(cx - r * 0.75_f32, cy), pos2(cx - r * 0.45_f32, cy - r * 0.3_f32)], stroke);
-            painter.line_segment([pos2(cx - r * 0.75_f32, cy), pos2(cx - r * 0.45_f32, cy + r * 0.3_f32)], stroke);
-            painter.line_segment([pos2(cx + r * 0.75_f32, cy), pos2(cx + r * 0.45_f32, cy - r * 0.3_f32)], stroke);
-            painter.line_segment([pos2(cx + r * 0.75_f32, cy), pos2(cx + r * 0.45_f32, cy + r * 0.3_f32)], stroke);
-            painter.line_segment([pos2(cx, cy - r * 0.75_f32), pos2(cx - r * 0.3_f32, cy - r * 0.45_f32)], stroke);
-            painter.line_segment([pos2(cx, cy - r * 0.75_f32), pos2(cx + r * 0.3_f32, cy - r * 0.45_f32)], stroke);
-            painter.line_segment([pos2(cx, cy + r * 0.75_f32), pos2(cx - r * 0.3_f32, cy + r * 0.45_f32)], stroke);
-            painter.line_segment([pos2(cx, cy + r * 0.75_f32), pos2(cx + r * 0.3_f32, cy + r * 0.45_f32)], stroke);
+            painter.line_segment(
+                [pos2(cx - r * 0.75_f32, cy), pos2(cx + r * 0.75_f32, cy)],
+                stroke,
+            );
+            painter.line_segment(
+                [pos2(cx, cy - r * 0.75_f32), pos2(cx, cy + r * 0.75_f32)],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx - r * 0.75_f32, cy),
+                    pos2(cx - r * 0.45_f32, cy - r * 0.3_f32),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx - r * 0.75_f32, cy),
+                    pos2(cx - r * 0.45_f32, cy + r * 0.3_f32),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx + r * 0.75_f32, cy),
+                    pos2(cx + r * 0.45_f32, cy - r * 0.3_f32),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx + r * 0.75_f32, cy),
+                    pos2(cx + r * 0.45_f32, cy + r * 0.3_f32),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx, cy - r * 0.75_f32),
+                    pos2(cx - r * 0.3_f32, cy - r * 0.45_f32),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx, cy - r * 0.75_f32),
+                    pos2(cx + r * 0.3_f32, cy - r * 0.45_f32),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx, cy + r * 0.75_f32),
+                    pos2(cx - r * 0.3_f32, cy + r * 0.45_f32),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    pos2(cx, cy + r * 0.75_f32),
+                    pos2(cx + r * 0.3_f32, cy + r * 0.45_f32),
+                ],
+                stroke,
+            );
         }
 
         ToolType::Transform => {
             // Transform bounding box with corner anchor nodes
-            let box_rect = Rect::from_center_size(rect.center(), Vec2::new(r * 1.3_f32, r * 1.3_f32));
+            let box_rect =
+                Rect::from_center_size(rect.center(), Vec2::new(r * 1.3_f32, r * 1.3_f32));
             painter.rect(box_rect, 1.0_f32, fill, stroke);
             let hs = 3.0_f32;
-            painter.rect_filled(Rect::from_center_size(box_rect.left_top(), Vec2::splat(hs)), 0.5_f32, color);
-            painter.rect_filled(Rect::from_center_size(box_rect.right_top(), Vec2::splat(hs)), 0.5_f32, color);
-            painter.rect_filled(Rect::from_center_size(box_rect.right_bottom(), Vec2::splat(hs)), 0.5_f32, color);
-            painter.rect_filled(Rect::from_center_size(box_rect.left_bottom(), Vec2::splat(hs)), 0.5_f32, color);
+            painter.rect_filled(
+                Rect::from_center_size(box_rect.left_top(), Vec2::splat(hs)),
+                0.5_f32,
+                color,
+            );
+            painter.rect_filled(
+                Rect::from_center_size(box_rect.right_top(), Vec2::splat(hs)),
+                0.5_f32,
+                color,
+            );
+            painter.rect_filled(
+                Rect::from_center_size(box_rect.right_bottom(), Vec2::splat(hs)),
+                0.5_f32,
+                color,
+            );
+            painter.rect_filled(
+                Rect::from_center_size(box_rect.left_bottom(), Vec2::splat(hs)),
+                0.5_f32,
+                color,
+            );
         }
 
         ToolType::Crop => {
             // Framing crop corners
             let c_rect = Rect::from_center_size(rect.center(), Vec2::new(r * 1.4_f32, r * 1.4_f32));
             let cl = r * 0.5_f32;
-            painter.line_segment([c_rect.left_top(), pos2(c_rect.left() + cl, c_rect.top())], stroke);
-            painter.line_segment([c_rect.left_top(), pos2(c_rect.left(), c_rect.top() + cl)], stroke);
-            painter.line_segment([c_rect.right_bottom(), pos2(c_rect.right() - cl, c_rect.bottom())], stroke);
-            painter.line_segment([c_rect.right_bottom(), pos2(c_rect.right(), c_rect.bottom() - cl)], stroke);
+            painter.line_segment(
+                [c_rect.left_top(), pos2(c_rect.left() + cl, c_rect.top())],
+                stroke,
+            );
+            painter.line_segment(
+                [c_rect.left_top(), pos2(c_rect.left(), c_rect.top() + cl)],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    c_rect.right_bottom(),
+                    pos2(c_rect.right() - cl, c_rect.bottom()),
+                ],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    c_rect.right_bottom(),
+                    pos2(c_rect.right(), c_rect.bottom() - cl),
+                ],
+                stroke,
+            );
         }
 
         ToolType::Eyedropper => {
@@ -261,7 +374,13 @@ pub fn draw_tool_icon(painter: &Painter, rect: Rect, tool: ToolType, color: Colo
             // Angled eraser block with dashed ring
             let e_rect = Rect::from_center_size(pos2(cx, cy), Vec2::new(r * 1.3_f32, r * 0.8_f32));
             painter.rect_stroke(e_rect, 2.0_f32, stroke);
-            painter.line_segment([pos2(e_rect.left() + 4.0, e_rect.top()), pos2(e_rect.left() + 4.0, e_rect.bottom())], stroke);
+            painter.line_segment(
+                [
+                    pos2(e_rect.left() + 4.0, e_rect.top()),
+                    pos2(e_rect.left() + 4.0, e_rect.bottom()),
+                ],
+                stroke,
+            );
         }
     }
 }

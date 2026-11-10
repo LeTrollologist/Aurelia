@@ -5,6 +5,9 @@ journal-backed orchestrator in [`tools/release`](tools/release), configured by
 [`release.toml`](release.toml). `scripts/pipeline.py` is retired and kept only for historical
 reference; do not use it for new releases.
 
+After publishing, regenerate the public ledger with `python scripts/rebuild_release_ledger.py`
+and commit `releases/ledger.json`.
+
 ---
 
 ## 1. Principles

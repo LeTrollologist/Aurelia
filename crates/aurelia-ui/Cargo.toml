@@ -2,6 +2,7 @@
 name = "aurelia-ui"
 version = "3.13.0-beta.3"
 edition = "2021"
+rust-version = "1.87"
 description = "Immediate-mode user interface, studio panels, palette docks, and modals for Aurelia"
 
 [dependencies]

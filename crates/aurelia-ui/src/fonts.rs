@@ -97,9 +97,7 @@ pub fn install(ctx: &egui::Context) {
         }
     }
     display_list.extend(proportional_fallbacks.iter().cloned());
-    fonts
-        .families
-        .insert(display(), display_list);
+    fonts.families.insert(display(), display_list);
 
     // Wordmark face: light, then regular.
     let mut brand_list: Vec<String> = Vec::new();

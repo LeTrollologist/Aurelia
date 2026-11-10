@@ -1,0 +1,899 @@
+{
+  "product": "Aurelia",
+  "source": "https://github.com/LeTrollologist/Aurelia/releases",
+  "generated_at": "2026-11-10T03:10:39+00:00",
+  "releases": [
+    {
+      "tag": "v3.13.0-beta.3",
+      "version": "3.13.0-beta.3",
+      "published_at": "2026-11-10T02:41:14Z",
+      "prerelease": true,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.3",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.13.0-beta.3.exe",
+          "bytes": 4860546,
+          "sha256": "81924fe613518de3ef93a307a6a4c41fb83dc251ff5769f7e320cf0ca5e415fb"
+        },
+        {
+          "name": "Aurelia-Setup-3.13.0-beta.3.exe.sig",
+          "bytes": 64,
+          "sha256": "e2853d8c6276a3d92903df1d2ef3133e2f145cebd80d5651b34c2210d7658f0d"
+        },
+        {
+          "name": "Aurelia-v3.13.0-beta.3-win64.zip",
+          "bytes": 3763489,
+          "sha256": "23ff4dde205b5cec5592d1fd8b57cf4956cfa248a0cabb8af5740a197c377c60"
+        },
+        {
+          "name": "Aurelia-v3.13.0-beta.3-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "b9b6ca200479dc669fd96510007eea4ebe4864be4e0f9975a75b75c8a3e5cccf"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 197,
+          "sha256": "f236c36abf9946003d49bfeb814ea3f6bb22110a5a3b55b7a3159ae1a234d8fb"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "b9e1c7f0316749b79aaab26489c75431b4647e80c5104db29e867f7b6722cc3c"
+        }
+      ]
+    },
+    {
+      "tag": "v3.13.0-beta.2",
+      "version": "3.13.0-beta.2",
+      "published_at": "2026-11-10T02:17:07Z",
+      "prerelease": true,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.2",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.13.0-beta.2.exe",
+          "bytes": 4860965,
+          "sha256": "949b6e738478e6f5be50a7ff9ae85640ff1ce036d382351bf8074820483fd594"
+        },
+        {
+          "name": "Aurelia-Setup-3.13.0-beta.2.exe.sig",
+          "bytes": 64,
+          "sha256": "7bb8d930fa5d0b518516e21615dac931931047cec205dfaba83c5c4fb1a00901"
+        },
+        {
+          "name": "Aurelia-v3.13.0-beta.2-win64.zip",
+          "bytes": 3770602,
+          "sha256": "19910572ee2582626dd3869a587428e20b8b121bebf6a39b99cca4853fee80ff"
+        },
+        {
+          "name": "Aurelia-v3.13.0-beta.2-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "9cf6be810f892bba7e62ca994cbded6664937eba50de57103523e92b53128796"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 197,
+          "sha256": "d92ab4c74b11bf7368b63a7c10ff1d8aca8256d86fc786324929899818d51e01"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "4e191efcb928498cf09e79fbdc57945a1915134c3f615488ee3039372f541b94"
+        }
+      ]
+    },
+    {
+      "tag": "v3.13.0-beta",
+      "version": "3.13.0-beta",
+      "published_at": "2026-11-09T23:46:55Z",
+      "prerelease": true,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.13.0-beta.exe",
+          "bytes": 4856156,
+          "sha256": "de6e9f2c3c9751aecf77a8b035484aa406dcb2d0a9abd92ebed16d39a92a5d66"
+        },
+        {
+          "name": "Aurelia-Setup-3.13.0-beta.exe.sig",
+          "bytes": 64,
+          "sha256": "943c4cf4a4fc34774f066551349b8d3502e5ad7d80836cb401dcedf3679ca92c"
+        },
+        {
+          "name": "Aurelia-v3.13.0-beta-win64.zip",
+          "bytes": 3759592,
+          "sha256": "d5c0b2d6478a2a4434fed8d24216c705ad37fc61aa43711b4d636e7be584ea6f"
+        },
+        {
+          "name": "Aurelia-v3.13.0-beta-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "1df915de868536e2451b2dc13da2217cb7bb99d880af18ddc1b5d0a2dc7271c9"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 193,
+          "sha256": "82806b71af497f61e7b09d138e953ef79daddefefc52a5c5ad220c47377f7194"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "0dc1643c8ac3696e2e78e07699946ff8bf29424d94f96fa59570c1feed19e969"
+        }
+      ]
+    },
+    {
+      "tag": "v3.12.0",
+      "version": "3.12.0",
+      "published_at": "2026-11-08T22:46:06Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.12.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.12.0.exe",
+          "bytes": 4712383,
+          "sha256": "aed450f87b781503dc5a625036cfd57bce283321d82d4d9f76828a0b2aead6ea"
+        },
+        {
+          "name": "Aurelia-Setup-3.12.0.exe.sig",
+          "bytes": 64,
+          "sha256": "1c73f192b934d2cbbf233ae99f20e08eeba64a50a0565b5d32554c21b806886c"
+        },
+        {
+          "name": "Aurelia-v3.12.0-win64.zip",
+          "bytes": 3557725,
+          "sha256": "bc48825cbe60c10b5f8c7ff58f7de134676f4523337aba7f43e1be3f6a617d5b"
+        },
+        {
+          "name": "Aurelia-v3.12.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "47b01c471b0dc0662fc76a15feac55b4c1706b4a490a7f50c00459d06bfec8d2"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 183,
+          "sha256": "09f20c48ebef8168858270c446f0e030b19bbc73793bc4861e0444e033494578"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "05bbf74fb12dd89025e83f4725ece42f7eb680a923ef2d041a140df4b39bfeb3"
+        }
+      ]
+    },
+    {
+      "tag": "v3.11.0",
+      "version": "3.11.0",
+      "published_at": "2026-11-08T19:06:27Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.11.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.11.0.exe",
+          "bytes": 4616505,
+          "sha256": "20f804ce3af23938a00e503007ade4b8e84f6875c31d7a179dac49aa7219a088"
+        },
+        {
+          "name": "Aurelia-Setup-3.11.0.exe.sig",
+          "bytes": 64,
+          "sha256": "61b7f3f84f95fb3dee10af39db08ae943dc6113580ff7f1942a96d441d7442f5"
+        },
+        {
+          "name": "Aurelia-v3.11.0-win64.zip",
+          "bytes": 3373419,
+          "sha256": "e1a2e580b459f431ae620b6f1cdb1e19769b7e6c03c4a9f7bd02ac736cb3d006"
+        },
+        {
+          "name": "Aurelia-v3.11.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "a2c88f29807b1051f2522a392cf6d6a265fa5b834c4927407004c18d67aaeed6"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 183,
+          "sha256": "259d20ad56bb127b549ef20257c64f64a542735102c2563f42504ec9f1d9a951"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "39a988fff686f9dff69788986e778063ca32105ca100a93f929be93e8ebe6a66"
+        }
+      ]
+    },
+    {
+      "tag": "v3.10.0",
+      "version": "3.10.0",
+      "published_at": "2026-11-08T18:26:54Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.10.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.10.0.exe",
+          "bytes": 4615547,
+          "sha256": "03bffd48284663d04757aee841fdd897d1085369c57a00060acb510657ecdab6"
+        },
+        {
+          "name": "Aurelia-Setup-3.10.0.exe.sig",
+          "bytes": 64,
+          "sha256": "972150d0167821e2ab668cf23d797d7e0875d41b0952bd5f83169586cd491e8f"
+        },
+        {
+          "name": "Aurelia-v3.10.0-win64.zip",
+          "bytes": 3370920,
+          "sha256": "d5dac94d6bc8be6d3d729e3ce78b2bf59efb6589ebfd383a5612d904f036afbc"
+        },
+        {
+          "name": "Aurelia-v3.10.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "f62bfd2179ee3e25354018893d87facbec21f4e42529b04df338a59f54731c4f"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 183,
+          "sha256": "4ddcee53c665f888871fcf34048d1dbd66359f718ae5bba4f97dfb8315a7b829"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "3a95fb167b10e03dbf754d19dccb534267165b0eff8bfd414bc92edfc3cde74e"
+        }
+      ]
+    },
+    {
+      "tag": "v3.9.0",
+      "version": "3.9.0",
+      "published_at": "2026-11-08T15:21:24Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.9.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.9.0.exe",
+          "bytes": 4602758,
+          "sha256": "d503b2570b434a537adc8bef819b3100dc865c937cb7bddabe448fc90bb30301"
+        },
+        {
+          "name": "Aurelia-Setup-3.9.0.exe.sig",
+          "bytes": 64,
+          "sha256": "a54ca6376b42b452d807fdef774526971e020a2c2eab966bc65ff3258db4d3a9"
+        },
+        {
+          "name": "Aurelia-v3.9.0-win64.zip",
+          "bytes": 3351880,
+          "sha256": "16eeae9fefa1a197c24b28ba4743d5c3903b11471a75f5799c2716c1f07c92dc"
+        },
+        {
+          "name": "Aurelia-v3.9.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "c7b2904a9dab8776115e05de0c5fda1aae7fb01b048866cc62fc09f6b3b236da"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "4915a6ea40b44928dea0a5a01bdf443372a51fa894fa4b3e1daa6d7b52a1b049"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "84b5f00ad9e70648ade48b7c5cc88f687b066dde962b1f842042fda5f4a58989"
+        }
+      ]
+    },
+    {
+      "tag": "v3.8.1",
+      "version": "3.8.1",
+      "published_at": "2026-11-08T13:21:49Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.8.1",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.8.1.exe",
+          "bytes": 4601015,
+          "sha256": "4e20e3a631d49c98787cdc7573091c696f6de37b65eca892ab18e88a264ca809"
+        },
+        {
+          "name": "Aurelia-Setup-3.8.1.exe.sig",
+          "bytes": 64,
+          "sha256": "5ca0ffb3cb3fe431d13ad749c45aebdf86ca6256d4f3c39321e32937545c8add"
+        },
+        {
+          "name": "Aurelia-v3.8.1-win64.zip",
+          "bytes": 3352870,
+          "sha256": "13aa3ecd461e5380d60926b4bd0fa1f0a5aadc79d07ff57d63069c20bd0794b9"
+        },
+        {
+          "name": "Aurelia-v3.8.1-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "902e3a0ff5b615f9c1162cd76ea402114988188923154f428d44f251bd6393b0"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "c9b6f040fe6c4be02cff5bf39cb2bcc436cb54ce47b7e03e5d904e0e48da0ca3"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "763ec8a6f8338de289959cfb38df1e4d5f06300ba78731712bb053d095713f43"
+        }
+      ]
+    },
+    {
+      "tag": "v3.8.0",
+      "version": "3.8.0",
+      "published_at": "2026-11-08T11:02:13Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.8.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.8.0.exe",
+          "bytes": 4602438,
+          "sha256": "49c0b9c88b066f8b4ccdba646882e54878f25a837fcf71cb955d3e4e0b0335f3"
+        },
+        {
+          "name": "Aurelia-Setup-3.8.0.exe.sig",
+          "bytes": 64,
+          "sha256": "70e8c7239c050949012f15166030817852a1c905942f1bf587aa2376a14f1c54"
+        },
+        {
+          "name": "Aurelia-v3.8.0-win64.zip",
+          "bytes": 3348606,
+          "sha256": "794a8c8357ed406941d49f1489566eb9ae9cc56bc2cbdc4c1ac8482887aa9e95"
+        },
+        {
+          "name": "Aurelia-v3.8.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "d352a8cce418b50698e6214f96f504056bd1bc95e53abcf4ab5643f1be4a6a42"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "5b7216e3a50d4f59ecb87ca6c71fce4bf1b859c44490ae6fa7be245d80d3f39e"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "007644795a30de12f0a4e095cc500b1e9b12565d0692f3f3462b884a88ccca5c"
+        }
+      ]
+    },
+    {
+      "tag": "v3.7.1",
+      "version": "3.7.1",
+      "published_at": "2026-11-07T23:14:12Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.7.1",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.7.1.exe",
+          "bytes": 4586811,
+          "sha256": "7f21dcea59629fe8cfcf04b519290fff125dc86ec5fc2d747a0a90e8e2e8876b"
+        },
+        {
+          "name": "Aurelia-Setup-3.7.1.exe.sig",
+          "bytes": 64,
+          "sha256": "2bc00d3f94ccbd6399b01ef0f07944160ed292022566d066a6ea8b347d49f61c"
+        },
+        {
+          "name": "Aurelia-v3.7.1-win64.zip",
+          "bytes": 3330057,
+          "sha256": "e31b708ecbb09cb9665fa167a8c7380ffb64b6c31062c6861b9bcafe235dfde5"
+        },
+        {
+          "name": "Aurelia-v3.7.1-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "43851c2e977cf14e4b1d027531c7eb425b888a028b6a283d1957cfd35940b100"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "fd214cfcc3b42a2bff7c3b370835b1fe09d61548a29104dd837643ca473b3274"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "0902b102e91d96178de05d9a84f7e5458688da6a45433f15db909ec6b578c79e"
+        }
+      ]
+    },
+    {
+      "tag": "v3.7.0",
+      "version": "3.7.0",
+      "published_at": "2026-11-07T19:44:34Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.7.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.7.0.exe",
+          "bytes": 4573604,
+          "sha256": "6a154d30f410ff1eae6a81a29b9880601a442c96962779f52e1c76fa88e33920"
+        },
+        {
+          "name": "Aurelia-Setup-3.7.0.exe.sig",
+          "bytes": 64,
+          "sha256": "7b917c7dc9cdbc277806d3dc214b75ee5590d71553770b7eba619e8971ee8eaa"
+        },
+        {
+          "name": "Aurelia-v3.7.0-win64.zip",
+          "bytes": 3305227,
+          "sha256": "62248c8dd12a66bfe480098cea82fbd3faa5fa50d73dc0dc972805cfea5c7c91"
+        },
+        {
+          "name": "Aurelia-v3.7.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "a6bee374bc0417ebe112dcf1b635ec5568cda44c5859717dc2712e31bf3bca60"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "dd056d82b0e23288072bffa69cb5ba77a31303718e9b0ff3a00983004a15aa41"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "a1cbdf5b4f5999d9130acd325b16542f956245f364460c3a03b6a5eb7771405b"
+        }
+      ]
+    },
+    {
+      "tag": "v3.6.0",
+      "version": "3.6.0",
+      "published_at": "2026-11-07T09:34:19Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.6.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.6.0.exe",
+          "bytes": 4572650,
+          "sha256": "898a71d9a2fe1b9b18b5aaef8703974bd08c4638b213ae6dabea77986b28bf6b"
+        },
+        {
+          "name": "Aurelia-Setup-3.6.0.exe.sig",
+          "bytes": 64,
+          "sha256": "a9005890d72d67a7d20644daaa36ce9d3e8785f52fed118ba56ecdd6d1d75a2d"
+        },
+        {
+          "name": "Aurelia-v3.6.0-win64.zip",
+          "bytes": 3304438,
+          "sha256": "054de4cd282b7c04eaf0c1788cc8ba7c8c5e2c3774aee433ae39874b87fb39c5"
+        },
+        {
+          "name": "Aurelia-v3.6.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "30b96b4838d4116699b18644f4ca719b2be17e5b953f9abbce2bd45e9134b15d"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "b7edab7fd2a8dfc6c4506b13654145cf83d324fb565f3038d17f911cc95cfaf6"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "ab6b0a269462672b05151d7dbe0213ab5e1b9fbf249f68a6291d41a57aa89be8"
+        }
+      ]
+    },
+    {
+      "tag": "v3.5.2",
+      "version": "3.5.2",
+      "published_at": "2026-11-06T16:16:00Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.5.2",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.5.2.exe",
+          "bytes": 4554556,
+          "sha256": "5b7d75192ac9e4088fe08fda6b21b404473559996279355cdcc4dc8846f1e2e0"
+        },
+        {
+          "name": "Aurelia-Setup-3.5.2.exe.sig",
+          "bytes": 64,
+          "sha256": "810f22e86b41c2b4cae42027d86fc0fa5c7bb97ae101a3f6590326c1ffafcfe3"
+        },
+        {
+          "name": "Aurelia-v3.5.2-win64.zip",
+          "bytes": 3272550,
+          "sha256": "3f2a63abc1ac4d48e80e560f0573d9656ded01684cdc15129a8e96d93f2544d6"
+        },
+        {
+          "name": "Aurelia-v3.5.2-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "78ce88a2c2fc9f21fd357284cd28226b5a3ed957c56ab6bab48cc910f5b7395b"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "33149b672604043de672311e1087d3ab56e083d59ffe2a68294b243b06896a5a"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "f39e94436a47ff135eeaadb20176abab035679b51362e2119be428ee475badad"
+        }
+      ]
+    },
+    {
+      "tag": "v3.5.1",
+      "version": "3.5.1",
+      "published_at": "2026-11-06T15:01:47Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.5.1",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.5.1.exe",
+          "bytes": 4552308,
+          "sha256": "df0bd3164bf919e043f10c3b4e983d2b67fa7d05ff38a9413b9fea678f8d2e3a"
+        },
+        {
+          "name": "Aurelia-Setup-3.5.1.exe.sig",
+          "bytes": 64,
+          "sha256": "c82c008da2eb6f28e47b266a3caa3e853795d0f723e2e283abf2456d423b9de6"
+        },
+        {
+          "name": "Aurelia-v3.5.1-win64.zip",
+          "bytes": 3267521,
+          "sha256": "25779bc033cde59680e80bb04249671b2d774cde418a816f4de749941551b94d"
+        },
+        {
+          "name": "Aurelia-v3.5.1-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "376f3cb5ec9db45a38e8c178e3953e32ef01711c58c6e6e8ce17edea64dab8c4"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "ebdde3b7a40f6d52f129a0d675ca4ba196ca7985b327f4d2115b704995497455"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "a48c67a7651fd3a3fdfaa4a2cb7d6832e83d8e87c93790ad117c6bf51d96902a"
+        }
+      ]
+    },
+    {
+      "tag": "v3.5.0",
+      "version": "3.5.0",
+      "published_at": "2026-11-06T08:48:08Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.5.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.5.0.exe",
+          "bytes": 4552010,
+          "sha256": "1f4f51cc75b5c4ac88e47aa72a737b8e098d6f6c74b576dad64e6526bfea1f6a"
+        },
+        {
+          "name": "Aurelia-Setup-3.5.0.exe.sig",
+          "bytes": 64,
+          "sha256": "14875a3376fc8e7447d588368c66a165c006565992bcbbf386232e44cf92c3f1"
+        },
+        {
+          "name": "Aurelia-v3.5.0-win64.zip",
+          "bytes": 3267942,
+          "sha256": "0ba5e564534c8d9c957c91e8afce15b217417c95a60eabe48c081c3cb5674e8a"
+        },
+        {
+          "name": "Aurelia-v3.5.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "3d885571a9b60919cbe624d07796fd04ec6c51acd6ee3dfb0e27b37d18c55118"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "f5be9ef47defc4a7bda10a6ecb3924d1251f7afd34bd502857c419c515b1ac70"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "8db9f344d68b21662688832878e4e7dcf1194fd90980d66501a40fdcf265f795"
+        }
+      ]
+    },
+    {
+      "tag": "v3.4.1",
+      "version": "3.4.1",
+      "published_at": "2026-11-05T18:46:09Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.4.1",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.4.1.exe",
+          "bytes": 4541286,
+          "sha256": "a9e9c839b901522011260d41fad3d8401377c58c9cd3ebbc1419c25e9647b063"
+        },
+        {
+          "name": "Aurelia-Setup-3.4.1.exe.sig",
+          "bytes": 64,
+          "sha256": "e33d07634ea7deed8dc1841580c2aade79bcff7c5b359837ba8976a67beb9ca2"
+        },
+        {
+          "name": "Aurelia-v3.4.1-win64.zip",
+          "bytes": 3252491,
+          "sha256": "84f58e7c6ad20dd8de18a98be7e5c8019ab34290fa089ae9bdafafc96e3ec91c"
+        },
+        {
+          "name": "Aurelia-v3.4.1-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "aeecf3d7179f4bd7c66c6f7fc8ed270c811983dd1a3b16132efe94c27f6b1ed8"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "b3f51f57f15302a760e7b02ca537a3369bd61923ab96ec79b65db5d5711c3327"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "f08d7e0857e47cfeded3f33adf5db658b6d85a09fc5463a6360f2f4aa898fd66"
+        }
+      ]
+    },
+    {
+      "tag": "v3.4.0",
+      "version": "3.4.0",
+      "published_at": "2026-11-05T17:59:30Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.4.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.4.0.exe",
+          "bytes": 4541775,
+          "sha256": "f0a6215578690b7b72ba87d67d591a8d382c9b142c8241cab97f3866435b5566"
+        },
+        {
+          "name": "Aurelia-Setup-3.4.0.exe.sig",
+          "bytes": 64,
+          "sha256": "5edf0ab84aa9dc14cf72e10049d148f4c5a696ff33791ed77955eaa2b73b9921"
+        },
+        {
+          "name": "Aurelia-v3.4.0-win64.zip",
+          "bytes": 3253163,
+          "sha256": "e795184f4750b4a56fd548f53c9c01bbf2b7d85917280d30e40b181a2951eb67"
+        },
+        {
+          "name": "Aurelia-v3.4.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "753eff13ee345d91afb176614c34f09014034f029f84cc25617364c28be8cc6e"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "046120f84dbfd93c596866abde634929e870a38ae9492f5d3c1576308be5929b"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "4be9177a81b97649f837a5d624b1795313f21b8cfcb5eff31713799f1f52cf19"
+        }
+      ]
+    },
+    {
+      "tag": "v3.2.0",
+      "version": "3.2.0",
+      "published_at": "2026-11-05T13:15:15Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.2.0",
+      "assets": [
+        {
+          "name": "aurelia-publisher-2026.pub",
+          "bytes": 66,
+          "sha256": "d5183063edb79a1d584bbbbd67488e5cd97c7069e4b0d88c431d478c9d216717"
+        },
+        {
+          "name": "Aurelia-Setup-3.2.0.exe",
+          "bytes": 4232210,
+          "sha256": "8460a94ce57648bb066a4d3f6b6e2f11d6a3983f1234186742c2a20e749385c4"
+        },
+        {
+          "name": "Aurelia-Setup-3.2.0.exe.sig",
+          "bytes": 64,
+          "sha256": "dc24669bce9c1e070e2be86a16f2ba0d3afcbb2759bb6632ad2817f8e9c89923"
+        },
+        {
+          "name": "Aurelia-v3.2.0-win64.zip",
+          "bytes": 2838623,
+          "sha256": "0b613721a1a6aed34f83a48e9ed63133cd997b0c1bc10993ffff5ea9ce6e18ff"
+        },
+        {
+          "name": "Aurelia-v3.2.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "ea50dcb5be0790282d0d0e20647aa07fe7b21e8fcc2aa14a7f6fb38a65bfd62c"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "e02316e99b44039d9f09a704b1af7eb3700f7859d419a5049e93233a9870d9ba"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "b7b7e8b2fc4b6d9719629532f49d3f87a64b8d92690e40b4f304f40475d72bfb"
+        }
+      ]
+    },
+    {
+      "tag": "v3.1.0",
+      "version": "3.1.0",
+      "published_at": "2026-11-04T19:10:56Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.1.0",
+      "assets": [
+        {
+          "name": "aurelia-publisher-2026.pub",
+          "bytes": 66,
+          "sha256": "d5183063edb79a1d584bbbbd67488e5cd97c7069e4b0d88c431d478c9d216717"
+        },
+        {
+          "name": "Aurelia-Setup-3.1.0.exe",
+          "bytes": 4229180,
+          "sha256": "8e9019bbfad80274a88dfaa38af021ecfbcf22c560e5d240ddbcb0def3ccf680"
+        },
+        {
+          "name": "Aurelia-Setup-3.1.0.exe.sig",
+          "bytes": 64,
+          "sha256": "176889989f8f1404d544a2ae3a64166978e9d4db39f3d0434b20b9640c5082d6"
+        },
+        {
+          "name": "Aurelia-v3.1.0-win64.zip",
+          "bytes": 2838725,
+          "sha256": "b4308a75dbde35fabe89d586c00989fc41163dd7c25f053272d1e038267c95ec"
+        },
+        {
+          "name": "Aurelia-v3.1.0-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "aff99ccba94002a76fcbe7c363b607512f004b2c14ded8d91062714bb87ae392"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "2475c46cd38425164c05342a0589e0b4d791bf3f337d3027ecf0032172a39333"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "42a124077cf9b52193e8c2fa612047382638b3ef1c0b65091dd78e2dd31d8856"
+        }
+      ]
+    },
+    {
+      "tag": "v3.0.3",
+      "version": "3.0.3",
+      "published_at": "2026-11-04T16:35:30Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.0.3",
+      "assets": [
+        {
+          "name": "aurelia-publisher-2026.pub",
+          "bytes": 66,
+          "sha256": "d5183063edb79a1d584bbbbd67488e5cd97c7069e4b0d88c431d478c9d216717"
+        },
+        {
+          "name": "Aurelia-Setup-3.0.3.exe",
+          "bytes": 4194953,
+          "sha256": "1922de1c3272bd1d30acada8748f10ba58157ce3905f61144da1c0bceed70215"
+        },
+        {
+          "name": "Aurelia-Setup-3.0.3.exe.sig",
+          "bytes": 64,
+          "sha256": "0ea38047a331ed09716c27d5c1c8118eb54d9951a60d792f60803c61eddc065a"
+        },
+        {
+          "name": "Aurelia-v3.0.3-win64.zip",
+          "bytes": 2654457,
+          "sha256": "b2e182c1de96fb398ed84a269ccd21bc87db27e3060eafa2c11a8ae495998f1d"
+        },
+        {
+          "name": "Aurelia-v3.0.3-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "0fd1d4ebe4b0692ba8cff4b140987fdf2da3c1508e6b0f3c771027734e860007"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 181,
+          "sha256": "db9ecbe2f82442c6cf147ba7b22d1e43afc186d1ca97c46f492d4e6ead5801b4"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "58c86bc289199d45b79416ed231ab30ba4af2cf9478f0a5e989297bfcc9075f3"
+        }
+      ]
+    },
+    {
+      "tag": "v3.0.2",
+      "version": "3.0.2",
+      "published_at": "2026-11-04T10:36:57Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.0.2",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.0.2.exe",
+          "bytes": 4194809,
+          "sha256": "2a3c5fdd5966f14d26c0f04582e569d260fc420a1d2a48ab5569df1f6fb945b6"
+        },
+        {
+          "name": "Aurelia-v3.0.2-win64.zip",
+          "bytes": 2723261,
+          "sha256": "4e3a12652d944a3b8a6a78ca54d29c1ed017e6e58d544d9a3c2ec002435d41ad"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 357,
+          "sha256": "c2ffc510dc7020f304d6cb81fe223816c7f8903f58a63a640dcc0028aeca6d2f"
+        },
+        {
+          "name": "virustotal-summary.txt",
+          "bytes": 821,
+          "sha256": "46258e0bd0ba963579d65b8ad208a41e0aaaefbdb90fa9d1089dcfd8c92c8a97"
+        }
+      ]
+    },
+    {
+      "tag": "v3.0.1",
+      "version": "3.0.1",
+      "published_at": "2026-11-04T00:08:44Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.0.1",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.0.1.exe",
+          "bytes": 4194546,
+          "sha256": "a6db11cc5a28b372e546a66140a3d748a1ab78e109c0e550434b7d45978a606c"
+        },
+        {
+          "name": "Aurelia-v3.0.1-win64.zip",
+          "bytes": 2722473,
+          "sha256": "ae9dbbb10d6848864cfa734e26612e3fcb8a352f3e5d8637f92f8457ed48f430"
+        },
+        {
+          "name": "RELEASE_NOTES.md",
+          "bytes": 2174,
+          "sha256": "65be38d74ca36705ab40fb661acecabc485a283d0b5934108bde4df9fd900fdf"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 357,
+          "sha256": "3a1856bf0d21babbb491d025084368accb8145d9231527cab3b7bb4150beefbe"
+        },
+        {
+          "name": "virustotal-summary.txt",
+          "bytes": 824,
+          "sha256": "e6255cd95fc241229f3d71a4dd1b8876b5084e19ab15e31021853234d8ec2ddc"
+        }
+      ]
+    },
+    {
+      "tag": "v3.0.0",
+      "version": "3.0.0",
+      "published_at": "2026-11-03T08:55:08Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.0.0",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.0.0.exe",
+          "bytes": 4191153,
+          "sha256": "761591f1c498217953a77cd0a2ca5e6926b29de03a255947a951e3850e97d62d"
+        },
+        {
+          "name": "Aurelia-v3.0.0-win64.zip",
+          "bytes": 2718527,
+          "sha256": "ee0cb112aee273de800d25b9300a236cf52d4bcda50c067abd8a01204f8d0108"
+        },
+        {
+          "name": "RELEASE_NOTES.md",
+          "bytes": 5694,
+          "sha256": "fbcbff77462477e1c46c25efd0668fe34822837ac7afe26b5bcf87886122cfdc"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 357,
+          "sha256": "615de4f446d2adfb9b22a73cff43b5fdf0d25d3c5091a8027dea2b5903febbb8"
+        },
+        {
+          "name": "virustotal-summary.txt",
+          "bytes": 824,
+          "sha256": "f96db1eb57623c373abadefa5c8ef20f41325a0c5af379bfabfe81e404352e40"
+        }
+      ]
+    }
+  ]
+}

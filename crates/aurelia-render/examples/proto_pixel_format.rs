@@ -141,7 +141,6 @@ fn thread_count(pixels: u32) -> usize {
         .max(1)
 }
 
-
 // Thirteen monomorphised pixel functions: `blend_working` takes the mode as a parameter, so
 // with a literal it constant-folds `blend_channel` away. This is the same trick production
 // uses to remove the per-pixel dispatch, and the prototype has to model it or it would be
@@ -175,11 +174,15 @@ define_pixel_fns! {
 }
 
 /// Composites every layer, in order, into the rows this band owns.
-fn compose_band<C: Channel>(out: &mut [C], y0: usize, w: u32, h: u32, layers: &[LayerView<'_ , C>]) {
+fn compose_band<C: Channel>(out: &mut [C], y0: usize, w: u32, h: u32, layers: &[LayerView<'_, C>]) {
     for (layer_index, layer) in layers.iter().enumerate() {
-        let base = layer
-            .clip_base
-            .and_then(|bi| if bi == layer_index { None } else { layers.get(bi) });
+        let base = layer.clip_base.and_then(|bi| {
+            if bi == layer_index {
+                None
+            } else {
+                layers.get(bi)
+            }
+        });
 
         // One dispatch per layer. Never per pixel: this is the rule the 3.3x gain in
         // v2.6.0 came from, and the whole point of measuring it here.
@@ -213,8 +216,8 @@ fn layer_band<C: Channel, F>(
     y0: usize,
     w: u32,
     h: u32,
-    layer: &LayerView<'_ , C>,
-    base: Option<&LayerView<'_ , C>>,
+    layer: &LayerView<'_, C>,
+    base: Option<&LayerView<'_, C>>,
     compose: &F,
 ) where
     F: Fn([f32; 4], [f32; 4], f32) -> [f32; 4],
@@ -247,7 +250,11 @@ fn layer_band<C: Channel, F>(
             if row_start + 3 >= base.pixels.len() {
                 continue;
             }
-            base_span = Some((&base.pixels[row_start..], base.offset_x as i64, base.opacity));
+            base_span = Some((
+                &base.pixels[row_start..],
+                base.offset_x as i64,
+                base.opacity,
+            ));
         }
 
         for x in x_start..x_end {
@@ -326,7 +333,13 @@ struct Stack {
     layers: Vec<ProtoLayer>,
 }
 
-fn build_doc(masked: bool, offset: bool, coverage: f32, clipped: bool, all_general: bool) -> Document {
+fn build_doc(
+    masked: bool,
+    offset: bool,
+    coverage: f32,
+    clipped: bool,
+    all_general: bool,
+) -> Document {
     let mut doc = Document::new(W, H);
     // A transparent canvas keeps the comparison honest: production fills the background
     // colour when it is asked for one, and the candidate here starts from zero. Both sides
@@ -345,8 +358,7 @@ fn build_doc(masked: bool, offset: bool, coverage: f32, clipped: bool, all_gener
                 px[0] = (x % 256) as u8;
                 px[1] = (y % 256) as u8;
                 px[2] = ((x ^ y) % 256) as u8;
-                px[3] = if coverage >= 1.0 || ((x * 7 + y * 13) % 100) < (coverage * 100.0) as u32
-                {
+                px[3] = if coverage >= 1.0 || ((x * 7 + y * 13) % 100) < (coverage * 100.0) as u32 {
                     255
                 } else {
                     0
@@ -385,7 +397,11 @@ fn stack_from(doc: &Document) -> Stack {
             offset_y: layer.offset_y,
             opacity: layer.opacity,
             mode: layer.blend_mode,
-            mask: layer.mask.as_ref().filter(|m| m.enabled).map(|m| m.pixels.clone()),
+            mask: layer
+                .mask
+                .as_ref()
+                .filter(|m| m.enabled)
+                .map(|m| m.pixels.clone()),
             clip_base: if layer.clipping_mask && index > 0 {
                 Some(index - 1)
             } else {
@@ -396,7 +412,7 @@ fn stack_from(doc: &Document) -> Stack {
     Stack { layers }
 }
 
-fn views8(stack: &Stack) -> Vec<LayerView<'_ , u8>> {
+fn views8(stack: &Stack) -> Vec<LayerView<'_, u8>> {
     stack
         .layers
         .iter()
@@ -412,7 +428,7 @@ fn views8(stack: &Stack) -> Vec<LayerView<'_ , u8>> {
         .collect()
 }
 
-fn views16(stack: &Stack) -> Vec<LayerView<'_ , u16>> {
+fn views16(stack: &Stack) -> Vec<LayerView<'_, u16>> {
     stack
         .layers
         .iter()
@@ -523,7 +539,10 @@ fn main() {
             "{}: a v*257 16-bit result must downconvert to the same bytes",
             case.label
         );
-        println!("  {:<10} u8 identical, u16 identical after downconversion", case.label);
+        println!(
+            "  {:<10} u8 identical, u16 identical after downconversion",
+            case.label
+        );
     }
 
     let variants: [&str; 3] = ["baseline u8", "candidate u8", "candidate u16"];
@@ -531,7 +550,12 @@ fn main() {
     for _ in 0..REPEATS {
         for (ci, case) in cases.iter().enumerate() {
             let base = ci * variants.len();
-            time(|| { std::hint::black_box(case.doc.composite_layers(true)); }, &mut samples[base]);
+            time(
+                || {
+                    std::hint::black_box(case.doc.composite_layers(true));
+                },
+                &mut samples[base],
+            );
             time(
                 || {
                     let views = views8(&case.stack);
@@ -549,9 +573,14 @@ fn main() {
         }
     }
 
-    println!("
-Throughput (MPix/s):");
-    println!("{:<12} {:>16} {:>16} {:>16}", "workload", variants[0], variants[1], variants[2]);
+    println!(
+        "
+Throughput (MPix/s):"
+    );
+    println!(
+        "{:<12} {:>16} {:>16} {:>16}",
+        "workload", variants[0], variants[1], variants[2]
+    );
     let mut u16_rates = Vec::new();
     let mut regressions = Vec::new();
     for (ci, case) in cases.iter().enumerate() {
@@ -569,8 +598,10 @@ Throughput (MPix/s):");
         }
     }
 
-    println!("
-Best rounds (same order, spread visible):");
+    println!(
+        "
+Best rounds (same order, spread visible):"
+    );
     for (ci, case) in cases.iter().enumerate() {
         let base = ci * variants.len();
         let best: Vec<f64> = (0..variants.len())
@@ -594,23 +625,38 @@ Best rounds (same order, spread visible):");
     println!("  1. T4 (>= {T4:.0} MPix/s) on the bench fixture, 16-bit storage: {bench_16:.1} MPix/s -> {}", if bench_16 >= T4 { "PASS" } else { "FAIL" });
     println!("     The 8-bit baseline holds it at {bench_base:.1} MPix/s.");
     println!("  2. Cost of double-width storage, candidate u8 -> u16, all layers general:");
-    println!("     opaque {:+.0}% ({opq8:.1} -> {opq16:.1}), sparse {:+.0}% ({spa8:.1} -> {spa16:.1}).",
-        100.0 * (opq16 / opq8 - 1.0), 100.0 * (spa16 / spa8 - 1.0));
+    println!(
+        "     opaque {:+.0}% ({opq8:.1} -> {opq16:.1}), sparse {:+.0}% ({spa8:.1} -> {spa16:.1}).",
+        100.0 * (opq16 / opq8 - 1.0),
+        100.0 * (spa16 / spa8 - 1.0)
+    );
 
     if bench_16 < T4 {
         println!("");
         println!("  T4 FAILS for a 16-bit document, and the cause is not the storage width:");
         println!("  the bench fixture lets three layers take the 8-bit integer fast path, which a");
-        println!("  16-bit document cannot have under decision 5, so every layer pays general-path");
-        println!("  cost - the all-general 8-bit baseline sits in the same range, the same ceiling.");
+        println!(
+            "  16-bit document cannot have under decision 5, so every layer pays general-path"
+        );
+        println!(
+            "  cost - the all-general 8-bit baseline sits in the same range, the same ceiling."
+        );
         println!("");
-        println!("  Width matters only where the loop is bandwidth-bound: opaque is compute-bound and");
-        println!("  pays almost nothing for double width, sparse is bandwidth-bound and pays heavily.");
+        println!(
+            "  Width matters only where the loop is bandwidth-bound: opaque is compute-bound and"
+        );
+        println!(
+            "  pays almost nothing for double width, sparse is bandwidth-bound and pays heavily."
+        );
         println!("");
         println!("  Options for review, not for code:");
-        println!("    a) define the 16-bit target against the general path, not the mixed fixture;");
+        println!(
+            "    a) define the 16-bit target against the general path, not the mixed fixture;"
+        );
         println!("    b) build a 16-bit fast path (decision 5 deferred this as a second project);");
-        println!("    c) adopt the generic model regardless - it beats today's general path on every");
+        println!(
+            "    c) adopt the generic model regardless - it beats today's general path on every"
+        );
         println!("       all-general workload, and is worth doing on its own merits.");
     }
 }

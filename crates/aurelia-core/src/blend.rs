@@ -34,7 +34,6 @@ define_compositors! {
     compose_adaptive => Adaptive,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum BlendMode {
     #[default]
@@ -240,7 +239,11 @@ impl BlendMode {
                     cg = lum + (cg - lum) * s;
                     cb_val = lum + (cb_val - lum) * s;
                 }
-                (cr.clamp(0.0, 1.0), cg.clamp(0.0, 1.0), cb_val.clamp(0.0, 1.0))
+                (
+                    cr.clamp(0.0, 1.0),
+                    cg.clamp(0.0, 1.0),
+                    cb_val.clamp(0.0, 1.0),
+                )
             }
             Self::Adaptive => {
                 // Auto-contrast: pick the reading of the source (as authored, or inverted)
@@ -328,38 +331,65 @@ mod adaptive_tests {
     /// The point of the mode: the same artwork stays legible on either backdrop.
     #[test]
     fn black_art_flips_on_black_and_stays_on_white() {
-        approx(over([0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]), [1.0, 1.0, 1.0, 1.0]);
-        approx(over([1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 1.0]), [0.0, 0.0, 0.0, 1.0]);
+        approx(
+            over([0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 1.0]),
+            [1.0, 1.0, 1.0, 1.0],
+        );
+        approx(
+            over([1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 1.0]),
+            [0.0, 0.0, 0.0, 1.0],
+        );
     }
 
     #[test]
     fn white_art_flips_on_white_and_stays_on_black() {
-        approx(over([1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]), [0.0, 0.0, 0.0, 1.0]);
-        approx(over([0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]), [1.0, 1.0, 1.0, 1.0]);
+        approx(
+            over([1.0, 1.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]),
+            [0.0, 0.0, 0.0, 1.0],
+        );
+        approx(
+            over([0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 1.0]),
+            [1.0, 1.0, 1.0, 1.0],
+        );
     }
 
     /// Equal distance is a tie; the authored colour wins rather than being flipped at random.
     #[test]
     fn a_neutral_tie_keeps_the_source() {
-        approx(over([0.5, 0.5, 0.5, 1.0], [0.5, 0.5, 0.5, 1.0]), [0.5, 0.5, 0.5, 1.0]);
+        approx(
+            over([0.5, 0.5, 0.5, 1.0], [0.5, 0.5, 0.5, 1.0]),
+            [0.5, 0.5, 0.5, 1.0],
+        );
     }
 
     #[test]
     fn colour_is_inverted_as_a_whole_not_per_channel() {
         // Red against red has zero contrast as-is; cyan has 0.4 luminance distance.
-        approx(over([1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0]), [0.0, 1.0, 1.0, 1.0]);
+        approx(
+            over([1.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 1.0]),
+            [0.0, 1.0, 1.0, 1.0],
+        );
     }
 
     #[test]
     fn partial_alpha_composites_the_chosen_colour_normally() {
         // Half-opaque black text on black chooses white, then blends: 0.5 grey.
-        approx(over([0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.5]), [0.5, 0.5, 0.5, 1.0]);
+        approx(
+            over([0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0, 0.5]),
+            [0.5, 0.5, 0.5, 1.0],
+        );
         // Half-opaque black on white stays black and lightens to 0.5.
-        approx(over([1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.5]), [0.5, 0.5, 0.5, 1.0]);
+        approx(
+            over([1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.5]),
+            [0.5, 0.5, 0.5, 1.0],
+        );
     }
 
     #[test]
     fn transparent_source_leaves_the_backdrop_untouched() {
-        approx(over([0.2, 0.4, 0.6, 1.0], [1.0, 0.0, 0.0, 0.0]), [0.2, 0.4, 0.6, 1.0]);
+        approx(
+            over([0.2, 0.4, 0.6, 1.0], [1.0, 0.0, 0.0, 0.0]),
+            [0.2, 0.4, 0.6, 1.0],
+        );
     }
 }

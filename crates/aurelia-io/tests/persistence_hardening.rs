@@ -4,9 +4,7 @@
 use aurelia_core::color::Color;
 use aurelia_core::document::{Document, EditorState, GuideLine, StraightRulerState};
 use aurelia_core::layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
-use aurelia_io::project::{
-    load_project_from_reader, save_project_file, save_project_to_writer,
-};
+use aurelia_io::project::{load_project_from_reader, save_project_file, save_project_to_writer};
 use std::io::Cursor;
 
 fn fixture_document() -> Document {
@@ -85,12 +83,14 @@ fn every_truncation_is_handled_without_panicking() {
     let editor_start = find(&bytes, b"AED1");
     let styles_start = find(&bytes, b"ASTY");
     for cut in editor_start..=bytes.len() {
-        let doc = load(&bytes[..cut]).unwrap_or_else(|error| {
-            panic!("cut {cut} of {} failed: {error}", bytes.len())
-        });
+        let doc = load(&bytes[..cut])
+            .unwrap_or_else(|error| panic!("cut {cut} of {} failed: {error}", bytes.len()));
         assert!(doc.width == 24 && doc.height == 16);
         if cut >= styles_start {
-            assert!(!doc.editor.guides.is_empty(), "editor survives a cut at {cut}");
+            assert!(
+                !doc.editor.guides.is_empty(),
+                "editor survives a cut at {cut}"
+            );
         }
     }
 }
@@ -160,11 +160,18 @@ fn a_failed_atomic_save_keeps_the_previous_file() {
     save_project_file(&fixture_document(), &path).expect("initial save");
     let original = std::fs::read(&path).expect("read original");
 
-    // Make the sibling temp path impossible to create; a failed save must not touch `path`.
-    let tmp = dir.join("atomic.aur.tmp");
-    std::fs::create_dir(&tmp).expect("blocking temp dir");
-    assert!(save_project_file(&fixture_document(), &path).is_err());
+    // A serialization failure must leave the previous file intact and remove the unique temp.
+    let mut bad = fixture_document();
+    bad.layers[0].name = "x".repeat(u16::MAX as usize + 1);
+    assert!(save_project_file(&bad, &path).is_err());
     assert_eq!(std::fs::read(&path).expect("read original"), original);
+
+    let leftovers: Vec<_> = std::fs::read_dir(&dir)
+        .expect("read temp dir")
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_name().to_string_lossy().ends_with(".tmp"))
+        .collect();
+    assert!(leftovers.is_empty(), "failed save left a temporary file");
 
     let _ = std::fs::remove_dir_all(&dir);
 }

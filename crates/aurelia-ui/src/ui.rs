@@ -6,11 +6,11 @@ use crate::state::{
     ActiveFilterModal, AppState, CanvasPreset, GuideOrientation, MoveMode, PendingEditAction,
     PendingFileAction, WindowAction,
 };
-use egui::{Align, Color32, Layout, Rect, RichText, ScrollArea, Stroke, Vec2};
 use aurelia_core::brush::{EraserMode, GradientType, ShapeFillMode, ToolType};
 use aurelia_core::color::{Color, DEFAULT_PALETTE};
 use aurelia_core::selection::SelectionMask;
 use aurelia_core::symmetry::SymmetryMode;
+use egui::{Align, Color32, Layout, Rect, RichText, ScrollArea, Stroke, Vec2};
 
 use aurelia_core::layer::LayerId;
 
@@ -52,13 +52,19 @@ fn render_tool_button(
         let hover = ui
             .ctx()
             .animate_bool_with_time(id, response.hovered(), 0.12);
-        let press = ui
-            .ctx()
-            .animate_bool_with_time(id.with("press"), response.is_pointer_button_down_on(), 0.05);
+        let press = ui.ctx().animate_bool_with_time(
+            id.with("press"),
+            response.is_pointer_button_down_on(),
+            0.05,
+        );
 
         let rounding = egui::Rounding::same(design::RADIUS);
         let base = if is_selected {
-            design::mix(design::INK_RAISED_TOP, accent_c32.linear_multiply(0.32), 0.5)
+            design::mix(
+                design::INK_RAISED_TOP,
+                accent_c32.linear_multiply(0.32),
+                0.5,
+            )
         } else {
             design::mix(
                 design::INK_RAISED,
@@ -185,13 +191,17 @@ fn history_row(ui: &mut egui::Ui, index: usize, label: &str, bytes: usize, redo:
             RichText::new(prefix)
                 .size(9.5)
                 .family(fonts::display())
-                .color(if redo { design::TEXT_DIM } else { design::TEXT_MUTED }),
+                .color(if redo {
+                    design::TEXT_DIM
+                } else {
+                    design::TEXT_MUTED
+                }),
         );
-        ui.label(
-            RichText::new(label)
-                .size(10.5)
-                .color(if redo { design::TEXT_DIM } else { design::TEXT }),
-        );
+        ui.label(RichText::new(label).size(10.5).color(if redo {
+            design::TEXT_DIM
+        } else {
+            design::TEXT
+        }));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(
                 RichText::new(format_bytes(bytes))
@@ -207,7 +217,8 @@ fn history_row(ui: &mut egui::Ui, index: usize, label: &str, bytes: usize, redo:
 /// was stretched, and its framing box was computed in a different space than the image it sat
 /// on. Both now use this rect.
 fn letterbox(available: egui::Rect, aspect: f32) -> egui::Rect {
-    if !aspect.is_finite() || aspect <= 0.0 || available.width() <= 0.0 || available.height() <= 0.0 {
+    if !aspect.is_finite() || aspect <= 0.0 || available.width() <= 0.0 || available.height() <= 0.0
+    {
         return available;
     }
     let available_aspect = available.width() / available.height();
@@ -215,11 +226,17 @@ fn letterbox(available: egui::Rect, aspect: f32) -> egui::Rect {
         // Slot is wider than the document: full height, centred horizontally.
         let width = available.height() * aspect;
         let x0 = available.min.x + (available.width() - width) * 0.5;
-        egui::Rect::from_min_size(egui::pos2(x0, available.min.y), egui::vec2(width, available.height()))
+        egui::Rect::from_min_size(
+            egui::pos2(x0, available.min.y),
+            egui::vec2(width, available.height()),
+        )
     } else {
         let height = available.width() / aspect;
         let y0 = available.min.y + (available.height() - height) * 0.5;
-        egui::Rect::from_min_size(egui::pos2(available.min.x, y0), egui::vec2(available.width(), height))
+        egui::Rect::from_min_size(
+            egui::pos2(available.min.x, y0),
+            egui::vec2(available.width(), height),
+        )
     }
 }
 
@@ -303,11 +320,17 @@ fn title_button(ui: &mut egui::Ui, kind: TitleButtonKind, maximized: bool) -> bo
         }
         TitleButtonKind::Close => {
             ui.painter().line_segment(
-                [centre + egui::vec2(-5.5, -5.5), centre + egui::vec2(5.5, 5.5)],
+                [
+                    centre + egui::vec2(-5.5, -5.5),
+                    centre + egui::vec2(5.5, 5.5),
+                ],
                 stroke,
             );
             ui.painter().line_segment(
-                [centre + egui::vec2(5.5, -5.5), centre + egui::vec2(-5.5, 5.5)],
+                [
+                    centre + egui::vec2(5.5, -5.5),
+                    centre + egui::vec2(-5.5, 5.5),
+                ],
                 stroke,
             );
         }
@@ -369,8 +392,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
     // Ensure reference texture is loaded if reference_image is present
     if state.ref_texture.is_none() {
         if let Some((w, h, raw_rgba)) = &state.reference_image {
-            let color_image = egui::ColorImage::from_rgba_unmultiplied([*w as usize, *h as usize], raw_rgba);
-            state.ref_texture = Some(ctx.load_texture("ref_image_texture", color_image, Default::default()));
+            let color_image =
+                egui::ColorImage::from_rgba_unmultiplied([*w as usize, *h as usize], raw_rgba);
+            state.ref_texture =
+                Some(ctx.load_texture("ref_image_texture", color_image, Default::default()));
         }
     }
 
@@ -380,7 +405,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .frame(design::bar_frame(design::INK_PANEL))
             .show(ctx, |ui| {
                 state.header_h = (ui.max_rect().height() + 10.0) * state.ui_ppp; // bar_frame pads 5 px top/bottom
-                // A shallow gradient under the bar reads as a lit edge rather than a border.
+                                                                                 // A shallow gradient under the bar reads as a lit edge rather than a border.
                 let bar_rect = ui.max_rect();
                 design::vgradient(
                     ui.painter(),
@@ -469,7 +494,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                     state.document_path = Some(path.clone());
                                                     state.mark_saved();
                                                     state.note_recent_file(&path);
-                                                    state.set_status(format!("Loaded {}", path.display()));
+                                                    state.set_status(format!(
+                                                        "Loaded {}",
+                                                        path.display()
+                                                    ));
                                                 }
                                                 Err(e) => {
                                                     state.set_status(format!("Load error: {}", e))
@@ -482,9 +510,21 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             }
                             ui.separator();
                             ui.menu_button("📤 Export Image...", |ui| {
-                                ui.radio_value(&mut state.export_format, 0, "PNG (lossless, alpha)");
-                                ui.radio_value(&mut state.export_format, 1, "JPEG (flattened, no alpha)");
-                                ui.radio_value(&mut state.export_format, 2, "WebP (lossless, alpha)");
+                                ui.radio_value(
+                                    &mut state.export_format,
+                                    0,
+                                    "PNG (lossless, alpha)",
+                                );
+                                ui.radio_value(
+                                    &mut state.export_format,
+                                    1,
+                                    "JPEG (flattened, no alpha)",
+                                );
+                                ui.radio_value(
+                                    &mut state.export_format,
+                                    2,
+                                    "WebP (lossless, alpha)",
+                                );
                                 if state.export_format == 1 {
                                     ui.add(
                                         egui::Slider::new(&mut state.jpeg_quality, 1..=100)
@@ -502,7 +542,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 ui.close_menu();
                             }
                             ui.separator();
-                            if ui.button("🪟 Windows Context Menu Integration...").clicked() {
+                            if ui
+                                .button("🪟 Windows Context Menu Integration...")
+                                .clicked()
+                            {
                                 state.show_shell_status_modal = Some("prompt".to_string());
                                 ui.close_menu();
                             }
@@ -563,25 +606,36 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 |ui| {
                                     for mode in aurelia_core::selection::SelectionCombineMode::ALL {
                                         if ui
-                                            .selectable_label(state.selection_mode == mode, format!("{} {}", mode.icon(), mode.label()))
+                                            .selectable_label(
+                                                state.selection_mode == mode,
+                                                format!("{} {}", mode.icon(), mode.label()),
+                                            )
                                             .clicked()
                                         {
                                             state.selection_mode = mode;
-                                            state.set_status(format!("Selection mode: {}", mode.label()));
+                                            state.set_status(format!(
+                                                "Selection mode: {}",
+                                                mode.label()
+                                            ));
                                             ui.close_menu();
                                         }
                                     }
                                     ui.separator();
                                     ui.label(
-                                        RichText::new("Shift: Add · Alt: Subtract · Shift+Alt: Intersect")
-                                            .size(9.0)
-                                            .color(design::TEXT_MUTED),
+                                        RichText::new(
+                                            "Shift: Add · Alt: Subtract · Shift+Alt: Intersect",
+                                        )
+                                        .size(9.0)
+                                        .color(design::TEXT_MUTED),
                                     );
                                 },
                             );
                             ui.separator();
                             if ui.button("Select All (Ctrl+A)").clicked() {
-                                state.selection = Some(SelectionMask::select_all(state.document.width, state.document.height));
+                                state.selection = Some(SelectionMask::select_all(
+                                    state.document.width,
+                                    state.document.height,
+                                ));
                                 state.set_status("Selected All");
                                 ui.close_menu();
                             }
@@ -595,8 +649,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             if ui.button("◱ Select Layer Alpha").clicked() {
                                 if let Some(layer) = state.document.active_layer() {
                                     let mask = SelectionMask::from_layer(layer, 8);
-                                    let selected =
-                                        mask.mask.iter().filter(|&&v| v > 8).count();
+                                    let selected = mask.mask.iter().filter(|&&v| v > 8).count();
                                     state.selection = Some(mask);
                                     state.set_status(format!(
                                         "Selected {} px from layer alpha",
@@ -608,14 +661,17 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 ui.close_menu();
                             }
                             if ui.button("∩ Intersect with Layer Alpha").clicked() {
-                                let alpha = state.document.active_layer().map(|layer| {
-                                    SelectionMask::from_layer(layer, 8)
-                                });
+                                let alpha = state
+                                    .document
+                                    .active_layer()
+                                    .map(|layer| SelectionMask::from_layer(layer, 8));
                                 if let Some(alpha) = alpha {
                                     match &mut state.selection {
                                         Some(mask) => {
                                             mask.intersect(&alpha);
-                                            state.set_status("Selection intersected with layer alpha");
+                                            state.set_status(
+                                                "Selection intersected with layer alpha",
+                                            );
                                         }
                                         None => {
                                             state.selection = Some(alpha);
@@ -687,7 +743,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         });
 
                         ui.menu_button("Filter", |ui| {
-                            ui.label(RichText::new("COLOR ADJUSTMENTS").size(8.5).strong().color(Color32::from_rgb(170, 157, 120)));
+                            ui.label(
+                                RichText::new("COLOR ADJUSTMENTS")
+                                    .size(8.5)
+                                    .strong()
+                                    .color(Color32::from_rgb(170, 157, 120)),
+                            );
                             if ui.button("🎨 HSL Adjustments...").clicked() {
                                 state.begin_filter_modal(ActiveFilterModal::Hsl);
                                 ui.close_menu();
@@ -710,7 +771,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 if let Some(layer) = state.document.active_layer_mut() {
                                     let before = layer.storage_bytes();
                                     aurelia_core::filter::filter_invert_layer(layer, sel.as_ref());
-                                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, "Invert Colors", before, layer.storage_bytes()));
+                                    let cmd = Box::new(
+                                        aurelia_core::history::LayerPixelsDeltaCommand::new(
+                                            layer.id,
+                                            "Invert Colors",
+                                            before,
+                                            layer.storage_bytes(),
+                                        ),
+                                    );
                                     state.history.push(cmd);
                                     state.set_status("Inverted Colors");
                                 }
@@ -720,8 +788,18 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 let sel = state.selection.clone();
                                 if let Some(layer) = state.document.active_layer_mut() {
                                     let before = layer.storage_bytes();
-                                    aurelia_core::filter::filter_grayscale_layer(layer, sel.as_ref());
-                                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, "Grayscale", before, layer.storage_bytes()));
+                                    aurelia_core::filter::filter_grayscale_layer(
+                                        layer,
+                                        sel.as_ref(),
+                                    );
+                                    let cmd = Box::new(
+                                        aurelia_core::history::LayerPixelsDeltaCommand::new(
+                                            layer.id,
+                                            "Grayscale",
+                                            before,
+                                            layer.storage_bytes(),
+                                        ),
+                                    );
                                     state.history.push(cmd);
                                     state.set_status("Applied Grayscale");
                                 }
@@ -732,7 +810,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 if let Some(layer) = state.document.active_layer_mut() {
                                     let before = layer.storage_bytes();
                                     aurelia_core::filter::filter_sepia_layer(layer, sel.as_ref());
-                                    let cmd = Box::new(aurelia_core::history::LayerPixelsDeltaCommand::new(layer.id, "Sepia", before, layer.storage_bytes()));
+                                    let cmd = Box::new(
+                                        aurelia_core::history::LayerPixelsDeltaCommand::new(
+                                            layer.id,
+                                            "Sepia",
+                                            before,
+                                            layer.storage_bytes(),
+                                        ),
+                                    );
                                     state.history.push(cmd);
                                     state.set_status("Applied Sepia Tone");
                                 }
@@ -740,7 +825,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             }
 
                             ui.separator();
-                            ui.label(RichText::new("ARTISTIC & BLUR FX").size(8.5).strong().color(Color32::from_rgb(170, 157, 120)));
+                            ui.label(
+                                RichText::new("ARTISTIC & BLUR FX")
+                                    .size(8.5)
+                                    .strong()
+                                    .color(Color32::from_rgb(170, 157, 120)),
+                            );
                             if ui.button("💧 Gaussian Blur...").clicked() {
                                 state.begin_filter_modal(ActiveFilterModal::GaussianBlur);
                                 ui.close_menu();
@@ -758,7 +848,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 ui.close_menu();
                             }
                             ui.separator();
-                            ui.label(RichText::new("TONE & STYLIZE").size(8.5).strong().color(Color32::from_rgb(170, 157, 120)));
+                            ui.label(
+                                RichText::new("TONE & STYLIZE")
+                                    .size(8.5)
+                                    .strong()
+                                    .color(Color32::from_rgb(170, 157, 120)),
+                            );
                             if ui.button("📊 Levels...").clicked() {
                                 state.begin_filter_modal(ActiveFilterModal::Levels);
                                 ui.close_menu();
@@ -778,22 +873,46 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         });
 
                         ui.menu_button("View", |ui| {
-                            if ui.checkbox(&mut state.show_navigator, "🧭 Viewport / Navigator Dock").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_navigator, "🧭 Viewport / Navigator Dock")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_perspective_dock, "📐 Perspective Studio (F5)").clicked() {
+                            if ui
+                                .checkbox(
+                                    &mut state.show_perspective_dock,
+                                    "📐 Perspective Studio (F5)",
+                                )
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.perspective.snap_enabled, "⇲ Perspective Snap (Ctrl+Shift+P)").clicked() {
+                            if ui
+                                .checkbox(
+                                    &mut state.perspective.snap_enabled,
+                                    "⇲ Perspective Snap (Ctrl+Shift+P)",
+                                )
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_scratchpad, "🎨 Mixing Scratchpad (F4)").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_scratchpad, "🎨 Mixing Scratchpad (F4)")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_grid, "⊞ Toggle Grid (Ctrl+')").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_grid, "⊞ Toggle Grid (Ctrl+')")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_rulers, "📏 Toggle Rulers (Ctrl+R)").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_rulers, "📏 Toggle Rulers (Ctrl+R)")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
                             let ruler_label = if state.straight_ruler.is_some() {
@@ -809,11 +928,17 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 }
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.timeline.is_enabled, "🎞 Animation Timeline").clicked() {
+                            if ui
+                                .checkbox(&mut state.timeline.is_enabled, "🎞 Animation Timeline")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
                             ui.separator();
-                            if ui.checkbox(&mut state.show_ui_panels, "👁 Studio Panels (Tab)").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_ui_panels, "👁 Studio Panels (Tab)")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
                             if ui.button("⛶ Fit to Screen (Ctrl+0)").clicked() {
@@ -830,22 +955,49 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         });
 
                         ui.menu_button("Window", |ui| {
-                            if ui.checkbox(&mut state.show_navigator, "🧭 Viewport / Navigator Panel").clicked() {
+                            if ui
+                                .checkbox(
+                                    &mut state.show_navigator,
+                                    "🧭 Viewport / Navigator Panel",
+                                )
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_perspective_dock, "📐 Perspective Studio (F5)").clicked() {
+                            if ui
+                                .checkbox(
+                                    &mut state.show_perspective_dock,
+                                    "📐 Perspective Studio (F5)",
+                                )
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_scratchpad, "🎨 Mixing Scratchpad (F4)").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_scratchpad, "🎨 Mixing Scratchpad (F4)")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_ref_window, "🖼 Reference Viewer").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_ref_window, "🖼 Reference Viewer")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.show_history_panel, "🕘 History Panel").clicked() {
+                            if ui
+                                .checkbox(&mut state.show_history_panel, "🕘 History Panel")
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
-                            if ui.checkbox(&mut state.timeline.is_enabled, "🎞 Animation Timeline Strip").clicked() {
+                            if ui
+                                .checkbox(
+                                    &mut state.timeline.is_enabled,
+                                    "🎞 Animation Timeline Strip",
+                                )
+                                .clicked()
+                            {
                                 ui.close_menu();
                             }
                             ui.separator();
@@ -882,11 +1034,19 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         ui.spacing_mut().item_spacing = egui::vec2(4.0, 0.0);
 
-                        if ui.button(RichText::new("About").size(11.0)).on_hover_text(format!("About Aurelia (v{})", crate::APP_VERSION)).clicked() {
+                        if ui
+                            .button(RichText::new("About").size(11.0))
+                            .on_hover_text(format!("About Aurelia (v{})", crate::APP_VERSION))
+                            .clicked()
+                        {
                             state.show_about_dialog = true;
                         }
 
-                        if ui.button(RichText::new("Help").size(11.0)).on_hover_text("Keyboard shortcuts & help (?)").clicked() {
+                        if ui
+                            .button(RichText::new("Help").size(11.0))
+                            .on_hover_text("Keyboard shortcuts & help (?)")
+                            .clicked()
+                        {
                             state.show_help = !state.show_help;
                         }
 
@@ -911,8 +1071,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             ui.separator();
                             ui.checkbox(&mut state.show_ref_window, "Reference studio");
                             ui.checkbox(&mut state.show_scratchpad, "Mixing scratchpad  (F4)");
-                            ui.checkbox(&mut state.show_perspective_dock, "Perspective studio  (F5)");
-                            ui.checkbox(&mut state.perspective.snap_enabled, "Snap to perspective  (Ctrl+Shift+P)");
+                            ui.checkbox(
+                                &mut state.show_perspective_dock,
+                                "Perspective studio  (F5)",
+                            );
+                            ui.checkbox(
+                                &mut state.perspective.snap_enabled,
+                                "Snap to perspective  (Ctrl+Shift+P)",
+                            );
                             ui.separator();
                             ui.checkbox(&mut state.show_ui_panels, "Studio panels  (Tab)");
                         });
@@ -921,23 +1087,59 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                         // S-Level Stabilizer quick chip
                         let s_lvl_txt = format!("S-{}", state.brush.stabilization_level);
-                        let s_btn = egui::Button::new(RichText::new(s_lvl_txt).size(10.5).strong().color(accent_c32))
-                            .fill(if state.brush.stabilization_level > 0 { accent_dim_c32 } else { design::INK_RAISED })
-                            .stroke(egui::Stroke::new(1.0_f32, if state.brush.stabilization_level > 0 { accent_c32 } else { design::HAIRLINE }));
-                        if ui.add(s_btn).on_hover_text(format!("{}: Click to cycle stabilizer (S-0..S-7)", state.brush.stabilization_label())).clicked() {
-                            state.brush.stabilization_level = (state.brush.stabilization_level + 1) % 8;
-                            state.set_status(format!("Stabilizer: {}", state.brush.stabilization_label()));
+                        let s_btn = egui::Button::new(
+                            RichText::new(s_lvl_txt)
+                                .size(10.5)
+                                .strong()
+                                .color(accent_c32),
+                        )
+                        .fill(if state.brush.stabilization_level > 0 {
+                            accent_dim_c32
+                        } else {
+                            design::INK_RAISED
+                        })
+                        .stroke(egui::Stroke::new(
+                            1.0_f32,
+                            if state.brush.stabilization_level > 0 {
+                                accent_c32
+                            } else {
+                                design::HAIRLINE
+                            },
+                        ));
+                        if ui
+                            .add(s_btn)
+                            .on_hover_text(format!(
+                                "{}: Click to cycle stabilizer (S-0..S-7)",
+                                state.brush.stabilization_label()
+                            ))
+                            .clicked()
+                        {
+                            state.brush.stabilization_level =
+                                (state.brush.stabilization_level + 1) % 8;
+                            state.set_status(format!(
+                                "Stabilizer: {}",
+                                state.brush.stabilization_label()
+                            ));
                         }
 
                         // Active Tool Badge
-                        let tool_label = format!("{} · {}px", state.brush.tool.label(), state.brush.size as u32);
+                        let tool_label = format!(
+                            "{} · {}px",
+                            state.brush.tool.label(),
+                            state.brush.size as u32
+                        );
                         ui.scope(|ui| {
                             ui.spacing_mut().button_padding = egui::vec2(9.0, 3.0);
                             ui.add(
-                                egui::Button::new(RichText::new(tool_label).size(11.0).strong().color(accent_c32))
-                                    .fill(accent_dim_c32)
-                                    .stroke(egui::Stroke::new(1.0_f32, accent_c32))
-                                    .rounding(6.0),
+                                egui::Button::new(
+                                    RichText::new(tool_label)
+                                        .size(11.0)
+                                        .strong()
+                                        .color(accent_c32),
+                                )
+                                .fill(accent_dim_c32)
+                                .stroke(egui::Stroke::new(1.0_f32, accent_c32))
+                                .rounding(6.0),
                             );
                         });
                     });
@@ -955,7 +1157,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     .inner_margin(6.0)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            if ui.button(RichText::new("👁 Show Studio Panels (Tab)").strong().color(accent_c32)).clicked() {
+                            if ui
+                                .button(
+                                    RichText::new("👁 Show Studio Panels (Tab)")
+                                        .strong()
+                                        .color(accent_c32),
+                                )
+                                .clicked()
+                            {
                                 state.show_ui_panels = true;
                             }
                             if ui.selectable_label(state.show_grid, "⊞ Grid").clicked() {
@@ -969,12 +1178,30 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
     // ── 2. BOTTOM TIMELINE STRIP PANEL ──
     if state.show_ui_panels && state.timeline.is_enabled {
         egui::TopBottomPanel::bottom("animation_timeline_panel")
-            .frame(egui::Frame::none().fill(Color32::from_rgb(22, 19, 8)).stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(58, 50, 25))).inner_margin(egui::Margin::symmetric(8.0, 6.0)))
+            .frame(
+                egui::Frame::none()
+                    .fill(Color32::from_rgb(22, 19, 8))
+                    .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgb(58, 50, 25)))
+                    .inner_margin(egui::Margin::symmetric(8.0, 6.0)),
+            )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     // Playback Controls
-                    let play_icon = if state.timeline.is_playing { "⏸ Pause" } else { "▶ Play" };
-                    if ui.button(RichText::new(play_icon).size(11.0).strong().color(if state.timeline.is_playing { Color32::from_rgb(255, 200, 80) } else { Color32::from_rgb(117, 223, 209) })).clicked() {
+                    let play_icon = if state.timeline.is_playing {
+                        "⏸ Pause"
+                    } else {
+                        "▶ Play"
+                    };
+                    if ui
+                        .button(RichText::new(play_icon).size(11.0).strong().color(
+                            if state.timeline.is_playing {
+                                Color32::from_rgb(255, 200, 80)
+                            } else {
+                                Color32::from_rgb(117, 223, 209)
+                            },
+                        ))
+                        .clicked()
+                    {
                         state.toggle_animation_playback();
                     }
                     if ui.button("⏮").on_hover_text("Previous Frame ([)").clicked() {
@@ -983,48 +1210,112 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     if ui.button("⏭").on_hover_text("Next Frame (])").clicked() {
                         state.step_next_frame();
                     }
-                    if ui.selectable_label(state.timeline.loop_playback, "🔁 Loop").clicked() {
+                    if ui
+                        .selectable_label(state.timeline.loop_playback, "🔁 Loop")
+                        .clicked()
+                    {
                         state.timeline.loop_playback = !state.timeline.loop_playback;
                     }
 
                     ui.separator();
 
                     // FPS slider
-                    ui.label(RichText::new("FPS:").size(10.5).color(Color32::from_rgb(195, 183, 150)));
-                    ui.add(egui::DragValue::new(&mut state.timeline.fps).range(1..=60).speed(0.5));
+                    ui.label(
+                        RichText::new("FPS:")
+                            .size(10.5)
+                            .color(Color32::from_rgb(195, 183, 150)),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut state.timeline.fps)
+                            .range(1..=60)
+                            .speed(0.5),
+                    );
 
                     ui.separator();
 
                     // Onion Skin toggle & settings
                     let onion_active = state.timeline.onion_skin_enabled;
-                    let onion_btn = egui::Button::new(RichText::new("🧅 Onion Skin (O)").size(10.5).color(if onion_active { accent_c32 } else { Color32::from_rgb(169, 157, 146) }))
-                        .fill(if onion_active { accent_c32.linear_multiply(0.2) } else { Color32::from_rgb(44, 38, 20) });
-                    if ui.add(onion_btn).on_hover_text("Toggle Ghost Onion Skinning (O)").clicked() {
+                    let onion_btn =
+                        egui::Button::new(RichText::new("🧅 Onion Skin (O)").size(10.5).color(
+                            if onion_active {
+                                accent_c32
+                            } else {
+                                Color32::from_rgb(169, 157, 146)
+                            },
+                        ))
+                        .fill(if onion_active {
+                            accent_c32.linear_multiply(0.2)
+                        } else {
+                            Color32::from_rgb(44, 38, 20)
+                        });
+                    if ui
+                        .add(onion_btn)
+                        .on_hover_text("Toggle Ghost Onion Skinning (O)")
+                        .clicked()
+                    {
                         state.toggle_onion_skin();
                     }
 
                     if onion_active {
-                        ui.label(RichText::new("Prev:").size(9.5).color(Color32::from_rgb(255, 120, 120)));
-                        ui.add(egui::DragValue::new(&mut state.timeline.onion_skin_prev_count).range(1..=5).speed(0.1));
-                        ui.label(RichText::new("Next:").size(9.5).color(Color32::from_rgb(146, 229, 218)));
-                        ui.add(egui::DragValue::new(&mut state.timeline.onion_skin_next_count).range(1..=5).speed(0.1));
-                        ui.label(RichText::new("Opacity:").size(9.5).color(Color32::from_rgb(195, 186, 160)));
-                        ui.add(egui::Slider::new(&mut state.timeline.onion_skin_opacity, 0.1..=1.0).show_value(false));
+                        ui.label(
+                            RichText::new("Prev:")
+                                .size(9.5)
+                                .color(Color32::from_rgb(255, 120, 120)),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut state.timeline.onion_skin_prev_count)
+                                .range(1..=5)
+                                .speed(0.1),
+                        );
+                        ui.label(
+                            RichText::new("Next:")
+                                .size(9.5)
+                                .color(Color32::from_rgb(146, 229, 218)),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut state.timeline.onion_skin_next_count)
+                                .range(1..=5)
+                                .speed(0.1),
+                        );
+                        ui.label(
+                            RichText::new("Opacity:")
+                                .size(9.5)
+                                .color(Color32::from_rgb(195, 186, 160)),
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut state.timeline.onion_skin_opacity, 0.1..=1.0)
+                                .show_value(false),
+                        );
                     }
 
                     ui.separator();
 
                     // Actions
-                    if ui.button(RichText::new("＋ Add Frame").strong().color(accent_c32)).clicked() {
+                    if ui
+                        .button(RichText::new("＋ Add Frame").strong().color(accent_c32))
+                        .clicked()
+                    {
                         state.add_animation_frame();
                     }
-                    if ui.button("Duplicate").on_hover_text("Duplicate Active Frame").clicked() {
+                    if ui
+                        .button("Duplicate")
+                        .on_hover_text("Duplicate Active Frame")
+                        .clicked()
+                    {
                         state.duplicate_animation_frame();
                     }
-                    if ui.button("🗑 Delete").on_hover_text("Delete Active Frame").clicked() {
+                    if ui
+                        .button("🗑 Delete")
+                        .on_hover_text("Delete Active Frame")
+                        .clicked()
+                    {
                         state.delete_animation_frame();
                     }
-                    if ui.button("🎬 Export...").on_hover_text("Export Animated GIF / WebP").clicked() {
+                    if ui
+                        .button("🎬 Export...")
+                        .on_hover_text("Export Animated GIF / WebP")
+                        .clicked()
+                    {
                         state.show_export_animation_dialog = true;
                     }
                 });
@@ -1037,21 +1328,42 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         let total_frames = state.timeline.frames.len();
                         for i in 0..total_frames {
                             let is_current = i == state.timeline.current_frame_idx;
-                            let frame_name = format!("{}: {}", i + 1, state.timeline.frames[i].name);
-                            let chip = egui::Button::new(RichText::new(frame_name).size(10.5).strong())
-                                .fill(if is_current { accent_c32.linear_multiply(0.4) } else { Color32::from_rgb(36, 31, 16) })
-                                .stroke(egui::Stroke::new(1.0_f32, if is_current { accent_c32 } else { Color32::from_rgb(75, 66, 40) }))
-                                .min_size(Vec2::new(76.0, 24.0));
+                            let frame_name =
+                                format!("{}: {}", i + 1, state.timeline.frames[i].name);
+                            let chip =
+                                egui::Button::new(RichText::new(frame_name).size(10.5).strong())
+                                    .fill(if is_current {
+                                        accent_c32.linear_multiply(0.4)
+                                    } else {
+                                        Color32::from_rgb(36, 31, 16)
+                                    })
+                                    .stroke(egui::Stroke::new(
+                                        1.0_f32,
+                                        if is_current {
+                                            accent_c32
+                                        } else {
+                                            Color32::from_rgb(75, 66, 40)
+                                        },
+                                    ))
+                                    .min_size(Vec2::new(76.0, 24.0));
                             if ui.add(chip).clicked() {
                                 state.select_animation_frame(i);
                             }
                             if i > 0 {
-                                if ui.small_button("◀").on_hover_text("Move frame left").clicked() {
+                                if ui
+                                    .small_button("◀")
+                                    .on_hover_text("Move frame left")
+                                    .clicked()
+                                {
                                     state.reorder_animation_frame(i, i - 1);
                                 }
                             }
                             if i + 1 < total_frames {
-                                if ui.small_button("▶").on_hover_text("Move frame right").clicked() {
+                                if ui
+                                    .small_button("▶")
+                                    .on_hover_text("Move frame right")
+                                    .clicked()
+                                {
                                     state.reorder_animation_frame(i, i + 1);
                                 }
                             }
@@ -1076,14 +1388,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     design::INK_SUNKEN,
                 );
                 ui.horizontal(|ui| {
-                    let dot_color = if state.is_dirty() { design::AMBER } else { design::TEAL };
+                    let dot_color = if state.is_dirty() {
+                        design::AMBER
+                    } else {
+                        design::TEAL
+                    };
                     ui.label(RichText::new("●").size(8.0).color(dot_color));
 
                     // One line only: status text must never grow the bar.
                     let status_line = state.status_message.lines().next().unwrap_or_default();
                     ui.add(
-                        egui::Label::new(RichText::new(status_line).size(11.0).color(design::TEXT_DIM))
-                            .truncate(),
+                        egui::Label::new(
+                            RichText::new(status_line)
+                                .size(11.0)
+                                .color(design::TEXT_DIM),
+                        )
+                        .truncate(),
                     );
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -1096,7 +1416,11 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             );
                         };
 
-                        metric(ui, format!("{} × {} px", state.document.width, state.document.height), design::TEXT_MUTED);
+                        metric(
+                            ui,
+                            format!("{} × {} px", state.document.width, state.document.height),
+                            design::TEXT_MUTED,
+                        );
                         if state.mask_editing && state.active_mask_available() {
                             metric(ui, "·".to_string(), design::TEXT_MUTED);
                             metric(ui, "MASK".to_string(), Color32::from_rgb(232, 110, 110));
@@ -1105,16 +1429,30 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         metric(
                             ui,
                             state.document_format_label().to_string(),
-                            if state.document.pixel_format == aurelia_core::layer::PixelFormat::Srgb16 {
+                            if state.document.pixel_format
+                                == aurelia_core::layer::PixelFormat::Srgb16
+                            {
                                 accent_c32
                             } else {
                                 design::TEXT_MUTED
                             },
                         );
                         ui.separator();
-                        metric(ui, format!("X {}  Y {}", state.cursor_canvas_pos.x.round() as i32, state.cursor_canvas_pos.y.round() as i32), design::TEXT_MUTED);
+                        metric(
+                            ui,
+                            format!(
+                                "X {}  Y {}",
+                                state.cursor_canvas_pos.x.round() as i32,
+                                state.cursor_canvas_pos.y.round() as i32
+                            ),
+                            design::TEXT_MUTED,
+                        );
                         ui.separator();
-                        metric(ui, format!("{}%", (state.zoom * 100.0).round() as i32), accent_c32);
+                        metric(
+                            ui,
+                            format!("{}%", (state.zoom * 100.0).round() as i32),
+                            accent_c32,
+                        );
                         ui.separator();
                         ui.label(
                             RichText::new(state.document_title())
@@ -2960,34 +3298,61 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(ctx.screen_rect().center())
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ctx, |ui| {
-                ui.label(RichText::new("Choose a preset or configure custom canvas dimensions:").size(11.0).color(Color32::from_rgb(210, 200, 170)));
+                ui.label(
+                    RichText::new("Choose a preset or configure custom canvas dimensions:")
+                        .size(11.0)
+                        .color(Color32::from_rgb(210, 200, 170)),
+                );
                 ui.add_space(6.0);
 
-                ui.label(RichText::new("PRESETS").size(9.5).strong().color(accent_c32));
+                ui.label(
+                    RichText::new("PRESETS")
+                        .size(9.5)
+                        .strong()
+                        .color(accent_c32),
+                );
                 ScrollArea::vertical().max_height(140.0).show(ui, |ui| {
                     for (idx, preset) in CanvasPreset::ALL.iter().enumerate() {
-                        let text = format!("{}: {} ({}×{})", preset.category, preset.name, preset.width, preset.height);
-                        if ui.selectable_label(state.new_canvas_preset_idx == idx, text).clicked() {
+                        let text = format!(
+                            "{}: {} ({}×{})",
+                            preset.category, preset.name, preset.width, preset.height
+                        );
+                        if ui
+                            .selectable_label(state.new_canvas_preset_idx == idx, text)
+                            .clicked()
+                        {
                             state.new_canvas_preset_idx = idx;
                             state.new_canvas_w = preset.width;
                             state.new_canvas_h = preset.height;
-                            state.new_canvas_aspect_ratio = preset.width as f32 / preset.height as f32;
+                            state.new_canvas_aspect_ratio =
+                                preset.width as f32 / preset.height as f32;
                         }
                     }
                 });
 
                 ui.add_space(8.0);
                 ui.separator();
-                ui.label(RichText::new("CUSTOM DIMENSIONS").size(9.5).strong().color(accent_c32));
+                ui.label(
+                    RichText::new("CUSTOM DIMENSIONS")
+                        .size(9.5)
+                        .strong()
+                        .color(accent_c32),
+                );
 
                 ui.horizontal(|ui| {
                     ui.label("Width:");
                     let mut w_str = state.new_canvas_w.to_string();
-                    if ui.add(egui::TextEdit::singleline(&mut w_str).desired_width(60.0)).changed() {
+                    if ui
+                        .add(egui::TextEdit::singleline(&mut w_str).desired_width(60.0))
+                        .changed()
+                    {
                         if let Ok(w) = w_str.parse::<u32>() {
                             state.new_canvas_w = w.clamp(16, 8192);
                             if state.new_canvas_lock_aspect && state.new_canvas_aspect_ratio > 0.0 {
-                                state.new_canvas_h = ((w as f32) / state.new_canvas_aspect_ratio).round().clamp(16.0, 8192.0) as u32;
+                                state.new_canvas_h = ((w as f32) / state.new_canvas_aspect_ratio)
+                                    .round()
+                                    .clamp(16.0, 8192.0)
+                                    as u32;
                             }
                         }
                     }
@@ -2996,11 +3361,17 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     ui.add_space(10.0);
                     ui.label("Height:");
                     let mut h_str = state.new_canvas_h.to_string();
-                    if ui.add(egui::TextEdit::singleline(&mut h_str).desired_width(60.0)).changed() {
+                    if ui
+                        .add(egui::TextEdit::singleline(&mut h_str).desired_width(60.0))
+                        .changed()
+                    {
                         if let Ok(h) = h_str.parse::<u32>() {
                             state.new_canvas_h = h.clamp(16, 8192);
                             if state.new_canvas_lock_aspect && state.new_canvas_aspect_ratio > 0.0 {
-                                state.new_canvas_w = ((h as f32) * state.new_canvas_aspect_ratio).round().clamp(16.0, 8192.0) as u32;
+                                state.new_canvas_w = ((h as f32) * state.new_canvas_aspect_ratio)
+                                    .round()
+                                    .clamp(16.0, 8192.0)
+                                    as u32;
                             }
                         }
                     }
@@ -3012,7 +3383,8 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         let tmp = state.new_canvas_w;
                         state.new_canvas_w = state.new_canvas_h;
                         state.new_canvas_h = tmp;
-                        state.new_canvas_aspect_ratio = state.new_canvas_w as f32 / state.new_canvas_h as f32;
+                        state.new_canvas_aspect_ratio =
+                            state.new_canvas_w as f32 / state.new_canvas_h as f32;
                     }
                 });
 
@@ -3048,15 +3420,17 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                 ui.add_space(12.0);
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("✦ Create Canvas").strong().color(accent_c32)).clicked() {
-                        state.pending_file_action = Some(PendingFileAction::NewCanvas(
-                            crate::state::NewCanvasSpec {
+                    if ui
+                        .button(RichText::new("✦ Create Canvas").strong().color(accent_c32))
+                        .clicked()
+                    {
+                        state.pending_file_action =
+                            Some(PendingFileAction::NewCanvas(crate::state::NewCanvasSpec {
                                 width: state.new_canvas_w,
                                 height: state.new_canvas_h,
                                 bg_mode: state.new_canvas_bg_mode,
                                 format: state.new_canvas_format,
-                            },
-                        ));
+                            }));
                         state.show_new_canvas_dialog = false;
                     }
 
@@ -3079,7 +3453,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 ui.horizontal(|ui| {
                     ui.label("New Width:");
                     let mut w_str = state.resize_canvas_w.to_string();
-                    if ui.add(egui::TextEdit::singleline(&mut w_str).desired_width(60.0)).changed() {
+                    if ui
+                        .add(egui::TextEdit::singleline(&mut w_str).desired_width(60.0))
+                        .changed()
+                    {
                         if let Ok(w) = w_str.parse::<u32>() {
                             state.resize_canvas_w = w.clamp(16, 8192);
                         }
@@ -3088,7 +3465,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                     ui.label("New Height:");
                     let mut h_str = state.resize_canvas_h.to_string();
-                    if ui.add(egui::TextEdit::singleline(&mut h_str).desired_width(60.0)).changed() {
+                    if ui
+                        .add(egui::TextEdit::singleline(&mut h_str).desired_width(60.0))
+                        .changed()
+                    {
                         if let Ok(h) = h_str.parse::<u32>() {
                             state.resize_canvas_h = h.clamp(16, 8192);
                         }
@@ -3098,20 +3478,33 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut state.resize_scale_mode, false, "Canvas Crop / Extend");
+                    ui.selectable_value(
+                        &mut state.resize_scale_mode,
+                        false,
+                        "Canvas Crop / Extend",
+                    );
                     ui.selectable_value(&mut state.resize_scale_mode, true, "Resample Scale Image");
                 });
 
                 if state.resize_scale_mode {
-                    ui.checkbox(&mut state.resize_bilinear, "Bilinear Smoothing (vs Nearest Neighbor)");
+                    ui.checkbox(
+                        &mut state.resize_bilinear,
+                        "Bilinear Smoothing (vs Nearest Neighbor)",
+                    );
                     ui.checkbox(&mut state.resize_scale_styles, "Scale Layer Styles");
                 } else {
-                    ui.checkbox(&mut state.resize_anchor_center, "Anchor Center (vs Top-Left)");
+                    ui.checkbox(
+                        &mut state.resize_anchor_center,
+                        "Anchor Center (vs Top-Left)",
+                    );
                 }
 
                 ui.add_space(12.0);
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("Apply Changes").strong().color(accent_c32)).clicked() {
+                    if ui
+                        .button(RichText::new("Apply Changes").strong().color(accent_c32))
+                        .clicked()
+                    {
                         let (nw, nh) = (state.resize_canvas_w, state.resize_canvas_h);
                         if nw > 0 && nh > 0 {
                             if state.resize_scale_mode {
@@ -3316,25 +3709,49 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     }
 
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.button("🗑 Clear").on_hover_text("Clear Scratchpad Canvas").clicked() {
+                        if ui
+                            .button("🗑 Clear")
+                            .on_hover_text("Clear Scratchpad Canvas")
+                            .clicked()
+                        {
                             state.clear_scratchpad(state.scratchpad_bg_mode);
                         }
                     });
                 });
 
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Size:").size(10.0).color(Color32::from_rgb(195, 183, 150)));
-                    ui.add(egui::Slider::new(&mut state.scratchpad_brush_size, 2.0..=64.0).suffix("px"));
+                    ui.label(
+                        RichText::new("Size:")
+                            .size(10.0)
+                            .color(Color32::from_rgb(195, 183, 150)),
+                    );
+                    ui.add(
+                        egui::Slider::new(&mut state.scratchpad_brush_size, 2.0..=64.0)
+                            .suffix("px"),
+                    );
 
                     ui.separator();
-                    ui.label(RichText::new("Canvas:").size(10.0).color(Color32::from_rgb(195, 183, 150)));
-                    if ui.selectable_label(state.scratchpad_bg_mode == 0, "Dark").clicked() {
+                    ui.label(
+                        RichText::new("Canvas:")
+                            .size(10.0)
+                            .color(Color32::from_rgb(195, 183, 150)),
+                    );
+                    if ui
+                        .selectable_label(state.scratchpad_bg_mode == 0, "Dark")
+                        .clicked()
+                    {
                         state.clear_scratchpad(0);
                     }
-                    if ui.selectable_label(state.scratchpad_bg_mode == 1, "White").clicked() {
+                    if ui
+                        .selectable_label(state.scratchpad_bg_mode == 1, "White")
+                        .clicked()
+                    {
                         state.clear_scratchpad(1);
                     }
-                    if ui.selectable_label(state.scratchpad_bg_mode == 2, "Grid").clicked() {
+                    if ui
+                        .selectable_label(state.scratchpad_bg_mode == 2, "Grid")
+                        .clicked()
+                    {
                         state.clear_scratchpad(2);
                     }
                 });
@@ -3345,7 +3762,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 let avail_w = ui.available_width().max(100.0);
                 let avail_h = (ui.available_height() - 4.0).max(100.0);
                 let pad_size = avail_w.min(avail_h);
-                let (rect, response) = ui.allocate_exact_size(egui::vec2(pad_size, pad_size), egui::Sense::click_and_drag());
+                let (rect, response) = ui.allocate_exact_size(
+                    egui::vec2(pad_size, pad_size),
+                    egui::Sense::click_and_drag(),
+                );
 
                 if let Some(tex) = &state.scratchpad_texture {
                     let painter = ui.painter_at(rect);
@@ -3358,7 +3778,11 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                         Color32::WHITE,
                     );
-                    painter.rect_stroke(rect, 4.0, egui::Stroke::new(1.0_f32, Color32::from_rgb(100, 87, 50)));
+                    painter.rect_stroke(
+                        rect,
+                        4.0,
+                        egui::Stroke::new(1.0_f32, Color32::from_rgb(100, 87, 50)),
+                    );
                 }
 
                 // Interaction Handling
@@ -3373,7 +3797,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         let is_alt = ui.input(|i| i.modifiers.alt);
                         if is_alt || state.scratchpad_mode == 2 {
                             if response.clicked() || response.dragged() {
-                                state.sample_scratchpad_pixel(sp_x.round() as u32, sp_y.round() as u32);
+                                state.sample_scratchpad_pixel(
+                                    sp_x.round() as u32,
+                                    sp_y.round() as u32,
+                                );
                             }
                         } else if response.drag_started() {
                             state.paint_scratchpad_point(current_pt, None, 1.0);
@@ -3412,18 +3839,36 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_hue_shift, -180.0..=180.0).text("Hue (°)")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_saturation_scale, 0.0..=2.5).text("Saturation")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_lightness_shift, -0.8..=0.8).text("Lightness")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_hue_shift, -180.0..=180.0)
+                                .text("Hue (°)"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_saturation_scale, 0.0..=2.5)
+                                .text("Saturation"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_lightness_shift, -0.8..=0.8)
+                                .text("Lightness"),
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("✓ Apply").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("✓ Apply").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
                         if ui.button("Cancel").clicked() {
@@ -3433,10 +3878,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::adjust_hsl_layer(layer, 
+                        aurelia_core::filter::adjust_hsl_layer(
+                            layer,
                             state.filter_hue_shift,
                             state.filter_saturation_scale,
                             state.filter_lightness_shift,
@@ -3463,17 +3912,30 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_brightness, -80.0..=80.0).text("Brightness")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_contrast, -80.0..=80.0).text("Contrast")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_brightness, -80.0..=80.0)
+                                .text("Brightness"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_contrast, -80.0..=80.0)
+                                .text("Contrast"),
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("✓ Apply").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("✓ Apply").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
                         if ui.button("Cancel").clicked() {
@@ -3483,10 +3945,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::adjust_brightness_contrast_layer(layer, 
+                        aurelia_core::filter::adjust_brightness_contrast_layer(
+                            layer,
                             state.filter_brightness,
                             state.filter_contrast,
                             sel_mask.as_ref(),
@@ -3512,18 +3978,36 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_cyan_red, -80.0..=80.0).text("Cyan / Red")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_magenta_green, -80.0..=80.0).text("Magenta / Green")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_yellow_blue, -80.0..=80.0).text("Yellow / Blue")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_cyan_red, -80.0..=80.0)
+                                .text("Cyan / Red"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_magenta_green, -80.0..=80.0)
+                                .text("Magenta / Green"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_yellow_blue, -80.0..=80.0)
+                                .text("Yellow / Blue"),
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("✓ Apply").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("✓ Apply").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
                         if ui.button("Cancel").clicked() {
@@ -3533,10 +4017,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::adjust_color_balance_layer(layer, 
+                        aurelia_core::filter::adjust_color_balance_layer(
+                            layer,
                             state.filter_cyan_red,
                             state.filter_magenta_green,
                             state.filter_yellow_blue,
@@ -3563,23 +4051,46 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_posterize_levels, 2..=24).text("Posterize Levels")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_threshold_val, 1..=254).text("B&W Threshold")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_posterize_levels, 2..=24)
+                                .text("Posterize Levels"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_threshold_val, 1..=254)
+                                .text("B&W Threshold"),
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("Apply Posterize").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("Apply Posterize").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
-                        if ui.button(RichText::new("Apply Threshold").strong()).clicked() {
-                            if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                        if ui
+                            .button(RichText::new("Apply Threshold").strong())
+                            .clicked()
+                        {
+                            if let (Some(orig), Some(layer)) = (
+                                &state.filter_original_pixels,
+                                state.document.active_layer_mut(),
+                            ) {
                                 layer.write_storage_bytes(0, orig);
-                                aurelia_core::filter::filter_threshold_layer(layer, state.filter_threshold_val, sel_mask.as_ref());
+                                aurelia_core::filter::filter_threshold_layer(
+                                    layer,
+                                    state.filter_threshold_val,
+                                    sel_mask.as_ref(),
+                                );
                             }
                             state.apply_filter_modal("Threshold");
                             return;
@@ -3591,10 +4102,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::filter_posterize_layer(layer, 
+                        aurelia_core::filter::filter_posterize_layer(
+                            layer,
                             state.filter_posterize_levels,
                             sel_mask.as_ref(),
                         );
@@ -3619,16 +4134,24 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_blur_radius, 1.0..=32.0).text("Blur Radius (px)")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_blur_radius, 1.0..=32.0)
+                                .text("Blur Radius (px)"),
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("✓ Apply").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("✓ Apply").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
                         if ui.button("Cancel").clicked() {
@@ -3638,10 +4161,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::filter_gaussian_blur_layer(layer, 
+                        aurelia_core::filter::filter_gaussian_blur_layer(
+                            layer,
                             state.filter_blur_radius,
                             sel_mask.as_ref(),
                         );
@@ -3666,29 +4193,59 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.label(RichText::new("Sharpen Amount:").size(10.0));
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_sharpen_amount, 0.1..=2.5).text("Sharpen")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_sharpen_amount, 0.1..=2.5)
+                                .text("Sharpen"),
+                        )
+                        .changed();
 
                     ui.separator();
                     ui.label(RichText::new("Unsharp Mask Parameters:").size(10.0));
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_unsharp_radius, 1.0..=8.0).text("Radius")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_unsharp_amount, 0.2..=2.5).text("Amount")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_unsharp_threshold, 0.0..=20.0).text("Threshold")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_unsharp_radius, 1.0..=8.0)
+                                .text("Radius"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_unsharp_amount, 0.2..=2.5)
+                                .text("Amount"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_unsharp_threshold, 0.0..=20.0)
+                                .text("Threshold"),
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("Apply Sharpen").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("Apply Sharpen").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
-                        if ui.button(RichText::new("Apply Unsharp Mask").strong()).clicked() {
-                            if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                        if ui
+                            .button(RichText::new("Apply Unsharp Mask").strong())
+                            .clicked()
+                        {
+                            if let (Some(orig), Some(layer)) = (
+                                &state.filter_original_pixels,
+                                state.document.active_layer_mut(),
+                            ) {
                                 layer.write_storage_bytes(0, orig);
-                                aurelia_core::filter::filter_unsharp_mask_layer(layer, 
+                                aurelia_core::filter::filter_unsharp_mask_layer(
+                                    layer,
                                     state.filter_unsharp_radius,
                                     state.filter_unsharp_amount,
                                     state.filter_unsharp_threshold,
@@ -3705,10 +4262,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::filter_sharpen_layer(layer, 
+                        aurelia_core::filter::filter_sharpen_layer(
+                            layer,
                             state.filter_sharpen_amount,
                             sel_mask.as_ref(),
                         );
@@ -3733,17 +4294,30 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_noise_intensity, 0.05..=0.8).text("Intensity")).changed();
-                    changed |= ui.checkbox(&mut state.filter_noise_colored, "Chromatic (RGB Color Noise)").changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_noise_intensity, 0.05..=0.8)
+                                .text("Intensity"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .checkbox(
+                            &mut state.filter_noise_colored,
+                            "Chromatic (RGB Color Noise)",
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("✓ Apply").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("✓ Apply").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
                         if ui.button("Cancel").clicked() {
@@ -3753,10 +4327,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::filter_film_grain_layer(layer, 
+                        aurelia_core::filter::filter_film_grain_layer(
+                            layer,
                             state.filter_noise_intensity,
                             state.filter_noise_colored,
                             sel_mask.as_ref(),
@@ -3782,30 +4360,65 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .collapsible(false)
                 .resizable(false)
                 .default_pos(ctx.screen_rect().center())
-            .pivot(egui::Align2::CENTER_CENTER)
+                .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.label(RichText::new("Vignette Settings:").size(10.0));
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_vignette_radius, 0.2..=1.4).text("Radius")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_vignette_softness, 0.1..=1.0).text("Softness")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_vignette_darkness, 0.1..=1.0).text("Darkness")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_vignette_radius, 0.2..=1.4)
+                                .text("Radius"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_vignette_softness, 0.1..=1.0)
+                                .text("Softness"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_vignette_darkness, 0.1..=1.0)
+                                .text("Darkness"),
+                        )
+                        .changed();
 
                     ui.separator();
                     ui.label(RichText::new("Chromatic Lens Aberration:").size(10.0));
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_chromatic_shift, 1.0..=18.0).text("Shift (px)")).changed();
-                    changed |= ui.add(egui::Slider::new(&mut state.filter_chromatic_angle, 0.0..=360.0).text("Angle (°)")).changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_chromatic_shift, 1.0..=18.0)
+                                .text("Shift (px)"),
+                        )
+                        .changed();
+                    changed |= ui
+                        .add(
+                            egui::Slider::new(&mut state.filter_chromatic_angle, 0.0..=360.0)
+                                .text("Angle (°)"),
+                        )
+                        .changed();
 
                     ui.add_space(8.0);
                     ui.checkbox(&mut state.filter_preview_active, "Live Preview");
 
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
-                        if ui.button(RichText::new("Apply Vignette").strong().color(accent_c32)).clicked() {
+                        if ui
+                            .button(RichText::new("Apply Vignette").strong().color(accent_c32))
+                            .clicked()
+                        {
                             do_apply = true;
                         }
-                        if ui.button(RichText::new("Apply Chromatic Aberration").strong()).clicked() {
-                            if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                        if ui
+                            .button(RichText::new("Apply Chromatic Aberration").strong())
+                            .clicked()
+                        {
+                            if let (Some(orig), Some(layer)) = (
+                                &state.filter_original_pixels,
+                                state.document.active_layer_mut(),
+                            ) {
                                 layer.write_storage_bytes(0, orig);
-                                aurelia_core::filter::filter_chromatic_aberration_layer(layer, 
+                                aurelia_core::filter::filter_chromatic_aberration_layer(
+                                    layer,
                                     state.filter_chromatic_shift,
                                     state.filter_chromatic_angle,
                                     sel_mask.as_ref(),
@@ -3821,10 +4434,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
 
             if changed || state.filter_preview_active {
-                if let (Some(orig), Some(layer)) = (&state.filter_original_pixels, state.document.active_layer_mut()) {
+                if let (Some(orig), Some(layer)) = (
+                    &state.filter_original_pixels,
+                    state.document.active_layer_mut(),
+                ) {
                     layer.write_storage_bytes(0, orig);
                     if state.filter_preview_active {
-                        aurelia_core::filter::filter_vignette_layer(layer, 
+                        aurelia_core::filter::filter_vignette_layer(
+                            layer,
                             state.filter_vignette_radius,
                             state.filter_vignette_softness,
                             state.filter_vignette_darkness,
@@ -3854,13 +4471,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_levels_black, 0.0..=0.9).text("Black point"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_levels_black, 0.0..=0.9)
+                                .text("Black point"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_levels_white, 0.1..=1.0).text("White point"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_levels_white, 0.1..=1.0)
+                                .text("White point"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_levels_gamma, 0.2..=3.0).text("Midtone gamma"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_levels_gamma, 0.2..=3.0)
+                                .text("Midtone gamma"),
+                        )
                         .changed();
 
                     ui.add_space(8.0);
@@ -3889,7 +4515,13 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 );
                 restore_and_preview(state, |layer| {
                     if preview {
-                        aurelia_core::filter::filter_levels_layer(layer, black, white, gamma, sel.as_ref());
+                        aurelia_core::filter::filter_levels_layer(
+                            layer,
+                            black,
+                            white,
+                            gamma,
+                            sel.as_ref(),
+                        );
                     }
                 });
             }
@@ -3914,10 +4546,16 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_colorize_hue, 0.0..=360.0).text("Hue"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_colorize_hue, 0.0..=360.0)
+                                .text("Hue"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_colorize_saturation, 0.0..=1.0).text("Saturation"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_colorize_saturation, 0.0..=1.0)
+                                .text("Saturation"),
+                        )
                         .changed();
 
                     ui.add_space(8.0);
@@ -3967,7 +4605,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_pixelate_block, 2..=64).text("Block size"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_pixelate_block, 2..=64)
+                                .text("Block size"),
+                        )
                         .changed();
 
                     ui.add_space(8.0);
@@ -4017,10 +4658,16 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_motion_distance, 1..=64).text("Distance (px)"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_motion_distance, 1..=64)
+                                .text("Distance (px)"),
+                        )
                         .changed();
                     changed |= ui
-                        .add(egui::Slider::new(&mut state.filter_motion_angle, 0.0..=180.0).text("Angle (°)"))
+                        .add(
+                            egui::Slider::new(&mut state.filter_motion_angle, 0.0..=180.0)
+                                .text("Angle (°)"),
+                        )
                         .changed();
 
                     ui.add_space(8.0);
@@ -4028,7 +4675,11 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
                         if ui
-                            .button(RichText::new("Apply Motion Blur").strong().color(accent_c32))
+                            .button(
+                                RichText::new("Apply Motion Blur")
+                                    .strong()
+                                    .color(accent_c32),
+                            )
                             .clicked()
                         {
                             do_apply = true;
@@ -4045,7 +4696,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 let (dist, angle) = (state.filter_motion_distance, state.filter_motion_angle);
                 restore_and_preview(state, |layer| {
                     if preview {
-                        aurelia_core::filter::filter_motion_blur_layer(layer, dist, angle, sel.as_ref());
+                        aurelia_core::filter::filter_motion_blur_layer(
+                            layer,
+                            dist,
+                            angle,
+                            sel.as_ref(),
+                        );
                     }
                 });
             }
@@ -4112,7 +4768,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
         let screen_pivot = to_screen_pos(tf.pivot + tf.translation);
 
         // Render Gizmo lines & handles using foreground painter
-        let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("transform_gizmo_layer")));
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            egui::Id::new("transform_gizmo_layer"),
+        ));
 
         let border_stroke = egui::Stroke::new(1.5_f32, Color32::from_rgb(236, 167, 19));
         painter.line_segment([screen_corners[0], screen_corners[1]], border_stroke);
@@ -4144,16 +4803,30 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
         // Rotation Handle (Circle)
         painter.circle_filled(screen_stem, 5.5_f32, Color32::from_rgb(236, 167, 19));
-        painter.circle_stroke(screen_stem, 5.5_f32, egui::Stroke::new(1.5_f32, Color32::from_rgb(255, 255, 255)));
+        painter.circle_stroke(
+            screen_stem,
+            5.5_f32,
+            egui::Stroke::new(1.5_f32, Color32::from_rgb(255, 255, 255)),
+        );
 
         // Pivot Handle (Crosshair circle)
-        painter.circle_stroke(screen_pivot, 6.0_f32, egui::Stroke::new(1.2_f32, Color32::from_rgb(255, 180, 0)));
-        painter.line_segment(
-            [screen_pivot - egui::vec2(8.0, 0.0), screen_pivot + egui::vec2(8.0, 0.0)],
+        painter.circle_stroke(
+            screen_pivot,
+            6.0_f32,
             egui::Stroke::new(1.2_f32, Color32::from_rgb(255, 180, 0)),
         );
         painter.line_segment(
-            [screen_pivot - egui::vec2(0.0, 8.0), screen_pivot + egui::vec2(0.0, 8.0)],
+            [
+                screen_pivot - egui::vec2(8.0, 0.0),
+                screen_pivot + egui::vec2(8.0, 0.0),
+            ],
+            egui::Stroke::new(1.2_f32, Color32::from_rgb(255, 180, 0)),
+        );
+        painter.line_segment(
+            [
+                screen_pivot - egui::vec2(0.0, 8.0),
+                screen_pivot + egui::vec2(0.0, 8.0),
+            ],
             egui::Stroke::new(1.2_f32, Color32::from_rgb(255, 180, 0)),
         );
 
@@ -4170,39 +4843,78 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     .inner_margin(8.0)
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new("✦ TRANSFORM").strong().color(Color32::from_rgb(236, 167, 19)));
+                            ui.label(
+                                RichText::new("✦ TRANSFORM")
+                                    .strong()
+                                    .color(Color32::from_rgb(236, 167, 19)),
+                            );
                             ui.separator();
 
-                            if ui.button(RichText::new("✓ Apply (Enter)").strong().color(Color32::from_rgb(101, 219, 203))).clicked() {
+                            if ui
+                                .button(
+                                    RichText::new("✓ Apply (Enter)")
+                                        .strong()
+                                        .color(Color32::from_rgb(101, 219, 203)),
+                                )
+                                .clicked()
+                            {
                                 state.commit_transform_session();
                                 return;
                             }
-                            if ui.button(RichText::new("✕ Cancel (Esc)").strong().color(Color32::from_rgb(255, 100, 100))).clicked() {
+                            if ui
+                                .button(
+                                    RichText::new("✕ Cancel (Esc)")
+                                        .strong()
+                                        .color(Color32::from_rgb(255, 100, 100)),
+                                )
+                                .clicked()
+                            {
                                 state.cancel_transform_session();
                                 return;
                             }
 
                             ui.separator();
 
-                            let mut rot_deg = state.transform_session.transform.rotation_rad.to_degrees();
-                            if ui.add(egui::DragValue::new(&mut rot_deg).speed(0.5).prefix("Angle: ").suffix("°")).changed() {
-                                state.transform_session.transform.rotation_rad = rot_deg.to_radians();
+                            let mut rot_deg =
+                                state.transform_session.transform.rotation_rad.to_degrees();
+                            if ui
+                                .add(
+                                    egui::DragValue::new(&mut rot_deg)
+                                        .speed(0.5)
+                                        .prefix("Angle: ")
+                                        .suffix("°"),
+                                )
+                                .changed()
+                            {
+                                state.transform_session.transform.rotation_rad =
+                                    rot_deg.to_radians();
                                 state.update_transform_preview();
                             }
 
                             let mut scale_pct = state.transform_session.transform.scale.x * 100.0;
-                            if ui.add(egui::DragValue::new(&mut scale_pct).speed(1.0).range(5.0..=500.0).prefix("Scale: ").suffix("%")).changed() {
+                            if ui
+                                .add(
+                                    egui::DragValue::new(&mut scale_pct)
+                                        .speed(1.0)
+                                        .range(5.0..=500.0)
+                                        .prefix("Scale: ")
+                                        .suffix("%"),
+                                )
+                                .changed()
+                            {
                                 let s = scale_pct / 100.0;
                                 state.transform_session.transform.scale = glam::Vec2::new(s, s);
                                 state.update_transform_preview();
                             }
 
                             if ui.button("⇄ Flip H").clicked() {
-                                state.transform_session.transform.flip_h = !state.transform_session.transform.flip_h;
+                                state.transform_session.transform.flip_h =
+                                    !state.transform_session.transform.flip_h;
                                 state.update_transform_preview();
                             }
                             if ui.button("⇅ Flip V").clicked() {
-                                state.transform_session.transform.flip_v = !state.transform_session.transform.flip_v;
+                                state.transform_session.transform.flip_v =
+                                    !state.transform_session.transform.flip_v;
                                 state.update_transform_preview();
                             }
                         });
@@ -4216,7 +4928,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             let win_size = ctx.screen_rect().size();
             let win_w = win_size.x;
             let win_h = win_size.y;
-            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("selection_boundary_layer")));
+            let painter = ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Foreground,
+                egui::Id::new("selection_boundary_layer"),
+            ));
 
             let time = ctx.input(|i| i.time);
             let phase = (time * 6.0).fract() as f32;
@@ -4228,7 +4943,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 let s1 = state.canvas_to_ui(p1, win_w, win_h);
                 let is_pri = (((i as f32) * 0.5 + phase * 4.0) as usize) % 2 == 0;
                 let stroke_c = if is_pri { c_pri } else { c_sec };
-                painter.line_segment([egui::pos2(s0.x, s0.y), egui::pos2(s1.x, s1.y)], egui::Stroke::new(1.3_f32, stroke_c));
+                painter.line_segment(
+                    [egui::pos2(s0.x, s0.y), egui::pos2(s1.x, s1.y)],
+                    egui::Stroke::new(1.3_f32, stroke_c),
+                );
             }
             ctx.request_repaint();
 
@@ -4246,7 +4964,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             .inner_margin(6.0)
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.label(RichText::new("✦ SELECTION").size(10.5).strong().color(Color32::from_rgb(236, 167, 19)));
+                                    ui.label(
+                                        RichText::new("✦ SELECTION")
+                                            .size(10.5)
+                                            .strong()
+                                            .color(Color32::from_rgb(236, 167, 19)),
+                                    );
                                     ui.separator();
                                     // Sticky combine mode, editable where the selection lives (#36).
                                     egui::ComboBox::from_id_source("selection_combine_mode")
@@ -4257,9 +4980,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         ))
                                         .width(96.0)
                                         .show_ui(ui, |ui| {
-                                            for mode in aurelia_core::selection::SelectionCombineMode::ALL {
+                                            for mode in
+                                                aurelia_core::selection::SelectionCombineMode::ALL
+                                            {
                                                 if ui
-                                                    .selectable_label(state.selection_mode == mode, mode.label())
+                                                    .selectable_label(
+                                                        state.selection_mode == mode,
+                                                        mode.label(),
+                                                    )
                                                     .clicked()
                                                 {
                                                     state.selection_mode = mode;
@@ -4267,7 +4995,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                             }
                                         });
                                     ui.separator();
-                                    if ui.button(RichText::new("Fill").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                                    if ui
+                                        .button(
+                                            RichText::new("Fill")
+                                                .strong()
+                                                .color(Color32::from_rgb(117, 223, 209)),
+                                        )
+                                        .clicked()
+                                    {
                                         state.fill_selection_active_layer();
                                     }
                                     if ui.button("Stroke...").clicked() {
@@ -4277,7 +5012,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         state.show_feather_dialog = true;
                                     }
                                     ui.separator();
-                                    if ui.button(RichText::new("✕ Deselect (Ctrl+D)").strong().color(Color32::from_rgb(255, 120, 120))).clicked() {
+                                    if ui
+                                        .button(
+                                            RichText::new("✕ Deselect (Ctrl+D)")
+                                                .strong()
+                                                .color(Color32::from_rgb(255, 120, 120)),
+                                        )
+                                        .clicked()
+                                    {
                                         state.selection = None;
                                         state.set_status("Deselected");
                                     }
@@ -4321,10 +5063,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             let (win_w, win_h) = screen_px(ctx);
             let p0 = state.canvas_to_ui(glam::Vec2::ZERO, win_w, win_h);
             let p1 = state.canvas_to_ui(
-                glam::Vec2::new(
-                    state.document.width as f32,
-                    state.document.height as f32,
-                ),
+                glam::Vec2::new(state.document.width as f32, state.document.height as f32),
                 win_w,
                 win_h,
             );
@@ -4342,10 +5081,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .with_clip_rect(clip.intersect(ctx.screen_rect()));
             painter.image(
                 texture.id(),
-                egui::Rect::from_min_max(
-                    egui::pos2(p0.x, p0.y),
-                    egui::pos2(p1.x, p1.y),
-                ),
+                egui::Rect::from_min_max(egui::pos2(p0.x, p0.y), egui::pos2(p1.x, p1.y)),
                 egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                 Color32::WHITE,
             );
@@ -4357,7 +5093,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
         let win_size = ctx.screen_rect().size();
         let win_w = win_size.x;
         let win_h = win_size.y;
-        let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("lasso_preview_layer")));
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            egui::Id::new("lasso_preview_layer"),
+        ));
         let stroke = egui::Stroke::new(1.5_f32, Color32::from_rgb(236, 167, 19));
 
         for i in 0..state.lasso_points.len() - 1 {
@@ -4369,7 +5108,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             let p_last = state.canvas_to_ui(*state.lasso_points.last().unwrap(), win_w, win_h);
             let p_first = state.canvas_to_ui(state.lasso_points[0], win_w, win_h);
             painter.line_segment(
-                [egui::pos2(p_last.x, p_last.y), egui::pos2(p_first.x, p_first.y)],
+                [
+                    egui::pos2(p_last.x, p_last.y),
+                    egui::pos2(p_first.x, p_first.y),
+                ],
                 egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(0, 240, 255, 120)),
             );
         }
@@ -4377,7 +5119,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
     // ── 9.5.5 GIMP-STYLE INTERACTIVE ON-CANVAS TEXT BOX & FLOATING HUD TOOLBAR ──
     let active_text_config = if let Some(active_id) = state.active_text_layer_id {
-        state.document.get_layer(active_id).and_then(|l| l.text.clone())
+        state
+            .document
+            .get_layer(active_id)
+            .and_then(|l| l.text.clone())
     } else if let Some(active_layer) = state.document.active_layer() {
         if active_layer.is_text() {
             active_layer.text.clone()
@@ -4393,7 +5138,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             let win_size = ctx.screen_rect().size();
             let win_w = win_size.x;
             let win_h = win_size.y;
-            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("text_canvas_overlay_layer")));
+            let painter = ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Foreground,
+                egui::Id::new("text_canvas_overlay_layer"),
+            ));
 
             // Compute canvas bounds of the text box
             let font = state.text_font.as_ref();
@@ -4416,15 +5164,26 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 (120.0, config.font_size)
             };
 
-            let text_box_w = if config.box_w > 0.0 { config.box_w } else { measured_w.max(60.0) };
-            let text_box_h = if config.box_h > 0.0 { config.box_h } else { measured_h.max(config.font_size) };
+            let text_box_w = if config.box_w > 0.0 {
+                config.box_w
+            } else {
+                measured_w.max(60.0)
+            };
+            let text_box_h = if config.box_h > 0.0 {
+                config.box_h
+            } else {
+                measured_h.max(config.font_size)
+            };
 
             let top_left = glam::Vec2::new(config.pos_x, config.pos_y);
             let bottom_right = top_left + glam::Vec2::new(text_box_w, text_box_h);
 
             let s_min = state.canvas_to_ui(top_left, win_w, win_h);
             let s_max = state.canvas_to_ui(bottom_right, win_w, win_h);
-            let screen_rect = egui::Rect::from_min_max(egui::pos2(s_min.x, s_min.y), egui::pos2(s_max.x, s_max.y));
+            let screen_rect = egui::Rect::from_min_max(
+                egui::pos2(s_min.x, s_min.y),
+                egui::pos2(s_max.x, s_max.y),
+            );
 
             // Draw crisp bounding outline with handles
             painter.rect_stroke(
@@ -4443,9 +5202,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             ];
 
             for &corner in &corners {
-                let handle_rect = egui::Rect::from_center_size(corner, egui::vec2(handle_size, handle_size));
+                let handle_rect =
+                    egui::Rect::from_center_size(corner, egui::vec2(handle_size, handle_size));
                 painter.rect_filled(handle_rect, 1.5, Color32::from_rgb(255, 255, 255));
-                painter.rect_stroke(handle_rect, 1.5, egui::Stroke::new(1.0_f32, Color32::from_rgb(236, 167, 19)));
+                painter.rect_stroke(
+                    handle_rect,
+                    1.5,
+                    egui::Stroke::new(1.0_f32, Color32::from_rgb(236, 167, 19)),
+                );
             }
 
             // Interactive On-Canvas Editable Text Box Frame
@@ -4458,7 +5222,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 .show(ctx, |ui| {
                     egui::Frame::none()
                         .fill(Color32::from_rgba_unmultiplied(8, 12, 24, 160))
-                        .stroke(egui::Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(0, 240, 255, 100)))
+                        .stroke(egui::Stroke::new(
+                            1.0_f32,
+                            Color32::from_rgba_unmultiplied(0, 240, 255, 100),
+                        ))
                         .rounding(3.0)
                         .inner_margin(3.0)
                         .show(ui, |ui| {
@@ -4477,7 +5244,8 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             // Floating GIMP-Style On-Canvas Formatting HUD Toolbar
             if state.show_ui_panels {
                 let hud_w = 520.0_f32;
-                let hud_x = (screen_rect.min.x + (screen_rect.width() - hud_w) * 0.5).clamp(230.0, (win_w - hud_w - 250.0).max(230.0));
+                let hud_x = (screen_rect.min.x + (screen_rect.width() - hud_w) * 0.5)
+                    .clamp(230.0, (win_w - hud_w - 250.0).max(230.0));
                 let hud_y = (screen_rect.min.y - 48.0).clamp(42.0, win_h - 90.0);
 
                 egui::Area::new("text_floating_hud_area".into())
@@ -4491,12 +5259,24 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             .inner_margin(6.0)
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.label(RichText::new("🔤 TEXT").size(10.5).strong().color(Color32::from_rgb(236, 167, 19)));
+                                    ui.label(
+                                        RichText::new("🔤 TEXT")
+                                            .size(10.5)
+                                            .strong()
+                                            .color(Color32::from_rgb(236, 167, 19)),
+                                    );
                                     ui.separator();
 
                                     // Inline Text Editor
                                     let mut hud_content = state.text.content.clone();
-                                    if ui.add(egui::TextEdit::singleline(&mut hud_content).hint_text("Edit text...").desired_width(110.0)).changed() {
+                                    if ui
+                                        .add(
+                                            egui::TextEdit::singleline(&mut hud_content)
+                                                .hint_text("Edit text...")
+                                                .desired_width(110.0),
+                                        )
+                                        .changed()
+                                    {
                                         state.text.content = hud_content;
                                         state.sync_active_text_layer();
                                     }
@@ -4505,7 +5285,15 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                                     // Font size
                                     let mut fs = state.text.font_size;
-                                    if ui.add(egui::DragValue::new(&mut fs).speed(0.5).range(6.0..=240.0).prefix("Size: ")).changed() {
+                                    if ui
+                                        .add(
+                                            egui::DragValue::new(&mut fs)
+                                                .speed(0.5)
+                                                .range(6.0..=240.0)
+                                                .prefix("Size: "),
+                                        )
+                                        .changed()
+                                    {
                                         state.text.font_size = fs;
                                         state.sync_active_text_layer();
                                     }
@@ -4514,9 +5302,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                                     // Color swatch
                                     let rgba = state.brush.primary_color.to_rgba8();
-                                    let mut c32 = Color32::from_rgba_premultiplied(rgba[0], rgba[1], rgba[2], rgba[3]);
+                                    let mut c32 = Color32::from_rgba_premultiplied(
+                                        rgba[0], rgba[1], rgba[2], rgba[3],
+                                    );
                                     if ui.color_edit_button_srgba(&mut c32).changed() {
-                                        state.brush.primary_color = Color::from_rgba8(c32.r(), c32.g(), c32.b(), c32.a());
+                                        state.brush.primary_color =
+                                            Color::from_rgba8(c32.r(), c32.g(), c32.b(), c32.a());
                                         state.sync_active_text_layer();
                                     }
 
@@ -4524,7 +5315,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                                     // Alignment
                                     for &align in aurelia_core::brush::TextAlign::ALL {
-                                        if ui.selectable_label(state.text.align == align, align.icon()).on_hover_text(align.label()).clicked() {
+                                        if ui
+                                            .selectable_label(
+                                                state.text.align == align,
+                                                align.icon(),
+                                            )
+                                            .on_hover_text(align.label())
+                                            .clicked()
+                                        {
                                             state.text.align = align;
                                             state.sync_active_text_layer();
                                         }
@@ -4533,9 +5331,19 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                     ui.separator();
 
                                     // Custom font button
-                                    if ui.button("📂 Font").on_hover_text(format!("Current: {}\nClick to load custom TTF/OTF", state.text.font_name)).clicked() {
+                                    if ui
+                                        .button("📂 Font")
+                                        .on_hover_text(format!(
+                                            "Current: {}\nClick to load custom TTF/OTF",
+                                            state.text.font_name
+                                        ))
+                                        .clicked()
+                                    {
                                         if let Some(path) = rfd::FileDialog::new()
-                                            .add_filter("Font Files (*.ttf, *.otf)", &["ttf", "otf"])
+                                            .add_filter(
+                                                "Font Files (*.ttf, *.otf)",
+                                                &["ttf", "otf"],
+                                            )
                                             .pick_file()
                                         {
                                             state.load_custom_font(&path.to_string_lossy());
@@ -4544,11 +5352,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                                     ui.separator();
 
-                                    if ui.button(RichText::new("⎘ Rasterize").size(10.0)).on_hover_text("Convert into standard bitmap layer").clicked() {
+                                    if ui
+                                        .button(RichText::new("⎘ Rasterize").size(10.0))
+                                        .on_hover_text("Convert into standard bitmap layer")
+                                        .clicked()
+                                    {
                                         state.rasterize_active_text_layer();
                                     }
 
-                                    if ui.button(RichText::new("✓ Done").strong().color(Color32::from_rgb(101, 219, 203))).clicked() {
+                                    if ui
+                                        .button(
+                                            RichText::new("✓ Done")
+                                                .strong()
+                                                .color(Color32::from_rgb(101, 219, 203)),
+                                        )
+                                        .clicked()
+                                    {
                                         state.active_text_layer_id = None;
                                     }
                                 });
@@ -4568,11 +5387,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(ctx.screen_rect().center())
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ctx, |ui| {
-                ui.label(RichText::new("Feather Radius (px):").size(11.0).color(Color32::from_rgb(240, 231, 205)));
+                ui.label(
+                    RichText::new("Feather Radius (px):")
+                        .size(11.0)
+                        .color(Color32::from_rgb(240, 231, 205)),
+                );
                 ui.add(egui::Slider::new(&mut state.feather_radius, 1..=50).text("px"));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("✓ Apply Feather").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                    if ui
+                        .button(
+                            RichText::new("✓ Apply Feather")
+                                .strong()
+                                .color(Color32::from_rgb(117, 223, 209)),
+                        )
+                        .clicked()
+                    {
                         let r = state.feather_radius;
                         state.feather_selection(r);
                         state.show_feather_dialog = false;
@@ -4593,11 +5423,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(ctx.screen_rect().center())
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ctx, |ui| {
-                ui.label(RichText::new("Expand By (px):").size(11.0).color(Color32::from_rgb(240, 231, 205)));
+                ui.label(
+                    RichText::new("Expand By (px):")
+                        .size(11.0)
+                        .color(Color32::from_rgb(240, 231, 205)),
+                );
                 ui.add(egui::Slider::new(&mut state.expand_radius, 1..=50).text("px"));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("✓ Apply Expand").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                    if ui
+                        .button(
+                            RichText::new("✓ Apply Expand")
+                                .strong()
+                                .color(Color32::from_rgb(117, 223, 209)),
+                        )
+                        .clicked()
+                    {
                         let r = state.expand_radius;
                         state.expand_selection(r);
                         state.show_expand_dialog = false;
@@ -4618,11 +5459,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(ctx.screen_rect().center())
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ctx, |ui| {
-                ui.label(RichText::new("Contract By (px):").size(11.0).color(Color32::from_rgb(240, 231, 205)));
+                ui.label(
+                    RichText::new("Contract By (px):")
+                        .size(11.0)
+                        .color(Color32::from_rgb(240, 231, 205)),
+                );
                 ui.add(egui::Slider::new(&mut state.contract_radius, 1..=50).text("px"));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("✓ Apply Contract").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                    if ui
+                        .button(
+                            RichText::new("✓ Apply Contract")
+                                .strong()
+                                .color(Color32::from_rgb(117, 223, 209)),
+                        )
+                        .clicked()
+                    {
                         let r = state.contract_radius;
                         state.contract_selection(r);
                         state.show_contract_dialog = false;
@@ -4643,10 +5495,18 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(ctx.screen_rect().center())
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ctx, |ui| {
-                ui.label(RichText::new("Stroke Width (px):").size(11.0).color(Color32::from_rgb(240, 231, 205)));
+                ui.label(
+                    RichText::new("Stroke Width (px):")
+                        .size(11.0)
+                        .color(Color32::from_rgb(240, 231, 205)),
+                );
                 ui.add(egui::Slider::new(&mut state.stroke_width, 1..=50).text("px"));
                 ui.add_space(6.0);
-                ui.label(RichText::new("Location:").size(11.0).color(Color32::from_rgb(240, 231, 205)));
+                ui.label(
+                    RichText::new("Location:")
+                        .size(11.0)
+                        .color(Color32::from_rgb(240, 231, 205)),
+                );
                 ui.horizontal(|ui| {
                     ui.radio_value(&mut state.stroke_position, 0, "Center");
                     ui.radio_value(&mut state.stroke_position, 1, "Inside");
@@ -4654,7 +5514,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("✓ Apply Stroke").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                    if ui
+                        .button(
+                            RichText::new("✓ Apply Stroke")
+                                .strong()
+                                .color(Color32::from_rgb(117, 223, 209)),
+                        )
+                        .clicked()
+                    {
                         let w = state.stroke_width;
                         let pos = state.stroke_position;
                         state.stroke_selection_active_layer(w, pos);
@@ -4676,11 +5543,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(ctx.screen_rect().center())
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ctx, |ui| {
-                ui.label(RichText::new("Preset Name:").size(11.0).color(Color32::from_rgb(240, 231, 205)));
+                ui.label(
+                    RichText::new("Preset Name:")
+                        .size(11.0)
+                        .color(Color32::from_rgb(240, 231, 205)),
+                );
                 ui.text_edit_singleline(&mut state.new_preset_name);
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("✓ Save Preset").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                    if ui
+                        .button(
+                            RichText::new("✓ Save Preset")
+                                .strong()
+                                .color(Color32::from_rgb(117, 223, 209)),
+                        )
+                        .clicked()
+                    {
                         let name = state.new_preset_name.clone();
                         state.save_current_as_preset(&name);
                         state.show_save_preset_dialog = false;
@@ -4701,14 +5579,20 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(ctx.screen_rect().center())
             .pivot(egui::Align2::CENTER_CENTER)
             .show(ctx, |ui| {
-                ui.label(RichText::new("Export Multi-Frame Animation").size(12.0).strong().color(Color32::from_rgb(253, 249, 236)));
+                ui.label(
+                    RichText::new("Export Multi-Frame Animation")
+                        .size(12.0)
+                        .strong()
+                        .color(Color32::from_rgb(253, 249, 236)),
+                );
                 ui.add_space(6.0);
 
                 // Export cost, checked against the same limits `aurelia-io` enforces, so the
                 // reason an export is refused is visible before the button is pressed.
                 let limits = aurelia_io::ExportLimits::default();
                 let frame_count = state.timeline.frames.len();
-                let per_frame_bytes = (state.document.width as u64) * (state.document.height as u64) * 4;
+                let per_frame_bytes =
+                    (state.document.width as u64) * (state.document.height as u64) * 4;
                 let total_bytes = per_frame_bytes.saturating_mul(frame_count as u64);
                 let over_limit = state.document.width > limits.max_dimension
                     || state.document.height > limits.max_dimension
@@ -4716,17 +5600,37 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     || total_bytes > limits.max_total_bytes;
 
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Total Frames:").size(11.0).color(Color32::from_rgb(215, 206, 180)));
-                    ui.label(RichText::new(format!("{}", state.timeline.frames.len())).strong().color(accent_c32));
+                    ui.label(
+                        RichText::new("Total Frames:")
+                            .size(11.0)
+                            .color(Color32::from_rgb(215, 206, 180)),
+                    );
+                    ui.label(
+                        RichText::new(format!("{}", state.timeline.frames.len()))
+                            .strong()
+                            .color(accent_c32),
+                    );
                 });
 
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Playback FPS:").size(11.0).color(Color32::from_rgb(215, 206, 180)));
-                    ui.add(egui::DragValue::new(&mut state.export_anim_fps).range(1..=60).suffix(" fps"));
+                    ui.label(
+                        RichText::new("Playback FPS:")
+                            .size(11.0)
+                            .color(Color32::from_rgb(215, 206, 180)),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut state.export_anim_fps)
+                            .range(1..=60)
+                            .suffix(" fps"),
+                    );
                 });
 
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Format:").size(11.0).color(Color32::from_rgb(215, 206, 180)));
+                    ui.label(
+                        RichText::new("Format:")
+                            .size(11.0)
+                            .color(Color32::from_rgb(215, 206, 180)),
+                    );
                     ui.radio_value(&mut state.export_anim_format, 0, "GIF (.gif)");
                     ui.radio_value(&mut state.export_anim_format, 1, "Sprite Sheet (.png)");
                     ui.radio_value(&mut state.export_anim_format, 2, "PNG Sequence");
@@ -4734,7 +5638,11 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                 if state.export_anim_format == 1 {
                     ui.horizontal(|ui| {
-                        ui.label(RichText::new("Columns:").size(11.0).color(Color32::from_rgb(215, 206, 180)));
+                        ui.label(
+                            RichText::new("Columns:")
+                                .size(11.0)
+                                .color(Color32::from_rgb(215, 206, 180)),
+                        );
                         ui.add(egui::DragValue::new(&mut state.sprite_columns).range(1..=32));
                     });
                 }
@@ -4770,7 +5678,14 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                 ui.horizontal(|ui| {
                     ui.add_enabled_ui(!over_limit, |ui| {
-                        if ui.button(RichText::new("✓ Export Animation").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                        if ui
+                            .button(
+                                RichText::new("✓ Export Animation")
+                                    .strong()
+                                    .color(Color32::from_rgb(117, 223, 209)),
+                            )
+                            .clicked()
+                        {
                             state.timeline.sync_from_document(&state.document);
                             let w = state.document.width;
                             let h = state.document.height;
@@ -4785,8 +5700,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             let result = match state.export_anim_format {
                                 0 => {
                                     let out_path = out_dir.join("animation.gif");
-                                    let frames = state.timeline.frames.iter()
-                                        .map(|frame| frame.composite_layers(w, h, inc_bg, bg_val));
+                                    let frames =
+                                        state.timeline.frames.iter().map(|frame| {
+                                            frame.composite_layers(w, h, inc_bg, bg_val)
+                                        });
                                     aurelia_io::export_animated_gif_stream(
                                         frames,
                                         w,
@@ -4796,12 +5713,16 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         &out_path,
                                         &limits,
                                     )
-                                    .map(|()| format!("Exported animated GIF to {}", out_path.display()))
+                                    .map(|()| {
+                                        format!("Exported animated GIF to {}", out_path.display())
+                                    })
                                 }
                                 1 => {
                                     let out_path = out_dir.join("spritesheet.png");
-                                    let frames = state.timeline.frames.iter()
-                                        .map(|frame| frame.composite_layers(w, h, inc_bg, bg_val));
+                                    let frames =
+                                        state.timeline.frames.iter().map(|frame| {
+                                            frame.composite_layers(w, h, inc_bg, bg_val)
+                                        });
                                     aurelia_io::export_sprite_sheet_stream(
                                         frames,
                                         w,
@@ -4810,14 +5731,21 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         &out_path,
                                         &limits,
                                     )
-                                    .map(|(sw, sh)| format!(
-                                        "Exported {}×{} sprite sheet ({} frames) to {}",
-                                        sw, sh, frame_count, out_path.display()
-                                    ))
+                                    .map(|(sw, sh)| {
+                                        format!(
+                                            "Exported {}×{} sprite sheet ({} frames) to {}",
+                                            sw,
+                                            sh,
+                                            frame_count,
+                                            out_path.display()
+                                        )
+                                    })
                                 }
                                 _ => {
-                                    let frames = state.timeline.frames.iter()
-                                        .map(|frame| frame.composite_layers(w, h, inc_bg, bg_val));
+                                    let frames =
+                                        state.timeline.frames.iter().map(|frame| {
+                                            frame.composite_layers(w, h, inc_bg, bg_val)
+                                        });
                                     aurelia_io::export_frame_sequence_stream(
                                         frames,
                                         w,
@@ -4827,7 +5755,13 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         aurelia_io::ExportFormat::Png,
                                         &limits,
                                     )
-                                    .map(|paths| format!("Exported {} frames to {}", paths.len(), out_dir.display()))
+                                    .map(|paths| {
+                                        format!(
+                                            "Exported {} frames to {}",
+                                            paths.len(),
+                                            out_dir.display()
+                                        )
+                                    })
                                 }
                             };
 
@@ -4940,72 +5874,193 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .default_pos(egui::pos2(ctx.screen_rect().width() - 570.0, 70.0))
             .show(ctx, |ui| {
                 ScrollArea::vertical().show(ui, |ui| {
-                    ui.label(RichText::new("PERSPECTIVE PROJECTION MODE").size(9.0).strong().color(accent_c32));
+                    ui.label(
+                        RichText::new("PERSPECTIVE PROJECTION MODE")
+                            .size(9.0)
+                            .strong()
+                            .color(accent_c32),
+                    );
                     ui.horizontal(|ui| {
                         let cur_type = state.perspective.p_type;
-                        if ui.selectable_label(cur_type == aurelia_core::perspective::PerspectiveType::None, "Off").clicked() {
-                            state.perspective.p_type = aurelia_core::perspective::PerspectiveType::None;
+                        if ui
+                            .selectable_label(
+                                cur_type == aurelia_core::perspective::PerspectiveType::None,
+                                "Off",
+                            )
+                            .clicked()
+                        {
+                            state.perspective.p_type =
+                                aurelia_core::perspective::PerspectiveType::None;
                         }
-                        if ui.selectable_label(cur_type == aurelia_core::perspective::PerspectiveType::OnePoint, "1-Point").clicked() {
-                            state.perspective.reset_preset(aurelia_core::perspective::PerspectiveType::OnePoint, state.document.width, state.document.height);
+                        if ui
+                            .selectable_label(
+                                cur_type == aurelia_core::perspective::PerspectiveType::OnePoint,
+                                "1-Point",
+                            )
+                            .clicked()
+                        {
+                            state.perspective.reset_preset(
+                                aurelia_core::perspective::PerspectiveType::OnePoint,
+                                state.document.width,
+                                state.document.height,
+                            );
                         }
-                        if ui.selectable_label(cur_type == aurelia_core::perspective::PerspectiveType::TwoPoint, "2-Point").clicked() {
-                            state.perspective.reset_preset(aurelia_core::perspective::PerspectiveType::TwoPoint, state.document.width, state.document.height);
+                        if ui
+                            .selectable_label(
+                                cur_type == aurelia_core::perspective::PerspectiveType::TwoPoint,
+                                "2-Point",
+                            )
+                            .clicked()
+                        {
+                            state.perspective.reset_preset(
+                                aurelia_core::perspective::PerspectiveType::TwoPoint,
+                                state.document.width,
+                                state.document.height,
+                            );
                         }
-                        if ui.selectable_label(cur_type == aurelia_core::perspective::PerspectiveType::ThreePoint, "3-Point").clicked() {
-                            state.perspective.reset_preset(aurelia_core::perspective::PerspectiveType::ThreePoint, state.document.width, state.document.height);
+                        if ui
+                            .selectable_label(
+                                cur_type == aurelia_core::perspective::PerspectiveType::ThreePoint,
+                                "3-Point",
+                            )
+                            .clicked()
+                        {
+                            state.perspective.reset_preset(
+                                aurelia_core::perspective::PerspectiveType::ThreePoint,
+                                state.document.width,
+                                state.document.height,
+                            );
                         }
                     });
 
-                    if state.perspective.p_type != aurelia_core::perspective::PerspectiveType::None {
+                    if state.perspective.p_type != aurelia_core::perspective::PerspectiveType::None
+                    {
                         ui.add_space(6.0);
                         ui.separator();
-                        ui.label(RichText::new("CONSTRAINT SNAPPING ENGINE").size(9.0).strong().color(accent_c32));
-                        ui.checkbox(&mut state.perspective.snap_enabled, "⇲ Enable Perspective Snapping (Ctrl+Shift+P)");
-                        ui.add(egui::Slider::new(&mut state.perspective.snap_strength, 0.1..=1.0).text("Snap Strictness"));
+                        ui.label(
+                            RichText::new("CONSTRAINT SNAPPING ENGINE")
+                                .size(9.0)
+                                .strong()
+                                .color(accent_c32),
+                        );
+                        ui.checkbox(
+                            &mut state.perspective.snap_enabled,
+                            "⇲ Enable Perspective Snapping (Ctrl+Shift+P)",
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut state.perspective.snap_strength, 0.1..=1.0)
+                                .text("Snap Strictness"),
+                        );
 
                         ui.add_space(6.0);
                         ui.separator();
-                        ui.label(RichText::new("GUIDE OVERLAY RENDERING").size(9.0).strong().color(accent_c32));
+                        ui.label(
+                            RichText::new("GUIDE OVERLAY RENDERING")
+                                .size(9.0)
+                                .strong()
+                                .color(accent_c32),
+                        );
                         ui.checkbox(&mut state.perspective.show_guides, "Show Guide Overlay");
-                        ui.add(egui::Slider::new(&mut state.perspective.guide_density, 6..=36).text("Ray Density"));
-                        ui.add(egui::Slider::new(&mut state.perspective.guide_opacity, 0.05..=1.0).text("Guide Opacity"));
+                        ui.add(
+                            egui::Slider::new(&mut state.perspective.guide_density, 6..=36)
+                                .text("Ray Density"),
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut state.perspective.guide_opacity, 0.05..=1.0)
+                                .text("Guide Opacity"),
+                        );
 
                         ui.add_space(6.0);
                         ui.separator();
-                        ui.label(RichText::new("HORIZON & VANISHING POINTS").size(9.0).strong().color(accent_c32));
+                        ui.label(
+                            RichText::new("HORIZON & VANISHING POINTS")
+                                .size(9.0)
+                                .strong()
+                                .color(accent_c32),
+                        );
                         let doc_h = state.document.height as f32;
-                        ui.add(egui::Slider::new(&mut state.perspective.horizon_y, -500.0..=(doc_h * 2.0)).text("Horizon Y"));
-                        ui.add(egui::Slider::new(&mut state.perspective.horizon_angle, -45.0..=45.0).text("Horizon Tilt (°)"));
+                        ui.add(
+                            egui::Slider::new(
+                                &mut state.perspective.horizon_y,
+                                -500.0..=(doc_h * 2.0),
+                            )
+                            .text("Horizon Y"),
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut state.perspective.horizon_angle, -45.0..=45.0)
+                                .text("Horizon Tilt (°)"),
+                        );
 
                         ui.add_space(4.0);
-                        ui.label(RichText::new("VP 1 (Primary / Center)").size(8.5).color(Color32::from_rgb(243, 205, 112)));
+                        ui.label(
+                            RichText::new("VP 1 (Primary / Center)")
+                                .size(8.5)
+                                .color(Color32::from_rgb(243, 205, 112)),
+                        );
                         ui.horizontal(|ui| {
-                            ui.add(egui::DragValue::new(&mut state.perspective.vp1.x).prefix("X: ").speed(1.0));
-                            ui.add(egui::DragValue::new(&mut state.perspective.vp1.y).prefix("Y: ").speed(1.0));
+                            ui.add(
+                                egui::DragValue::new(&mut state.perspective.vp1.x)
+                                    .prefix("X: ")
+                                    .speed(1.0),
+                            );
+                            ui.add(
+                                egui::DragValue::new(&mut state.perspective.vp1.y)
+                                    .prefix("Y: ")
+                                    .speed(1.0),
+                            );
                         });
 
-                        if state.perspective.p_type == aurelia_core::perspective::PerspectiveType::TwoPoint
-                            || state.perspective.p_type == aurelia_core::perspective::PerspectiveType::ThreePoint
+                        if state.perspective.p_type
+                            == aurelia_core::perspective::PerspectiveType::TwoPoint
+                            || state.perspective.p_type
+                                == aurelia_core::perspective::PerspectiveType::ThreePoint
                         {
-                            ui.label(RichText::new("VP 2 (Right Vanishing Point)").size(8.5).color(Color32::from_rgb(93, 217, 200)));
+                            ui.label(
+                                RichText::new("VP 2 (Right Vanishing Point)")
+                                    .size(8.5)
+                                    .color(Color32::from_rgb(93, 217, 200)),
+                            );
                             ui.horizontal(|ui| {
-                                ui.add(egui::DragValue::new(&mut state.perspective.vp2.x).prefix("X: ").speed(1.0));
-                                ui.add(egui::DragValue::new(&mut state.perspective.vp2.y).prefix("Y: ").speed(1.0));
+                                ui.add(
+                                    egui::DragValue::new(&mut state.perspective.vp2.x)
+                                        .prefix("X: ")
+                                        .speed(1.0),
+                                );
+                                ui.add(
+                                    egui::DragValue::new(&mut state.perspective.vp2.y)
+                                        .prefix("Y: ")
+                                        .speed(1.0),
+                                );
                             });
                         }
 
-                        if state.perspective.p_type == aurelia_core::perspective::PerspectiveType::ThreePoint {
-                            ui.label(RichText::new("VP 3 (Vertical / Nadir Point)").size(8.5).color(Color32::from_rgb(230, 120, 240)));
+                        if state.perspective.p_type
+                            == aurelia_core::perspective::PerspectiveType::ThreePoint
+                        {
+                            ui.label(
+                                RichText::new("VP 3 (Vertical / Nadir Point)")
+                                    .size(8.5)
+                                    .color(Color32::from_rgb(230, 120, 240)),
+                            );
                             ui.horizontal(|ui| {
-                                ui.add(egui::DragValue::new(&mut state.perspective.vp3.x).prefix("X: ").speed(1.0));
-                                ui.add(egui::DragValue::new(&mut state.perspective.vp3.y).prefix("Y: ").speed(1.0));
+                                ui.add(
+                                    egui::DragValue::new(&mut state.perspective.vp3.x)
+                                        .prefix("X: ")
+                                        .speed(1.0),
+                                );
+                                ui.add(
+                                    egui::DragValue::new(&mut state.perspective.vp3.y)
+                                        .prefix("Y: ")
+                                        .speed(1.0),
+                                );
                             });
                         }
 
                         ui.add_space(6.0);
                         if ui.button("Reset Vanishing Points to Center").clicked() {
-                            state.perspective.init_for_canvas(state.document.width, state.document.height);
+                            state
+                                .perspective
+                                .init_for_canvas(state.document.width, state.document.height);
                         }
                     }
                 });
@@ -5022,17 +6077,49 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     let cur_mode = state.transform_session.mode;
-                    if ui.selectable_label(cur_mode == aurelia_core::transform::TransformMode::Affine, "⛶ Free").on_hover_text("Standard Affine Box (Scale, Rotate, Skew, Translate)").clicked() {
+                    if ui
+                        .selectable_label(
+                            cur_mode == aurelia_core::transform::TransformMode::Affine,
+                            "⛶ Free",
+                        )
+                        .on_hover_text("Standard Affine Box (Scale, Rotate, Skew, Translate)")
+                        .clicked()
+                    {
                         state.set_transform_mode(aurelia_core::transform::TransformMode::Affine);
                     }
-                    if ui.selectable_label(cur_mode == aurelia_core::transform::TransformMode::PerspectiveQuad, "☖ Quad").on_hover_text("4-Corner Perspective Quad Warping").clicked() {
-                        state.set_transform_mode(aurelia_core::transform::TransformMode::PerspectiveQuad);
+                    if ui
+                        .selectable_label(
+                            cur_mode == aurelia_core::transform::TransformMode::PerspectiveQuad,
+                            "☖ Quad",
+                        )
+                        .on_hover_text("4-Corner Perspective Quad Warping")
+                        .clicked()
+                    {
+                        state.set_transform_mode(
+                            aurelia_core::transform::TransformMode::PerspectiveQuad,
+                        );
                     }
-                    if ui.selectable_label(cur_mode == aurelia_core::transform::TransformMode::MeshGrid, "▦ Mesh").on_hover_text("Bicubic Mesh Grid Deformation").clicked() {
+                    if ui
+                        .selectable_label(
+                            cur_mode == aurelia_core::transform::TransformMode::MeshGrid,
+                            "▦ Mesh",
+                        )
+                        .on_hover_text("Bicubic Mesh Grid Deformation")
+                        .clicked()
+                    {
                         state.set_transform_mode(aurelia_core::transform::TransformMode::MeshGrid);
                     }
-                    if ui.selectable_label(cur_mode == aurelia_core::transform::TransformMode::ThinPlateSpline, "✦ TPS Pins").on_hover_text("Thin Plate Spline Multi-Pin Landmark Warping").clicked() {
-                        state.set_transform_mode(aurelia_core::transform::TransformMode::ThinPlateSpline);
+                    if ui
+                        .selectable_label(
+                            cur_mode == aurelia_core::transform::TransformMode::ThinPlateSpline,
+                            "✦ TPS Pins",
+                        )
+                        .on_hover_text("Thin Plate Spline Multi-Pin Landmark Warping")
+                        .clicked()
+                    {
+                        state.set_transform_mode(
+                            aurelia_core::transform::TransformMode::ThinPlateSpline,
+                        );
                     }
                 });
 
@@ -5041,31 +6128,46 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                 match state.transform_session.mode {
                     aurelia_core::transform::TransformMode::Affine => {
-                        let mut rot_deg = state.transform_session.transform.rotation_rad.to_degrees();
-                        if ui.add(egui::Slider::new(&mut rot_deg, -180.0..=180.0).text("Angle (°)")).changed() {
+                        let mut rot_deg =
+                            state.transform_session.transform.rotation_rad.to_degrees();
+                        if ui
+                            .add(egui::Slider::new(&mut rot_deg, -180.0..=180.0).text("Angle (°)"))
+                            .changed()
+                        {
                             state.transform_session.transform.rotation_rad = rot_deg.to_radians();
                             state.update_transform_preview();
                         }
                         let mut scale_pct = state.transform_session.transform.scale.x * 100.0;
-                        if ui.add(egui::Slider::new(&mut scale_pct, 5.0..=400.0).text("Scale (%)")).changed() {
+                        if ui
+                            .add(egui::Slider::new(&mut scale_pct, 5.0..=400.0).text("Scale (%)"))
+                            .changed()
+                        {
                             let s = scale_pct / 100.0;
                             state.transform_session.transform.scale = glam::Vec2::new(s, s);
                             state.update_transform_preview();
                         }
                         ui.horizontal(|ui| {
                             if ui.button("⇄ Flip H").clicked() {
-                                state.transform_session.transform.flip_h = !state.transform_session.transform.flip_h;
+                                state.transform_session.transform.flip_h =
+                                    !state.transform_session.transform.flip_h;
                                 state.update_transform_preview();
                             }
                             if ui.button("⇅ Flip V").clicked() {
-                                state.transform_session.transform.flip_v = !state.transform_session.transform.flip_v;
+                                state.transform_session.transform.flip_v =
+                                    !state.transform_session.transform.flip_v;
                                 state.update_transform_preview();
                             }
                             ui.checkbox(&mut state.transform_session.lock_aspect, "Lock Ratio");
                         });
                     }
                     aurelia_core::transform::TransformMode::PerspectiveQuad => {
-                        ui.label(RichText::new("Drag the 4 corner handles on canvas to create perspective planes.").size(9.5).color(Color32::from_rgb(220, 207, 170)));
+                        ui.label(
+                            RichText::new(
+                                "Drag the 4 corner handles on canvas to create perspective planes.",
+                            )
+                            .size(9.5)
+                            .color(Color32::from_rgb(220, 207, 170)),
+                        );
                         if ui.button("↺ Reset Quad Corners").clicked() {
                             state.reset_transform_deformation();
                         }
@@ -5073,9 +6175,16 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     aurelia_core::transform::TransformMode::MeshGrid => {
                         ui.horizontal(|ui| {
                             ui.label("Density:");
-                            let densities = [(3, 3, "3×3"), (4, 4, "4×4"), (5, 5, "5×5"), (6, 6, "6×6"), (8, 8, "8×8")];
+                            let densities = [
+                                (3, 3, "3×3"),
+                                (4, 4, "4×4"),
+                                (5, 5, "5×5"),
+                                (6, 6, "6×6"),
+                                (8, 8, "8×8"),
+                            ];
                             for (r, c, lbl) in densities {
-                                let is_active = state.transform_session.grid_rows == r && state.transform_session.grid_cols == c;
+                                let is_active = state.transform_session.grid_rows == r
+                                    && state.transform_session.grid_cols == c;
                                 if ui.selectable_label(is_active, lbl).clicked() {
                                     state.set_transform_grid_density(r, c);
                                 }
@@ -5086,13 +6195,21 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         }
                     }
                     aurelia_core::transform::TransformMode::ThinPlateSpline => {
-                        ui.label(RichText::new(format!("Active Landmark Pins: {}", state.transform_session.tps_target_pins.len())).size(9.5).color(accent_c32));
+                        ui.label(
+                            RichText::new(format!(
+                                "Active Landmark Pins: {}",
+                                state.transform_session.tps_target_pins.len()
+                            ))
+                            .size(9.5)
+                            .color(accent_c32),
+                        );
                         ui.horizontal(|ui| {
                             if ui.button("+ Add Center Pin").clicked() {
-                                let center = state.transform_session.patch_origin + glam::Vec2::new(
-                                    state.transform_session.patch_w as f32 * 0.5,
-                                    state.transform_session.patch_h as f32 * 0.5,
-                                );
+                                let center = state.transform_session.patch_origin
+                                    + glam::Vec2::new(
+                                        state.transform_session.patch_w as f32 * 0.5,
+                                        state.transform_session.patch_h as f32 * 0.5,
+                                    );
                                 state.add_tps_pin(center);
                             }
                             if ui.button("↺ Reset Pins").clicked() {
@@ -5106,16 +6223,39 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 ui.horizontal(|ui| {
                     ui.label("Interpolation:");
                     let interp = state.transform_session.interpolation;
-                    if ui.selectable_label(interp == aurelia_core::transform::InterpolationMode::Bicubic, "Bicubic").on_hover_text("High-quality smooth Catmull-Rom cubic sampling").clicked() {
-                        state.transform_session.interpolation = aurelia_core::transform::InterpolationMode::Bicubic;
+                    if ui
+                        .selectable_label(
+                            interp == aurelia_core::transform::InterpolationMode::Bicubic,
+                            "Bicubic",
+                        )
+                        .on_hover_text("High-quality smooth Catmull-Rom cubic sampling")
+                        .clicked()
+                    {
+                        state.transform_session.interpolation =
+                            aurelia_core::transform::InterpolationMode::Bicubic;
                         state.update_transform_preview();
                     }
-                    if ui.selectable_label(interp == aurelia_core::transform::InterpolationMode::Bilinear, "Bilinear").clicked() {
-                        state.transform_session.interpolation = aurelia_core::transform::InterpolationMode::Bilinear;
+                    if ui
+                        .selectable_label(
+                            interp == aurelia_core::transform::InterpolationMode::Bilinear,
+                            "Bilinear",
+                        )
+                        .clicked()
+                    {
+                        state.transform_session.interpolation =
+                            aurelia_core::transform::InterpolationMode::Bilinear;
                         state.update_transform_preview();
                     }
-                    if ui.selectable_label(interp == aurelia_core::transform::InterpolationMode::Nearest, "Nearest").on_hover_text("Crisp pixel art nearest neighbor").clicked() {
-                        state.transform_session.interpolation = aurelia_core::transform::InterpolationMode::Nearest;
+                    if ui
+                        .selectable_label(
+                            interp == aurelia_core::transform::InterpolationMode::Nearest,
+                            "Nearest",
+                        )
+                        .on_hover_text("Crisp pixel art nearest neighbor")
+                        .clicked()
+                    {
+                        state.transform_session.interpolation =
+                            aurelia_core::transform::InterpolationMode::Nearest;
                         state.update_transform_preview();
                     }
                 });
@@ -5123,10 +6263,24 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 ui.add_space(4.0);
                 ui.separator();
                 ui.horizontal(|ui| {
-                    if ui.button(RichText::new("✓ Apply (Enter)").strong().color(Color32::from_rgb(117, 223, 209))).clicked() {
+                    if ui
+                        .button(
+                            RichText::new("✓ Apply (Enter)")
+                                .strong()
+                                .color(Color32::from_rgb(117, 223, 209)),
+                        )
+                        .clicked()
+                    {
                         state.commit_transform_session();
                     }
-                    if ui.button(RichText::new("✕ Cancel (Esc)").strong().color(Color32::from_rgb(250, 120, 120))).clicked() {
+                    if ui
+                        .button(
+                            RichText::new("✕ Cancel (Esc)")
+                                .strong()
+                                .color(Color32::from_rgb(250, 120, 120)),
+                        )
+                        .clicked()
+                    {
                         state.cancel_transform_session();
                     }
                 });
@@ -5135,9 +6289,18 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
     // ── ON-CANVAS TRANSFORM GIZMOS ──
     if state.transform_session.is_active {
-        let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("transform_gizmos_layer")));
+        let painter = ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Foreground,
+            egui::Id::new("transform_gizmos_layer"),
+        ));
         let screen_rect = ctx.screen_rect();
-        render_transform_gizmos(&painter, state, screen_rect.width(), screen_rect.height(), accent_c32);
+        render_transform_gizmos(
+            &painter,
+            state,
+            screen_rect.width(),
+            screen_rect.height(),
+            accent_c32,
+        );
     }
 
     // ── 11. ABOUT AURELIA MODAL ──
@@ -5259,8 +6422,16 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .resizable(false)
             .show(ctx, |ui| {
                 let draft = &mut state.preferences_draft;
-                ui.label(RichText::new("GENERAL").size(9.5).strong().color(accent_c32));
-                ui.checkbox(&mut draft.autosave_enabled, "Autosave documents periodically");
+                ui.label(
+                    RichText::new("GENERAL")
+                        .size(9.5)
+                        .strong()
+                        .color(accent_c32),
+                );
+                ui.checkbox(
+                    &mut draft.autosave_enabled,
+                    "Autosave documents periodically",
+                );
                 ui.horizontal(|ui| {
                     ui.add_enabled_ui(draft.autosave_enabled, |ui| {
                         ui.label("Interval");
@@ -5276,7 +6447,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
                 ui.add_space(6.0);
 
-                ui.label(RichText::new("HISTORY").size(9.5).strong().color(accent_c32));
+                ui.label(
+                    RichText::new("HISTORY")
+                        .size(9.5)
+                        .strong()
+                        .color(accent_c32),
+                );
                 ui.horizontal(|ui| {
                     ui.label("Undo budget");
                     ui.add(
@@ -5287,7 +6463,9 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             )
                             .suffix(" MiB"),
                     )
-                    .on_hover_text("Memory ceiling for undo history; the newest step always survives");
+                    .on_hover_text(
+                        "Memory ceiling for undo history; the newest step always survives",
+                    );
                 });
                 ui.label(
                     RichText::new(format!(
@@ -5308,7 +6486,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 });
                 ui.add_space(6.0);
 
-                ui.label(RichText::new("APPEARANCE").size(9.5).strong().color(accent_c32));
+                ui.label(
+                    RichText::new("APPEARANCE")
+                        .size(9.5)
+                        .strong()
+                        .color(accent_c32),
+                );
                 ui.horizontal(|ui| {
                     for (theme, label) in [
                         (aurelia_core::color::ThemeMode::Dawn, "Dawn"),
@@ -5334,8 +6517,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                 ui.separator();
                 ui.horizontal(|ui| {
                     if ui.button("Reset to Defaults").clicked() {
-                        state.preferences_draft =
-                            crate::state::PreferencesDraft::default();
+                        state.preferences_draft = crate::state::PreferencesDraft::default();
                         state.preferences_error = None;
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -5363,7 +6545,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             .collapsible(false)
             .show(ctx, |ui| {
                 ScrollArea::vertical().show(ui, |ui| {
-                    ui.label(RichText::new("STUDIO SHORTCUTS").size(10.0).strong().color(accent_c32));
+                    ui.label(
+                        RichText::new("STUDIO SHORTCUTS")
+                            .size(10.0)
+                            .strong()
+                            .color(accent_c32),
+                    );
                     let shortcuts = [
                         ("Tab", "Toggle Full Canvas / Zen Mode"),
                         ("B", "Brush Tool"),
@@ -5397,13 +6584,22 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         ("Ctrl + R", "Toggle Viewport Rulers"),
                     ];
 
-                    egui::Grid::new("help_grid").num_columns(2).spacing([12.0, 4.0]).show(ui, |ui| {
-                        for (k, desc) in shortcuts {
-                            ui.label(RichText::new(k).strong().color(Color32::from_rgb(253, 246, 227)));
-                            ui.label(RichText::new(desc).color(Color32::from_rgb(205, 195, 165)));
-                            ui.end_row();
-                        }
-                    });
+                    egui::Grid::new("help_grid")
+                        .num_columns(2)
+                        .spacing([12.0, 4.0])
+                        .show(ui, |ui| {
+                            for (k, desc) in shortcuts {
+                                ui.label(
+                                    RichText::new(k)
+                                        .strong()
+                                        .color(Color32::from_rgb(253, 246, 227)),
+                                );
+                                ui.label(
+                                    RichText::new(desc).color(Color32::from_rgb(205, 195, 165)),
+                                );
+                                ui.end_row();
+                            }
+                        });
                 });
                 if ui.button("Close").clicked() {
                     state.show_help = false;
@@ -5513,10 +6709,7 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
     let screen = ctx.screen_rect();
     let win_w = screen.width();
     let win_h = screen.height();
-    let [vx0, vy0, vx1, vy1] = state.viewport_rect(
-        (win_w * ppp) as usize,
-        (win_h * ppp) as usize,
-    );
+    let [vx0, vy0, vx1, vy1] = state.viewport_rect((win_w * ppp) as usize, (win_h * ppp) as usize);
     let viewport = egui::Rect::from_min_max(
         egui::pos2(vx0 as f32 / ppp, vy0 as f32 / ppp),
         egui::pos2(vx1 as f32 / ppp, vy1 as f32 / ppp),
@@ -5526,8 +6719,14 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
     let canvas_min = state.canvas_to_ui(glam::Vec2::ZERO, win_w, win_h);
     let canvas_max = state.canvas_to_ui(glam::Vec2::new(doc_w, doc_h), win_w, win_h);
     let paper = egui::Rect::from_min_max(
-        egui::pos2(canvas_min.x.min(canvas_max.x), canvas_min.y.min(canvas_max.y)),
-        egui::pos2(canvas_min.x.max(canvas_max.x), canvas_min.y.max(canvas_max.y)),
+        egui::pos2(
+            canvas_min.x.min(canvas_max.x),
+            canvas_min.y.min(canvas_max.y),
+        ),
+        egui::pos2(
+            canvas_min.x.max(canvas_max.x),
+            canvas_min.y.max(canvas_max.y),
+        ),
     );
     let clip = viewport.intersect(paper);
     if clip.width() <= 0.0 || clip.height() <= 0.0 {
@@ -5602,11 +6801,7 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
                     egui::Id::new("straight_edge_ruler"),
                 ))
                 .with_clip_rect(viewport);
-            ruler_painter.add(egui::Shape::convex_polygon(
-                corners,
-                body_fill,
-                body_stroke,
-            ));
+            ruler_painter.add(egui::Shape::convex_polygon(corners, body_fill, body_stroke));
             let tick_color = Color32::from_rgb(236, 208, 128);
             let mut tick = 0.0;
             while tick <= ruler.length {
@@ -5636,7 +6831,11 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
             ruler_painter.text(
                 midpoint + normal * (half + 20.0),
                 egui::Align2::CENTER_CENTER,
-                format!("{:.0} px · {:.1}°", ruler.length, ruler.angle_rad.to_degrees()),
+                format!(
+                    "{:.0} px · {:.1}°",
+                    ruler.length,
+                    ruler.angle_rad.to_degrees()
+                ),
                 egui::FontId::proportional(10.0),
                 Color32::from_rgb(255, 224, 150),
             );
@@ -5759,8 +6958,14 @@ fn render_transform_gizmos(
             let edge_dir = (corners_screen[1] - corners_screen[0]).normalized();
             let normal = egui::vec2(-edge_dir.y, edge_dir.x);
             let rot_handle = top_mid + normal * 24.0;
-            painter.line_segment([top_mid.to_pos2(), rot_handle.to_pos2()], Stroke::new(2.0_f32, shadow));
-            painter.line_segment([top_mid.to_pos2(), rot_handle.to_pos2()], Stroke::new(1.2_f32, accent_c32));
+            painter.line_segment(
+                [top_mid.to_pos2(), rot_handle.to_pos2()],
+                Stroke::new(2.0_f32, shadow),
+            );
+            painter.line_segment(
+                [top_mid.to_pos2(), rot_handle.to_pos2()],
+                Stroke::new(1.2_f32, accent_c32),
+            );
             painter.circle_filled(rot_handle.to_pos2(), 5.0, accent_c32);
             painter.circle_stroke(rot_handle.to_pos2(), 5.0, Stroke::new(1.5_f32, white));
 
@@ -5768,7 +6973,8 @@ fn render_transform_gizmos(
             let mut handles = Vec::new();
             handles.extend(corners_screen.iter().cloned());
             for i in 0..4 {
-                let mid = (corners_screen[i].to_vec2() + corners_screen[(i + 1) % 4].to_vec2()) * 0.5;
+                let mid =
+                    (corners_screen[i].to_vec2() + corners_screen[(i + 1) % 4].to_vec2()) * 0.5;
                 handles.push(mid.to_pos2());
             }
 
@@ -5780,8 +6986,16 @@ fn render_transform_gizmos(
             }
 
             // Draw pivot point
-            let pivot_sp = state.canvas_to_ui(session.transform.pivot + session.transform.translation, win_w, win_h);
-            painter.circle_stroke(egui::pos2(pivot_sp.x, pivot_sp.y), 6.0, Stroke::new(1.5_f32, white));
+            let pivot_sp = state.canvas_to_ui(
+                session.transform.pivot + session.transform.translation,
+                win_w,
+                win_h,
+            );
+            painter.circle_stroke(
+                egui::pos2(pivot_sp.x, pivot_sp.y),
+                6.0,
+                Stroke::new(1.5_f32, white),
+            );
             painter.circle_filled(egui::pos2(pivot_sp.x, pivot_sp.y), 2.0, accent_c32);
         }
         aurelia_core::transform::TransformMode::PerspectiveQuad => {
@@ -5827,7 +7041,10 @@ fn render_transform_gizmos(
                 for c in 0..(cols - 1) {
                     let p0 = state.canvas_to_ui(mesh.get_vertex(r, c), win_w, win_h);
                     let p1 = state.canvas_to_ui(mesh.get_vertex(r, c + 1), win_w, win_h);
-                    painter.line_segment([egui::pos2(p0.x, p0.y), egui::pos2(p1.x, p1.y)], Stroke::new(1.2_f32, Color32::from_rgba_unmultiplied(100, 180, 255, 160)));
+                    painter.line_segment(
+                        [egui::pos2(p0.x, p0.y), egui::pos2(p1.x, p1.y)],
+                        Stroke::new(1.2_f32, Color32::from_rgba_unmultiplied(100, 180, 255, 160)),
+                    );
                 }
             }
 
@@ -5836,7 +7053,10 @@ fn render_transform_gizmos(
                 for r in 0..(rows - 1) {
                     let p0 = state.canvas_to_ui(mesh.get_vertex(r, c), win_w, win_h);
                     let p1 = state.canvas_to_ui(mesh.get_vertex(r + 1, c), win_w, win_h);
-                    painter.line_segment([egui::pos2(p0.x, p0.y), egui::pos2(p1.x, p1.y)], Stroke::new(1.2_f32, Color32::from_rgba_unmultiplied(100, 180, 255, 160)));
+                    painter.line_segment(
+                        [egui::pos2(p0.x, p0.y), egui::pos2(p1.x, p1.y)],
+                        Stroke::new(1.2_f32, Color32::from_rgba_unmultiplied(100, 180, 255, 160)),
+                    );
                 }
             }
 
@@ -5856,19 +7076,35 @@ fn render_transform_gizmos(
             }
         }
         aurelia_core::transform::TransformMode::ThinPlateSpline => {
-            for (i, (&src_can, &tgt_can)) in session.tps_source_pins.iter().zip(session.tps_target_pins.iter()).enumerate() {
+            for (i, (&src_can, &tgt_can)) in session
+                .tps_source_pins
+                .iter()
+                .zip(session.tps_target_pins.iter())
+                .enumerate()
+            {
                 let src_sp = state.canvas_to_ui(src_can, win_w, win_h);
                 let tgt_sp = state.canvas_to_ui(tgt_can, win_w, win_h);
                 let p_src = egui::pos2(src_sp.x, src_sp.y);
                 let p_tgt = egui::pos2(tgt_sp.x, tgt_sp.y);
 
                 if p_src.distance(p_tgt) > 1.0 {
-                    painter.line_segment([p_src, p_tgt], Stroke::new(1.5_f32, Color32::from_rgb(255, 200, 50)));
-                    painter.circle_stroke(p_src, 3.0, Stroke::new(1.0_f32, Color32::from_rgb(180, 180, 180)));
+                    painter.line_segment(
+                        [p_src, p_tgt],
+                        Stroke::new(1.5_f32, Color32::from_rgb(255, 200, 50)),
+                    );
+                    painter.circle_stroke(
+                        p_src,
+                        3.0,
+                        Stroke::new(1.0_f32, Color32::from_rgb(180, 180, 180)),
+                    );
                 }
 
                 painter.circle_filled(p_tgt, 6.0, Color32::from_rgb(45, 39, 20));
-                painter.circle_stroke(p_tgt, 6.0, Stroke::new(2.0_f32, Color32::from_rgb(255, 180, 40)));
+                painter.circle_stroke(
+                    p_tgt,
+                    6.0,
+                    Stroke::new(2.0_f32, Color32::from_rgb(255, 180, 40)),
+                );
                 painter.circle_filled(p_tgt, 3.0, white);
                 painter.text(
                     p_tgt + egui::vec2(8.0, -8.0),
@@ -5931,7 +7167,11 @@ fn paint_ruler_numbers(ctx: &egui::Context, state: &AppState) {
         let ticks = ruler_ticks(doc_w, zoom, centre_x, vp[0] as isize, vp[2] as isize);
         let placements = crate::ruler_text::place_labels(&ticks, doc_w, vp[2] as f32, |value| {
             let text = format!("{}", value.round() as i64);
-            clipped.layout_no_wrap(text, font.clone(), number_colour).size().x * ppp
+            clipped
+                .layout_no_wrap(text, font.clone(), number_colour)
+                .size()
+                .x
+                * ppp
         });
         for label in placements {
             clipped.text(
@@ -5951,17 +7191,18 @@ fn paint_ruler_numbers(ctx: &egui::Context, state: &AppState) {
     let left_top = vp[1] + design::RULER_PX as usize;
     let left_rect = egui::Rect::from_min_size(
         egui::pos2(vp[0] as f32 / ppp, left_top as f32 / ppp),
-        egui::vec2(
-            strip / ppp,
-            (vp[3].saturating_sub(left_top)) as f32 / ppp,
-        ),
+        egui::vec2(strip / ppp, (vp[3].saturating_sub(left_top)) as f32 / ppp),
     );
     if left_rect.height() > 8.0 {
         let clipped = painter.with_clip_rect(left_rect);
         let ticks = ruler_ticks(doc_h, zoom, centre_y, left_top as isize, vp[3] as isize);
         let placements = crate::ruler_text::place_labels(&ticks, doc_h, vp[3] as f32, |value| {
             let text = format!("{}", value.round() as i64);
-            clipped.layout_no_wrap(text, font.clone(), number_colour).size().x * ppp
+            clipped
+                .layout_no_wrap(text, font.clone(), number_colour)
+                .size()
+                .x
+                * ppp
         });
         for label in placements {
             let galley = clipped.layout_no_wrap(
@@ -5998,17 +7239,22 @@ mod layout_tests {
         let wide = letterbox(slot, 3.0);
         assert!((wide.width() - 200.0).abs() < 1e-4);
         assert!((wide.height() - 200.0 / 3.0).abs() < 1e-3);
-        assert!((wide.center().y - slot.center().y).abs() < 1e-4, "must be vertically centred");
+        assert!(
+            (wide.center().y - slot.center().y).abs() < 1e-4,
+            "must be vertically centred"
+        );
 
         // A 1:2 document: full height, letterboxed horizontally.
         let tall = letterbox(slot, 0.5);
         assert!((tall.height() - 100.0).abs() < 1e-4);
         assert!((tall.width() - 50.0).abs() < 1e-4);
-        assert!((tall.center().x - slot.center().x).abs() < 1e-4, "must be horizontally centred");
+        assert!(
+            (tall.center().x - slot.center().x).abs() < 1e-4,
+            "must be horizontally centred"
+        );
 
         // A degenerate aspect falls back to the slot rather than producing a zero rect.
         assert_eq!(letterbox(slot, f32::NAN), slot);
         assert_eq!(letterbox(slot, 0.0), slot);
     }
 }
-

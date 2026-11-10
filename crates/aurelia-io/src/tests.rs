@@ -26,8 +26,14 @@ mod tests {
         assert_eq!(loaded_doc.layers.len(), 2);
         assert_eq!(loaded_doc.layers[1].name, "Overlay Layer");
         assert_eq!(loaded_doc.layers[1].opacity, 0.85);
-        assert_eq!(loaded_doc.layers[1].blend_mode, aurelia_core::blend::BlendMode::Overlay);
-        assert_eq!(loaded_doc.layers[1].get_pixel(10, 10).unwrap(), [168, 159, 216, 255]);
+        assert_eq!(
+            loaded_doc.layers[1].blend_mode,
+            aurelia_core::blend::BlendMode::Overlay
+        );
+        assert_eq!(
+            loaded_doc.layers[1].get_pixel(10, 10).unwrap(),
+            [168, 159, 216, 255]
+        );
     }
 
     #[test]
@@ -36,8 +42,14 @@ mod tests {
 
         let mut doc = Document::new(32, 24);
         doc.editor.guides = vec![
-            GuideLine { vertical: true, position: 12.5 },
-            GuideLine { vertical: false, position: 7.0 },
+            GuideLine {
+                vertical: true,
+                position: 12.5,
+            },
+            GuideLine {
+                vertical: false,
+                position: 7.0,
+            },
         ];
         doc.editor.grid_origin = [3.25, 9.5];
         doc.editor.straight_ruler = Some(StraightRulerState {
@@ -65,7 +77,10 @@ mod tests {
 
         let loaded = load_project_from_reader(&bytes[..]).expect("load old layout");
         assert_eq!(loaded.width, 16);
-        assert_eq!(loaded.editor, aurelia_core::document::EditorState::default());
+        assert_eq!(
+            loaded.editor,
+            aurelia_core::document::EditorState::default()
+        );
     }
 
     #[test]
@@ -126,7 +141,9 @@ mod tests {
         let loaded_doc = load_project_from_reader(&mut buffer).expect("Failed to load project");
 
         assert_eq!(loaded_doc.layers.len(), 2);
-        let loaded_adj = loaded_doc.get_layer(adj_id).expect("Adjustment layer not found");
+        let loaded_adj = loaded_doc
+            .get_layer(adj_id)
+            .expect("Adjustment layer not found");
         assert!(loaded_adj.is_adjustment());
         assert_eq!(loaded_adj.name, "Grading Layer");
         assert_eq!(loaded_adj.opacity, 0.75);
@@ -134,7 +151,11 @@ mod tests {
 
         if let Some(cfg) = &loaded_adj.adjustment {
             match &cfg.adjustment_type {
-                AdjustmentType::Hsl { hue_shift, saturation, lightness } => {
+                AdjustmentType::Hsl {
+                    hue_shift,
+                    saturation,
+                    lightness,
+                } => {
                     assert!((hue_shift - 45.0).abs() < 1e-4);
                     assert!((saturation - 1.5).abs() < 1e-4);
                     assert!((lightness - (-0.1)).abs() < 1e-4);
@@ -274,7 +295,12 @@ mod tests {
         let red = [255u8, 0, 0, 255];
         let blue = [0u8, 0, 255, 255];
         let frame = |color: [u8; 4]| -> Vec<u8> {
-            color.iter().copied().cycle().take((w * h * 4) as usize).collect()
+            color
+                .iter()
+                .copied()
+                .cycle()
+                .take((w * h * 4) as usize)
+                .collect()
         };
 
         let dir = std::env::temp_dir().join(format!("hc-sheet-{}", std::process::id()));
@@ -294,7 +320,6 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-
     #[test]
     fn layer_mask_survives_a_save_and_load_roundtrip() {
         let mut doc = Document::new(6, 5);
@@ -310,12 +335,23 @@ mod tests {
         buf.set_position(0);
         let loaded = load_project_from_reader(buf).expect("load");
 
-        let mask = loaded.get_layer(id).expect("layer").mask.as_ref().expect("mask");
+        let mask = loaded
+            .get_layer(id)
+            .expect("layer")
+            .mask
+            .as_ref()
+            .expect("mask");
         assert_eq!((mask.width, mask.height), (6, 5));
         assert!(mask.enabled);
-        assert!(mask.pixels.iter().all(|&p| p == 0), "the inverted mask is all hidden");
+        assert!(
+            mask.pixels.iter().all(|&p| p == 0),
+            "the inverted mask is all hidden"
+        );
         // Pixels themselves are untouched by the mask.
-        assert_eq!(loaded.get_layer(id).unwrap().get_pixel(1, 1), Some([10, 20, 30, 255]));
+        assert_eq!(
+            loaded.get_layer(id).unwrap().get_pixel(1, 1),
+            Some([10, 20, 30, 255])
+        );
     }
 
     #[test]
@@ -439,7 +475,9 @@ mod tests {
             let sub_group = doc.add_group(Some("Sub".into()));
             let child = doc.add_layer(Some("Child".into()));
             assert!(doc.get_layer_mut(child).is_some());
-            doc.get_layer_mut(child).unwrap().set_pixel(2, 2, [10, 20, 30, 255]);
+            doc.get_layer_mut(child)
+                .unwrap()
+                .set_pixel(2, 2, [10, 20, 30, 255]);
             assert!(doc.set_layer_parent(sub_group, Some(group)));
             assert!(doc.set_layer_parent(child, Some(sub_group)));
 
@@ -522,7 +560,9 @@ mod tests {
             layer.set_pixel(0, 0, [1, 2, 3, 255]);
         }
         let top = doc.add_layer(Some("wide".to_string()));
-        let channels: Vec<u16> = (0..(4 * 4 * 4)).map(|i| (i as u16).wrapping_mul(1013)).collect();
+        let channels: Vec<u16> = (0..(4 * 4 * 4))
+            .map(|i| (i as u16).wrapping_mul(1013))
+            .collect();
         if let Some(layer) = doc.get_layer_mut(top) {
             *layer.buffer_mut() = LayerBuffer::Srgb16(channels.clone());
         }
@@ -532,11 +572,19 @@ mod tests {
         let loaded = load_project_from_reader(&bytes[..]).expect("load");
 
         let base_loaded = loaded.get_layer(base).expect("base");
-        assert_eq!(base_loaded.format(), PixelFormat::Srgb8, "8-bit layer must stay 8-bit");
+        assert_eq!(
+            base_loaded.format(),
+            PixelFormat::Srgb8,
+            "8-bit layer must stay 8-bit"
+        );
         assert_eq!(base_loaded.get_pixel(0, 0), Some([1, 2, 3, 255]));
 
         let top_loaded = loaded.get_layer(top).expect("top");
-        assert_eq!(top_loaded.format(), PixelFormat::Srgb16, "16-bit layer must stay 16-bit");
+        assert_eq!(
+            top_loaded.format(),
+            PixelFormat::Srgb16,
+            "16-bit layer must stay 16-bit"
+        );
         assert_eq!(top_loaded.as_srgb16().expect("16-bit"), channels.as_slice());
     }
     /// A damaged file must be reported, not panic - a crash here would look like data loss
@@ -561,7 +609,10 @@ mod tests {
         // Truncating anywhere inside the artwork must be reported.
         for cut in [0usize, 3, 4, 12, 30, thumb_len_at - 1] {
             let result = load_project_from_reader(&v2[..cut]);
-            assert!(result.is_err(), "a file truncated to {cut} bytes must be rejected");
+            assert!(
+                result.is_err(),
+                "a file truncated to {cut} bytes must be rejected"
+            );
         }
 
         // Losing only the thumbnail is tolerated on purpose: an openable project should not
@@ -627,7 +678,10 @@ mod tests {
         // 2. Unsupported per-layer format tag.
         let mut bad = bytes.clone();
         let tag_at = layer_tag_offset(&bad);
-        assert_eq!(bad[tag_at], 0, "expected the inherit tag at the derived offset");
+        assert_eq!(
+            bad[tag_at], 0,
+            "expected the inherit tag at the derived offset"
+        );
         bad[tag_at] = 0xFF;
         assert!(
             load_project_from_reader(&bad[..]).is_err(),
@@ -690,7 +744,11 @@ mod tests {
         let loaded = load_project_from_reader(&bytes[..]).expect("load");
 
         let layer = loaded.get_layer(id).expect("layer");
-        assert_eq!(layer.format(), PixelFormat::Srgb16, "storage must stay 16-bit");
+        assert_eq!(
+            layer.format(),
+            PixelFormat::Srgb16,
+            "storage must stay 16-bit"
+        );
         assert_eq!(
             layer.as_srgb16().expect("16-bit storage"),
             channels.as_slice(),
@@ -708,7 +766,10 @@ mod tests {
         if let Some(layer) = doc.get_layer_mut(id) {
             layer.convert_format(PixelFormat::Srgb8);
         }
-        assert!(doc.layers.iter().all(|layer| layer.format() == PixelFormat::Srgb8));
+        assert!(doc
+            .layers
+            .iter()
+            .all(|layer| layer.format() == PixelFormat::Srgb8));
 
         let mut bytes = Vec::new();
         save_project_to_writer(&doc, &mut bytes).expect("save");
@@ -725,5 +786,9 @@ mod tests {
             "the layer's own storage tag must survive as well"
         );
         let new_id = loaded.add_layer(None);
-        assert_eq!(loaded.get_layer(new_id).expect("layer").format(), PixelFormat::Srgb16);
-    }}
+        assert_eq!(
+            loaded.get_layer(new_id).expect("layer").format(),
+            PixelFormat::Srgb16
+        );
+    }
+}

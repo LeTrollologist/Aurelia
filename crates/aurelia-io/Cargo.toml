@@ -2,6 +2,7 @@
 name = "aurelia-io"
 version = "3.13.0-beta.3"
 edition = "2021"
+rust-version = "1.87"
 description = "File format encoders, decoders, PNG exporter, and binary project serializer for Aurelia"
 
 [dependencies]

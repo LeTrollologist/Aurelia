@@ -66,10 +66,7 @@ impl SymmetryConfig {
                     let angle = angle_step * (i as f32);
                     let cos = angle.cos();
                     let sin = angle.sin();
-                    let rotated = Vec2::new(
-                        rel.x * cos - rel.y * sin,
-                        rel.x * sin + rel.y * cos,
-                    );
+                    let rotated = Vec2::new(rel.x * cos - rel.y * sin, rel.x * sin + rel.y * cos);
                     mandala_pts.push(center + rotated);
                 }
             }

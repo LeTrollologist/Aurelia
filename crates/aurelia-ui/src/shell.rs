@@ -37,14 +37,18 @@ pub fn register_shell_associations() -> Result<String, String> {
 
     #[cfg(target_os = "windows")]
     {
-        let exe_path = std::env::current_exe().map_err(|e| format!("Failed to get exe path: {}", e))?;
+        let exe_path =
+            std::env::current_exe().map_err(|e| format!("Failed to get exe path: {}", e))?;
         let exe_str = exe_path.to_string_lossy();
         let cmd_str = format!("\"{}\" \"%1\"", exe_str);
         let icon_str = format!("\"{}\",0", exe_str);
 
         // 1. Register SystemFileAssociations for standard image extensions
         for &ext in SUPPORTED_EXTENSIONS {
-            let base_key = format!(r"HKCU\Software\Classes\SystemFileAssociations\{}\shell\OpenWithAurelia", ext);
+            let base_key = format!(
+                r"HKCU\Software\Classes\SystemFileAssociations\{}\shell\OpenWithAurelia",
+                ext
+            );
             let cmd_key = format!(r"{}\command", base_key);
 
             // Set display name
@@ -128,7 +132,10 @@ pub fn unregister_shell_associations() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         for &ext in SUPPORTED_EXTENSIONS {
-            let base_key = format!(r"HKCU\Software\Classes\SystemFileAssociations\{}\shell\OpenWithAurelia", ext);
+            let base_key = format!(
+                r"HKCU\Software\Classes\SystemFileAssociations\{}\shell\OpenWithAurelia",
+                ext
+            );
             let _ = Command::new("reg")
                 .args(&["delete", &base_key, "/f"])
                 .creation_flags(CREATE_NO_WINDOW)

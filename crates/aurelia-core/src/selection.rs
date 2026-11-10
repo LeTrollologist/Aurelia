@@ -205,7 +205,8 @@ impl SelectionMask {
     pub fn recompute_metadata(&mut self) {
         self.has_active_selection = self.mask.iter().any(|&v| v > 8);
         if self.has_active_selection {
-            self.cached_boundary = Self::compute_boundary_segments(self.width, self.height, &self.mask);
+            self.cached_boundary =
+                Self::compute_boundary_segments(self.width, self.height, &self.mask);
         } else {
             self.cached_boundary.clear();
         }
@@ -583,7 +584,12 @@ impl SelectionMask {
                     for dx in -r..=r {
                         let nx = x + dx;
                         let ny = y + dy;
-                        if nx < 0 || nx >= w || ny < 0 || ny >= h || src[(ny * w + nx) as usize] <= 8 {
+                        if nx < 0
+                            || nx >= w
+                            || ny < 0
+                            || ny >= h
+                            || src[(ny * w + nx) as usize] <= 8
+                        {
                             all_set = false;
                             break 'check;
                         }
@@ -690,7 +696,8 @@ impl SelectionMask {
                             let pyf = ny as f32 + 0.5;
                             let dist = ((pxf - bxf).powi(2) + (pyf - byf).powi(2)).sqrt();
                             if dist <= r + 0.5 {
-                                let cov = (1.0 - (dist - (r - 0.5)).clamp(0.0, 1.0)).clamp(0.0, 1.0);
+                                let cov =
+                                    (1.0 - (dist - (r - 0.5)).clamp(0.0, 1.0)).clamp(0.0, 1.0);
                                 let idx = (ny * w + nx) as usize;
                                 stroke_mask[idx] = stroke_mask[idx].max(cov);
                             }
@@ -858,11 +865,13 @@ mod combine_tests {
             vec![255, 100, 200, 255]
         );
         assert_eq!(
-            base.combined(&incoming, SelectionCombineMode::Subtract).mask,
+            base.combined(&incoming, SelectionCombineMode::Subtract)
+                .mask,
             vec![0, 0, 100, 255]
         );
         assert_eq!(
-            base.combined(&incoming, SelectionCombineMode::Intersect).mask,
+            base.combined(&incoming, SelectionCombineMode::Intersect)
+                .mask,
             vec![0, 15, 78, 0]
         );
     }
@@ -888,11 +897,21 @@ mod combine_tests {
         let nowhere = mask(&[0, 0, 0, 0]);
         let everywhere = mask(&[255, 255, 255, 255]);
 
-        assert!(!nowhere.combined(&nowhere, SelectionCombineMode::Union).has_selection());
-        assert!(!everywhere.combined(&everywhere, SelectionCombineMode::Subtract).has_selection());
-        assert!(!mask(&[255, 0, 0, 0]).combined(&mask(&[0, 255, 0, 0]), SelectionCombineMode::Intersect).has_selection());
-        assert!(nowhere.combined(&everywhere, SelectionCombineMode::Union).has_selection());
-        assert!(everywhere.combined(&nowhere, SelectionCombineMode::Union).has_selection());
+        assert!(!nowhere
+            .combined(&nowhere, SelectionCombineMode::Union)
+            .has_selection());
+        assert!(!everywhere
+            .combined(&everywhere, SelectionCombineMode::Subtract)
+            .has_selection());
+        assert!(!mask(&[255, 0, 0, 0])
+            .combined(&mask(&[0, 255, 0, 0]), SelectionCombineMode::Intersect)
+            .has_selection());
+        assert!(nowhere
+            .combined(&everywhere, SelectionCombineMode::Union)
+            .has_selection());
+        assert!(everywhere
+            .combined(&nowhere, SelectionCombineMode::Union)
+            .has_selection());
 
         let full = everywhere.combined(&everywhere, SelectionCombineMode::Intersect);
         assert!(full.has_selection());
@@ -908,10 +927,18 @@ mod combine_tests {
     #[test]
     fn identity_cases_and_size_mismatch_are_safe() {
         let base = mask(&[0, 255, 255, 255]);
-        assert!(base.combined(&base, SelectionCombineMode::Union).same_coverage(&base));
-        assert!(base.combined(&base, SelectionCombineMode::Intersect).same_coverage(&base));
-        assert!(!base.combined(&base, SelectionCombineMode::Subtract).has_selection());
-        assert!(base.combined(&base, SelectionCombineMode::Replace).same_coverage(&base));
+        assert!(base
+            .combined(&base, SelectionCombineMode::Union)
+            .same_coverage(&base));
+        assert!(base
+            .combined(&base, SelectionCombineMode::Intersect)
+            .same_coverage(&base));
+        assert!(!base
+            .combined(&base, SelectionCombineMode::Subtract)
+            .has_selection());
+        assert!(base
+            .combined(&base, SelectionCombineMode::Replace)
+            .same_coverage(&base));
 
         // Fractional coverage is not an idempotent lattice for multiply: intersect with itself
         // can only lower a value, never raise it, and exact endpoints stay exact.
@@ -920,13 +947,21 @@ mod combine_tests {
         for (after, before) in doubled.mask.iter().zip(fractional.mask.iter()) {
             assert!(after <= before, "{after} must not exceed {before}");
         }
-        assert_eq!(doubled.mask[3], 255, "255 is the fixed point of the multiply");
-        assert_eq!(doubled.mask[1], 6, "40 * 40 / 255 floors to 6, as the in-place op does");
+        assert_eq!(
+            doubled.mask[3], 255,
+            "255 is the fixed point of the multiply"
+        );
+        assert_eq!(
+            doubled.mask[1], 6,
+            "40 * 40 / 255 floors to 6, as the in-place op does"
+        );
 
         let mut target = base.clone();
         let wrong_size = SelectionMask::from_mask_vec(2, 1, vec![255, 255]);
         target.combine(&wrong_size, SelectionCombineMode::Union);
-        assert!(target.same_coverage(&base), "a mismatched mask must change nothing");
+        assert!(
+            target.same_coverage(&base),
+            "a mismatched mask must change nothing"
+        );
     }
 }
-

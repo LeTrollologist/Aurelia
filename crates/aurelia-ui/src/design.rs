@@ -6,9 +6,7 @@
 //! surfaces, a single gold accent, hairline edges and a restrained top sheen that
 //! reads as gloss without noise.
 
-use egui::{
-    Color32, FontId, Mesh, Painter, Rect, Response, RichText, Rounding, Sense, Stroke, Ui,
-};
+use egui::{Color32, FontId, Mesh, Painter, Rect, Response, RichText, Rounding, Sense, Stroke, Ui};
 
 use crate::fonts;
 
@@ -168,7 +166,8 @@ pub fn section(ui: &mut Ui, title: &str) {
     ui.add_space(7.0);
     ui.horizontal(|ui| {
         let (tick, _) = ui.allocate_exact_size(egui::vec2(2.0, 12.0), Sense::hover());
-        ui.painter().rect_filled(tick, 1.0, GOLD.linear_multiply(0.85));
+        ui.painter()
+            .rect_filled(tick, 1.0, GOLD.linear_multiply(0.85));
         ui.add_space(3.0);
         ui.label(
             RichText::new(spaced(title))
@@ -228,9 +227,11 @@ pub fn gloss_button(
     let hovered = ui
         .ctx()
         .animate_bool_with_time(id.with("hover"), response.hovered(), 0.12);
-    let pressed = ui
-        .ctx()
-        .animate_bool_with_time(id.with("press"), response.is_pointer_button_down_on(), 0.05);
+    let pressed = ui.ctx().animate_bool_with_time(
+        id.with("press"),
+        response.is_pointer_button_down_on(),
+        0.05,
+    );
 
     // Idle -> hover lightens the fill; pressed sinks it back slightly.
     let base = if active {
@@ -251,11 +252,7 @@ pub fn gloss_button(
     let painter = ui.painter();
     gloss(painter, rect, rounding, base, sheen);
 
-    let ring = if active {
-        0.85
-    } else {
-        0.55 * hovered
-    };
+    let ring = if active { 0.85 } else { 0.55 * hovered };
     if ring > 0.01 {
         painter.rect_stroke(
             rect,
@@ -274,7 +271,11 @@ pub fn gloss_button(
         painter.rect_stroke(rect, rounding, Stroke::new(1.0, HAIRLINE));
     }
 
-    let text_color = if active { accent } else { mix(TEXT_DIM, TEXT, hovered) };
+    let text_color = if active {
+        accent
+    } else {
+        mix(TEXT_DIM, TEXT, hovered)
+    };
     painter.text(
         rect.center(),
         egui::Align2::CENTER_CENTER,

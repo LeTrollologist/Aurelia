@@ -401,15 +401,11 @@ pub fn filter_sepia<C: Channel>(
 
         let (r, g, b) = (px[0], px[1], px[2]);
         // Truncating, as it always was.
-        pixels[idx] = C::from_scaled_f32_trunc(
-            (0.393 * r + 0.769 * g + 0.189 * b).clamp(0.0, mx),
-        );
-        pixels[idx + 1] = C::from_scaled_f32_trunc(
-            (0.349 * r + 0.686 * g + 0.168 * b).clamp(0.0, mx),
-        );
-        pixels[idx + 2] = C::from_scaled_f32_trunc(
-            (0.272 * r + 0.534 * g + 0.131 * b).clamp(0.0, mx),
-        );
+        pixels[idx] = C::from_scaled_f32_trunc((0.393 * r + 0.769 * g + 0.189 * b).clamp(0.0, mx));
+        pixels[idx + 1] =
+            C::from_scaled_f32_trunc((0.349 * r + 0.686 * g + 0.168 * b).clamp(0.0, mx));
+        pixels[idx + 2] =
+            C::from_scaled_f32_trunc((0.272 * r + 0.534 * g + 0.131 * b).clamp(0.0, mx));
     }
 }
 
@@ -774,9 +770,12 @@ pub fn filter_vignette<C: Channel>(
             let shade = 1.0 - factor * darkness;
 
             // Truncating, as it always was.
-            pixels[idx] = C::from_scaled_f32_trunc((pixels[idx].to_scaled_f32() * shade).clamp(0.0, mx));
-            pixels[idx + 1] = C::from_scaled_f32_trunc((pixels[idx + 1].to_scaled_f32() * shade).clamp(0.0, mx));
-            pixels[idx + 2] = C::from_scaled_f32_trunc((pixels[idx + 2].to_scaled_f32() * shade).clamp(0.0, mx));
+            pixels[idx] =
+                C::from_scaled_f32_trunc((pixels[idx].to_scaled_f32() * shade).clamp(0.0, mx));
+            pixels[idx + 1] =
+                C::from_scaled_f32_trunc((pixels[idx + 1].to_scaled_f32() * shade).clamp(0.0, mx));
+            pixels[idx + 2] =
+                C::from_scaled_f32_trunc((pixels[idx + 2].to_scaled_f32() * shade).clamp(0.0, mx));
         }
     }
 }

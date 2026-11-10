@@ -21,7 +21,11 @@ const LAYER_COUNTS: [usize; 4] = [1, 2, 4, 8];
 
 fn styles() -> LayerStyles {
     LayerStyles {
-        stroke: Some(StrokeStyle { width: 3.0, color: Color::BLACK, opacity: 0.8 }),
+        stroke: Some(StrokeStyle {
+            width: 3.0,
+            color: Color::BLACK,
+            opacity: 0.8,
+        }),
         drop_shadow: Some(DropShadowStyle {
             offset_x: 6.0,
             offset_y: 6.0,
@@ -29,7 +33,11 @@ fn styles() -> LayerStyles {
             color: Color::BLACK,
             opacity: 0.5,
         }),
-        outer_glow: Some(OuterGlowStyle { radius: 6.0, color: Color::WHITE, opacity: 0.4 }),
+        outer_glow: Some(OuterGlowStyle {
+            radius: 6.0,
+            color: Color::WHITE,
+            opacity: 0.4,
+        }),
     }
 }
 
@@ -43,7 +51,12 @@ fn styled_doc(width: u32, height: u32, layers: usize, small: bool) -> Document {
             doc.add_layer(Some(format!("Styled {index}")))
         };
         if let Some(layer) = doc.get_layer_mut(id) {
-            for (i, px) in layer.as_srgb8_mut().expect("8-bit").chunks_exact_mut(4).enumerate() {
+            for (i, px) in layer
+                .as_srgb8_mut()
+                .expect("8-bit")
+                .chunks_exact_mut(4)
+                .enumerate()
+            {
                 let x = (i as u32) % width;
                 let y = (i as u32) / width;
                 // `small` puts a 10%-wide object in the centre; support is still inside the
@@ -83,7 +96,11 @@ impl Samples {
     fn summary(values: &[f64]) -> (f64, f64, f64) {
         let mut sorted = values.to_vec();
         sorted.sort_by(|a, b| a.total_cmp(b));
-        (sorted[0], percentile(&sorted, 0.5), percentile(&sorted, 0.95))
+        (
+            sorted[0],
+            percentile(&sorted, 0.5),
+            percentile(&sorted, 0.95),
+        )
     }
 
     fn report(&self) {
@@ -129,7 +146,10 @@ fn measure(width: u32, height: u32, layers: usize, small: bool) -> Samples {
     let mut buffer = vec![0u32; (width * height) as usize];
     let viewport = [0, 0, width as usize, height as usize];
     let mut samples = Samples {
-        label: format!("{width}x{height}-{layers}layer{}", if small { "-small" } else { "" }),
+        label: format!(
+            "{width}x{height}-{layers}layer{}",
+            if small { "-small" } else { "" }
+        ),
         style: Vec::new(),
         composite: Vec::new(),
         viewport: Vec::new(),

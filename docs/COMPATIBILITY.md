@@ -18,7 +18,7 @@
 | AUR v1 / HCV v2–v5 | ✅ | — | legacy compatibility |
 | PNG / JPEG / WebP | ✅ | ✅ | PNG is 16-bit for 16-bit/mixed documents and 8-bit otherwise; Aurelia's JPEG/WebP encoders are 8-bit |
 | GIF / sprite sheet / frame sequence | ✅ (import) | ✅ | animation timeline export |
-| ICC / Display P3 | ❌ | ❌ | no color-management workflow yet |
+| ICC / Display P3 | Yes | No | document ICC profiles are embedded in PNG (iCCP), JPEG (APP2) and WebP (ICCP); Display P3 and CMYK are not implemented |
 
 ## Application features
 
@@ -29,7 +29,7 @@
 | Animation | timeline + GIF/sprite/frame export; no video container |
 | Reference images | single dock; not persisted as a library |
 | Workspace | panel toggles persisted; no named workspace presets |
-| Brushes | built-in presets; no import/export library |
+| Brushes | built-in presets plus `.gbr` / `.abr` stamp import; no export library |
 | Discord presence | opt-in, generic activity, optional project name, no artwork previews |
 | Accessibility | keyboard shortcuts; screen-reader and contrast work outstanding |
 

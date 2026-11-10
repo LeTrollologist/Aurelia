@@ -165,7 +165,11 @@ mod tests {
                 u8::to_f32(value),
                 "promoted {value} does not compute to the same working value"
             );
-            assert_eq!(srgb16_to_srgb8(promoted), value, "{value} did not survive the round trip");
+            assert_eq!(
+                srgb16_to_srgb8(promoted),
+                value,
+                "{value} did not survive the round trip"
+            );
         }
     }
 
@@ -182,7 +186,11 @@ mod tests {
                 seen.insert(working.to_bits()),
                 "half-step value {value} collided with an existing working value"
             );
-            assert_eq!(srgb16_to_srgb8(value), step as u8, "half way up rounds back to the step");
+            assert_eq!(
+                srgb16_to_srgb8(value),
+                step as u8,
+                "half way up rounds back to the step"
+            );
         }
     }
 

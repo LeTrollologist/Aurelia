@@ -1,14 +1,17 @@
-use flate2::read::DeflateDecoder;
-use flate2::write::DeflateEncoder;
-use flate2::Compression;
 use aurelia_core::blend::BlendMode;
 use aurelia_core::color::ThemeMode;
 use aurelia_core::document::{Document, EditorState, GuideLine, StraightRulerState};
 use aurelia_core::layer::Layer;
+use flate2::read::DeflateDecoder;
+use flate2::write::DeflateEncoder;
+use flate2::Compression;
 use image::{ImageBuffer, ImageFormat, Rgba};
+use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 const AUR_MAGIC_V1: &[u8; 4] = b"AUR\x01";
@@ -174,7 +177,7 @@ pub(crate) fn write_project_version<W: Write>(
 
     for layer in &doc.layers {
         writer.write_all(&layer.id.to_le_bytes())?;
-        
+
         let name_bytes = layer.name.as_bytes();
         if name_bytes.len() > u16::MAX as usize {
             return Err(ProjectError::TextFieldTooLong {
@@ -239,18 +242,29 @@ pub(crate) fn write_project_version<W: Write>(
         // If adjustment, serialize adjustment parameters
         if let Some(adj) = &layer.adjustment {
             match &adj.adjustment_type {
-                aurelia_core::layer::AdjustmentType::BrightnessContrast { brightness, contrast } => {
+                aurelia_core::layer::AdjustmentType::BrightnessContrast {
+                    brightness,
+                    contrast,
+                } => {
                     writer.write_all(&[0u8])?;
                     writer.write_all(&brightness.to_le_bytes())?;
                     writer.write_all(&contrast.to_le_bytes())?;
                 }
-                aurelia_core::layer::AdjustmentType::Hsl { hue_shift, saturation, lightness } => {
+                aurelia_core::layer::AdjustmentType::Hsl {
+                    hue_shift,
+                    saturation,
+                    lightness,
+                } => {
                     writer.write_all(&[1u8])?;
                     writer.write_all(&hue_shift.to_le_bytes())?;
                     writer.write_all(&saturation.to_le_bytes())?;
                     writer.write_all(&lightness.to_le_bytes())?;
                 }
-                aurelia_core::layer::AdjustmentType::ColorBalance { cyan_red, magenta_green, yellow_blue } => {
+                aurelia_core::layer::AdjustmentType::ColorBalance {
+                    cyan_red,
+                    magenta_green,
+                    yellow_blue,
+                } => {
                     writer.write_all(&[2u8])?;
                     writer.write_all(&cyan_red.to_le_bytes())?;
                     writer.write_all(&magenta_green.to_le_bytes())?;
@@ -280,13 +294,27 @@ pub(crate) fn write_project_version<W: Write>(
 
         // Flags bitmask
         let mut flags = 0u8;
-        if layer.visible { flags |= 1 << 0; }
-        if layer.locked { flags |= 1 << 1; }
-        if layer.alpha_locked { flags |= 1 << 2; }
-        if layer.clipping_mask { flags |= 1 << 3; }
-        if layer.is_reference { flags |= 1 << 4; }
-        if layer.is_expanded { flags |= 1 << 5; }
-        if layer.pass_through { flags |= 1 << 6; }
+        if layer.visible {
+            flags |= 1 << 0;
+        }
+        if layer.locked {
+            flags |= 1 << 1;
+        }
+        if layer.alpha_locked {
+            flags |= 1 << 2;
+        }
+        if layer.clipping_mask {
+            flags |= 1 << 3;
+        }
+        if layer.is_reference {
+            flags |= 1 << 4;
+        }
+        if layer.is_expanded {
+            flags |= 1 << 5;
+        }
+        if layer.pass_through {
+            flags |= 1 << 6;
+        }
         writer.write_all(&[flags])?;
 
         writer.write_all(&layer.opacity.to_le_bytes())?;
@@ -355,25 +383,26 @@ pub(crate) fn write_project_version<W: Write>(
 
         // Layer mask (AUR v2+): 0 = none, 1 = enabled flag + raw mask bytes.
         if version >= 2 {
-        match &layer.mask {
-            Some(mask)
-                if mask.pixels.len() == (doc.width as usize) * (doc.height as usize)
-                    && mask.width == doc.width
-                    && mask.height == doc.height =>
-            {
-                writer.write_all(&[1u8])?;
-                writer.write_all(&[u8::from(mask.enabled)])?;
-                writer.write_all(&mask.pixels)?;
+            match &layer.mask {
+                Some(mask)
+                    if mask.pixels.len() == (doc.width as usize) * (doc.height as usize)
+                        && mask.width == doc.width
+                        && mask.height == doc.height =>
+                {
+                    writer.write_all(&[1u8])?;
+                    writer.write_all(&[u8::from(mask.enabled)])?;
+                    writer.write_all(&mask.pixels)?;
+                }
+                _ => writer.write_all(&[0u8])?,
             }
-            _ => writer.write_all(&[0u8])?,
-        }
         }
     }
 
     // Save flat preview thumbnail
     let thumb_flat = doc.composite_layers(true);
-    let thumb_img: ImageBuffer<Rgba<u8>, &[u8]> = ImageBuffer::from_raw(doc.width, doc.height, &thumb_flat[..])
-        .ok_or(ProjectError::CorruptData)?;
+    let thumb_img: ImageBuffer<Rgba<u8>, &[u8]> =
+        ImageBuffer::from_raw(doc.width, doc.height, &thumb_flat[..])
+            .ok_or(ProjectError::CorruptData)?;
     let mut thumb_bytes = Cursor::new(Vec::new());
     thumb_img.write_to(&mut thumb_bytes, ImageFormat::Png)?;
     let thumb_ref = thumb_bytes.get_ref();
@@ -460,7 +489,12 @@ type LayerStyleEntries = Vec<(u64, aurelia_core::layer_style::LayerStyles)>;
 fn read_trailing_sections<R: Read>(reader: &mut R) -> (Option<LayerStyleEntries>, Option<Vec<u8>>) {
     const TRAILING_CAP: u64 = 8 * 1024 * 1024;
     let mut rest = Vec::new();
-    if reader.by_ref().take(TRAILING_CAP).read_to_end(&mut rest).is_err() {
+    if reader
+        .by_ref()
+        .take(TRAILING_CAP)
+        .read_to_end(&mut rest)
+        .is_err()
+    {
         return (None, None);
     }
 
@@ -469,12 +503,8 @@ fn read_trailing_sections<R: Read>(reader: &mut R) -> (Option<LayerStyleEntries>
     let mut at = 0usize;
     while at + 8 <= rest.len() {
         let magic = &rest[at..at + 4];
-        let length = u32::from_le_bytes([
-            rest[at + 4],
-            rest[at + 5],
-            rest[at + 6],
-            rest[at + 7],
-        ]) as usize;
+        let length =
+            u32::from_le_bytes([rest[at + 4], rest[at + 5], rest[at + 6], rest[at + 7]]) as usize;
         let payload_start = at + 8;
         let Some(payload_end) = payload_start.checked_add(length) else {
             break;
@@ -498,7 +528,9 @@ fn read_trailing_sections<R: Read>(reader: &mut R) -> (Option<LayerStyleEntries>
     (styles, icc_profile)
 }
 
-fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_style::LayerStyles)>> {
+fn parse_layer_styles(
+    payload: &[u8],
+) -> Option<Vec<(u64, aurelia_core::layer_style::LayerStyles)>> {
     use aurelia_core::color::Color;
     use aurelia_core::layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
 
@@ -531,7 +563,10 @@ fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_st
         }
     }
 
-    let mut cursor = Cursor { data: payload, at: 0 };
+    let mut cursor = Cursor {
+        data: payload,
+        at: 0,
+    };
     let version = cursor.u8()?;
     if version != 1 {
         return None;
@@ -552,7 +587,11 @@ fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_st
             let width = cursor.f32()?.max(0.0);
             let opacity = cursor.f32()?.clamp(0.0, 1.0);
             let color = cursor.color()?;
-            styles.stroke = Some(StrokeStyle { width, color, opacity });
+            styles.stroke = Some(StrokeStyle {
+                width,
+                color,
+                opacity,
+            });
         }
         if flags & 2 != 0 {
             let offset_x = cursor.f32()?;
@@ -572,7 +611,11 @@ fn parse_layer_styles(payload: &[u8]) -> Option<Vec<(u64, aurelia_core::layer_st
             let radius = cursor.f32()?.max(0.0);
             let opacity = cursor.f32()?.clamp(0.0, 1.0);
             let color = cursor.color()?;
-            styles.outer_glow = Some(OuterGlowStyle { radius, color, opacity });
+            styles.outer_glow = Some(OuterGlowStyle {
+                radius,
+                color,
+                opacity,
+            });
         }
         out.push((id, styles));
     }
@@ -638,7 +681,8 @@ fn read_editor_state<R: Read>(reader: &mut R) -> Option<EditorState> {
         &mut reader.by_ref().take(preview_len as u64),
         &mut std::io::sink(),
     )
-    .ok()? != preview_len as u64
+    .ok()?
+        != preview_len as u64
     {
         return None;
     }
@@ -682,10 +726,7 @@ fn parse_editor_payload(payload: &[u8]) -> Option<EditorState> {
         if !position.is_finite() {
             return None;
         }
-        editor.guides.push(GuideLine {
-            vertical,
-            position,
-        });
+        editor.guides.push(GuideLine { vertical, position });
     }
     let mut origin = [0u8; 8];
     cursor.read_exact(&mut origin).ok()?;
@@ -719,19 +760,33 @@ fn parse_editor_payload(payload: &[u8]) -> Option<EditorState> {
     Some(editor)
 }
 
-/// Writes a project file atomically: the stream is written to a sibling
-/// `.aur.tmp` file and renamed over the target only after it is fully flushed,
-/// so an interrupted save can never truncate an existing artwork.
+/// Writes a project through a unique sibling temporary file.
+///
+/// The temporary file is synchronized to durable storage before the atomic replacement, so a
+/// successful rename cannot publish a partially written image of the document. A failed
+/// write/sync/rename removes the temporary file and leaves the previous destination untouched.
+/// Parent-directory synchronization is attempted after a successful rename where the platform
+/// permits opening a directory as a file.
 pub fn save_project_file(doc: &Document, path: impl AsRef<Path>) -> Result<(), ProjectError> {
     let path = path.as_ref();
-    let mut tmp_name = path.file_name().map(|n| n.to_os_string()).unwrap_or_default();
-    tmp_name.push(".tmp");
-    let tmp_path = path.with_file_name(tmp_name);
+    let tmp_path = unique_temp_path(path);
 
     let result = (|| -> Result<(), ProjectError> {
-        let file = File::create(&tmp_path)?;
-        save_project_to_writer(doc, file)?;
+        let mut file = File::create(&tmp_path)?;
+        save_project_to_writer(doc, &mut file)?;
+        file.sync_all()?;
+        drop(file);
         std::fs::rename(&tmp_path, path)?;
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
+            // Directory fsync is not available on every Windows filesystem; it is a
+            // best-effort strengthening, not part of the file's own durability.
+            if let Ok(directory) = File::open(parent) {
+                let _ = directory.sync_all();
+            }
+        }
         Ok(())
     })();
 
@@ -739,6 +794,27 @@ pub fn save_project_file(doc: &Document, path: impl AsRef<Path>) -> Result<(), P
         let _ = std::fs::remove_file(&tmp_path);
     }
     result
+}
+
+static SAVE_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+/// A unique sibling path: process id, nanosecond timestamp and an in-process counter.
+fn unique_temp_path(path: &Path) -> PathBuf {
+    let base = path.file_name().unwrap_or_else(|| OsStr::new("project"));
+    let sequence = SAVE_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let mut name = OsString::from(".");
+    name.push(base);
+    name.push(format!(
+        ".{}.{}.{}.tmp",
+        std::process::id(),
+        nanos,
+        sequence
+    ));
+    path.with_file_name(name)
 }
 
 pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, ProjectError> {
@@ -833,7 +909,17 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
         let mut adjustment = None;
         let mut text_config = None;
 
-        let (kind, parent_id, visible, locked, alpha_locked, clipping_mask, is_reference, is_expanded, pass_through) = if is_v5 {
+        let (
+            kind,
+            parent_id,
+            visible,
+            locked,
+            alpha_locked,
+            clipping_mask,
+            is_reference,
+            is_expanded,
+            pass_through,
+        ) = if is_v5 {
             reader.read_exact(&mut buf1)?;
             let kind = match buf1[0] {
                 1 => aurelia_core::layer::LayerKind::Group,
@@ -845,7 +931,10 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                             let brightness = f32::from_le_bytes(buf4);
                             reader.read_exact(&mut buf4)?;
                             let contrast = f32::from_le_bytes(buf4);
-                            aurelia_core::layer::AdjustmentType::BrightnessContrast { brightness, contrast }
+                            aurelia_core::layer::AdjustmentType::BrightnessContrast {
+                                brightness,
+                                contrast,
+                            }
                         }
                         1 => {
                             reader.read_exact(&mut buf4)?;
@@ -854,7 +943,11 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                             let saturation = f32::from_le_bytes(buf4);
                             reader.read_exact(&mut buf4)?;
                             let lightness = f32::from_le_bytes(buf4);
-                            aurelia_core::layer::AdjustmentType::Hsl { hue_shift, saturation, lightness }
+                            aurelia_core::layer::AdjustmentType::Hsl {
+                                hue_shift,
+                                saturation,
+                                lightness,
+                            }
                         }
                         2 => {
                             reader.read_exact(&mut buf4)?;
@@ -863,7 +956,11 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                             let magenta_green = f32::from_le_bytes(buf4);
                             reader.read_exact(&mut buf4)?;
                             let yellow_blue = f32::from_le_bytes(buf4);
-                            aurelia_core::layer::AdjustmentType::ColorBalance { cyan_red, magenta_green, yellow_blue }
+                            aurelia_core::layer::AdjustmentType::ColorBalance {
+                                cyan_red,
+                                magenta_green,
+                                yellow_blue,
+                            }
                         }
                         3 => aurelia_core::layer::AdjustmentType::Invert,
                         4 => {
@@ -883,7 +980,9 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                         }
                         _ => aurelia_core::layer::AdjustmentType::Invert,
                     };
-                    adjustment = Some(aurelia_core::layer::AdjustmentConfig { adjustment_type: adj_type });
+                    adjustment = Some(aurelia_core::layer::AdjustmentConfig {
+                        adjustment_type: adj_type,
+                    });
                     aurelia_core::layer::LayerKind::Adjustment
                 }
                 3 => {
@@ -961,7 +1060,17 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             let is_expanded = (flags & (1 << 5)) != 0;
             let pass_through = (flags & (1 << 6)) != 0;
 
-            (kind, parent_id, visible, locked, alpha_locked, clipping_mask, is_reference, is_expanded, pass_through)
+            (
+                kind,
+                parent_id,
+                visible,
+                locked,
+                alpha_locked,
+                clipping_mask,
+                is_reference,
+                is_expanded,
+                pass_through,
+            )
         } else if is_v4 {
             reader.read_exact(&mut buf1)?;
             let kind = match buf1[0] {
@@ -974,7 +1083,10 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                             let brightness = f32::from_le_bytes(buf4);
                             reader.read_exact(&mut buf4)?;
                             let contrast = f32::from_le_bytes(buf4);
-                            aurelia_core::layer::AdjustmentType::BrightnessContrast { brightness, contrast }
+                            aurelia_core::layer::AdjustmentType::BrightnessContrast {
+                                brightness,
+                                contrast,
+                            }
                         }
                         1 => {
                             reader.read_exact(&mut buf4)?;
@@ -983,7 +1095,11 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                             let saturation = f32::from_le_bytes(buf4);
                             reader.read_exact(&mut buf4)?;
                             let lightness = f32::from_le_bytes(buf4);
-                            aurelia_core::layer::AdjustmentType::Hsl { hue_shift, saturation, lightness }
+                            aurelia_core::layer::AdjustmentType::Hsl {
+                                hue_shift,
+                                saturation,
+                                lightness,
+                            }
                         }
                         2 => {
                             reader.read_exact(&mut buf4)?;
@@ -992,7 +1108,11 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                             let magenta_green = f32::from_le_bytes(buf4);
                             reader.read_exact(&mut buf4)?;
                             let yellow_blue = f32::from_le_bytes(buf4);
-                            aurelia_core::layer::AdjustmentType::ColorBalance { cyan_red, magenta_green, yellow_blue }
+                            aurelia_core::layer::AdjustmentType::ColorBalance {
+                                cyan_red,
+                                magenta_green,
+                                yellow_blue,
+                            }
                         }
                         3 => aurelia_core::layer::AdjustmentType::Invert,
                         4 => {
@@ -1012,7 +1132,9 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
                         }
                         _ => aurelia_core::layer::AdjustmentType::Invert,
                     };
-                    adjustment = Some(aurelia_core::layer::AdjustmentConfig { adjustment_type: adj_type });
+                    adjustment = Some(aurelia_core::layer::AdjustmentConfig {
+                        adjustment_type: adj_type,
+                    });
                     aurelia_core::layer::LayerKind::Adjustment
                 }
                 _ => aurelia_core::layer::LayerKind::Raster,
@@ -1032,7 +1154,17 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             let is_expanded = (flags & (1 << 5)) != 0;
             let pass_through = (flags & (1 << 6)) != 0;
 
-            (kind, parent_id, visible, locked, alpha_locked, clipping_mask, is_reference, is_expanded, pass_through)
+            (
+                kind,
+                parent_id,
+                visible,
+                locked,
+                alpha_locked,
+                clipping_mask,
+                is_reference,
+                is_expanded,
+                pass_through,
+            )
         } else if is_v3 {
             reader.read_exact(&mut buf1)?;
             let kind = if buf1[0] == 1 {
@@ -1055,7 +1187,17 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             let is_expanded = (flags & (1 << 5)) != 0;
             let pass_through = (flags & (1 << 6)) != 0;
 
-            (kind, parent_id, visible, locked, alpha_locked, clipping_mask, is_reference, is_expanded, pass_through)
+            (
+                kind,
+                parent_id,
+                visible,
+                locked,
+                alpha_locked,
+                clipping_mask,
+                is_reference,
+                is_expanded,
+                pass_through,
+            )
         } else {
             reader.read_exact(&mut buf1)?;
             let visible = buf1[0] != 0;
@@ -1063,7 +1205,17 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             reader.read_exact(&mut buf1)?;
             let locked = buf1[0] != 0;
 
-            (aurelia_core::layer::LayerKind::Raster, None, visible, locked, false, false, false, true, false)
+            (
+                aurelia_core::layer::LayerKind::Raster,
+                None,
+                visible,
+                locked,
+                false,
+                false,
+                false,
+                true,
+                false,
+            )
         };
 
         reader.read_exact(&mut buf4)?;
@@ -1152,8 +1304,7 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
             let mut compressed = reader.by_ref().take(comp_len as u64);
             let mut raw = Vec::new();
             {
-                let mut decoder =
-                    DeflateDecoder::new(&mut compressed).take(expected as u64 + 1);
+                let mut decoder = DeflateDecoder::new(&mut compressed).take(expected as u64 + 1);
                 decoder.read_to_end(&mut raw)?;
             }
             // A deflate stream can end before comp_len; discard the remainder so the reader
@@ -1318,6 +1469,16 @@ mod tests {
             save_project_to_writer(&doc, &mut out),
             Err(ProjectError::TextTooLarge { .. })
         ));
+    }
+
+    #[test]
+    fn temporary_save_paths_are_unique_siblings() {
+        let target = Path::new("art.aur");
+        let first = unique_temp_path(target);
+        let second = unique_temp_path(target);
+        assert_ne!(first, second);
+        assert_eq!(first.parent(), target.parent());
+        assert!(first.to_string_lossy().ends_with(".tmp"));
     }
 
     #[test]

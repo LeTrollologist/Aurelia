@@ -144,10 +144,9 @@ impl Output {
 fn widen(doc: &mut Document) {
     for layer in &mut doc.layers {
         let channels: Vec<u16> = match layer.buffer() {
-            LayerBuffer::Srgb8(bytes) => bytes
-                .iter()
-                .map(|&value| srgb8_to_srgb16(value))
-                .collect(),
+            LayerBuffer::Srgb8(bytes) => {
+                bytes.iter().map(|&value| srgb8_to_srgb16(value)).collect()
+            }
             LayerBuffer::Srgb16(channels) => channels.clone(),
         };
         *layer.buffer_mut() = LayerBuffer::Srgb16(channels);
@@ -251,21 +250,43 @@ fn main() {
         "\nAurelia composite benchmark - {W}x{H}, {LAYERS} layers, {} output,",
         output.label()
     );
-    println!(
-        "  {ITERS} iterations x {REPEATS} interleaved rounds (median of)"
-    );
+    println!("  {ITERS} iterations x {REPEATS} interleaved rounds (median of)");
 
     let mut cases = vec![
-        Case { label: "plain stack", make: || build_doc(false, false, 1.0) },
-        Case { label: "with layer mask", make: || build_doc(true, false, 1.0) },
+        Case {
+            label: "plain stack",
+            make: || build_doc(false, false, 1.0),
+        },
+        Case {
+            label: "with layer mask",
+            make: || build_doc(true, false, 1.0),
+        },
         // The general path: what the offset/blend branch costs, and how much of that cost
         // is avoidable work on transparent pixels.
-        Case { label: "general, opaque", make: || build_doc(false, true, 1.0) },
-        Case { label: "general, 50% coverage", make: || build_doc(false, true, 0.5) },
-        Case { label: "general, 10% coverage", make: || build_doc(false, true, 0.1) },
-        Case { label: "general, 10% + mask", make: || build_doc(true, true, 0.1) },
-        Case { label: "general, clipping", make: || build_clip_doc(1.0) },
-        Case { label: "general, clipping 10%", make: || build_clip_doc(0.1) },
+        Case {
+            label: "general, opaque",
+            make: || build_doc(false, true, 1.0),
+        },
+        Case {
+            label: "general, 50% coverage",
+            make: || build_doc(false, true, 0.5),
+        },
+        Case {
+            label: "general, 10% coverage",
+            make: || build_doc(false, true, 0.1),
+        },
+        Case {
+            label: "general, 10% + mask",
+            make: || build_doc(true, true, 0.1),
+        },
+        Case {
+            label: "general, clipping",
+            make: || build_clip_doc(1.0),
+        },
+        Case {
+            label: "general, clipping 10%",
+            make: || build_clip_doc(0.1),
+        },
     ];
     // One case per blend mode: they no longer share a loop, so a slow mode has to be
     // visible instead of being averaged away behind Normal.

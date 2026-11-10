@@ -29,10 +29,7 @@ const MAX_FRAME_BYTES: usize = 1_000_000;
 /// Parses the 8-byte Discord IPC header, enforcing the frame-size limit before any
 /// allocation. `expected_opcode` is used for the READY handshake; normal polling accepts
 /// any opcode and handles PING below.
-fn parse_frame_header(
-    header: &[u8; 8],
-    expected_opcode: Option<u32>,
-) -> io::Result<(u32, usize)> {
+fn parse_frame_header(header: &[u8; 8], expected_opcode: Option<u32>) -> io::Result<(u32, usize)> {
     let opcode = u32::from_le_bytes(header[0..4].try_into().unwrap());
     let length = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
     if let Some(expected) = expected_opcode {

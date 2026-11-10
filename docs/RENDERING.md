@@ -19,9 +19,9 @@ is an implementation goal for specific passes, not a global guarantee.
 - Working data follows the document: 8-bit documents composite on the integer fast path, while
   16-bit documents use the generic working-precision path and are downconverted only at the
   8-bit presentation boundary.
-- There is **no ICC/Display P3 color management** yet: profiles are not loaded, embedded or
-  converted, and untagged images are treated as sRGB.
-- Color management is the highest-priority rendering gap; see `ROADMAP.md`.
+- Document ICC profiles can be assigned, cleared and converted to the document working space;
+  PNG (`iCCP`), JPEG (`APP2`) and WebP (`ICCP`) carry them through export/import. The viewport
+  remains 8-bit sRGB; Display P3 and CMYK workflows are not implemented.
 
 ## Overlays and UI
 
