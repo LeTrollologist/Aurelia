@@ -1571,6 +1571,35 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         });
                     });
 
+                    ui.horizontal(|ui| {
+                        if ui.small_button("Manage").on_hover_text("Rename or delete saved presets").clicked() {
+                            state.show_preset_manager = true;
+                        }
+                        if ui.small_button("Export presets").clicked() {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .add_filter("Aurelia presets", &["aurp"])
+                                .set_file_name("presets.aurp")
+                                .save_file()
+                            {
+                                if let Err(error) = state.export_preset_library(&path) {
+                                    state.preset_error = Some(error);
+                                }
+                            }
+                        }
+                        if ui.small_button("Import presets").clicked() {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .add_filter("Aurelia presets", &["aurp"])
+                                .pick_file()
+                            {
+                                if let Err(error) = state.import_preset_library(&path) {
+                                    state.preset_error = Some(error);
+                                }
+                            }
+                        }
+                    });
+                    if let Some(error) = &state.preset_error {
+                        ui.label(RichText::new(error).size(9.0).color(Color32::from_rgb(224, 112, 92)));
+                    }
                     egui::Grid::new("preset_shelf_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
                         let num_presets = state.presets.len();
                         for i in 0..num_presets {
@@ -1697,6 +1726,27 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             });
                             ui.checkbox(&mut state.brush.gradient_dither, "Dither Smoothing");
                             ui.label(RichText::new("Drag on canvas: blends Primary to Secondary").size(9.0).color(Color32::from_rgb(172, 161, 130)));
+                            ui.add_space(6.0);
+                            ui.separator();
+                            ui.label(RichText::new("GRADIENT PRESETS").size(9.5).strong().color(accent_c32));
+                            egui::Grid::new("gradient_preset_shelf_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+                                let count = state.gradient_presets.len();
+                                for i in 0..count {
+                                    let name = state.gradient_presets[i].name.clone();
+                                    let active = state.active_gradient_preset_idx == Some(i);
+                                    if ui.selectable_label(active, name).clicked() {
+                                        state.apply_gradient_preset(i);
+                                    }
+                                    if i % 2 == 1 { ui.end_row(); }
+                                }
+                            });
+                            if ui.small_button("Save current gradient").clicked() {
+                                let name = format!("Gradient {}", state.gradient_presets.len() + 1);
+                                state.save_current_as_gradient_preset(&name);
+                            }
+                            if let Some(error) = &state.preset_error {
+                                ui.label(RichText::new(error).size(9.0).color(Color32::from_rgb(224, 112, 92)));
+                            }
                         }
                         ToolType::Wand => {
                             ui.add(egui::Slider::new(&mut state.wand_tolerance, 0..=128).text("Tolerance"));
@@ -5565,6 +5615,121 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     }
                     if ui.button("Cancel").clicked() {
                         state.show_save_preset_dialog = false;
+                    }
+                });
+            });
+    }
+
+    // ── Preset Library Manager ──
+    if state.show_preset_manager {
+        egui::Window::new("Preset Library")
+            .fixed_size(Vec2::new(420.0, 460.0))
+            .collapsible(false)
+            .resizable(true)
+            .default_pos(ctx.screen_rect().center())
+            .pivot(egui::Align2::CENTER_CENTER)
+            .show(ctx, |ui| {
+                ui.label(
+                    RichText::new("BRUSH PRESETS")
+                        .size(9.5)
+                        .strong()
+                        .color(accent_c32),
+                );
+                let mut delete_brush = None;
+                egui::ScrollArea::vertical()
+                    .max_height(150.0)
+                    .show(ui, |ui| {
+                        for i in 0..state.presets.len() {
+                            ui.horizontal(|ui| {
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut state.presets[i].name)
+                                        .desired_width(230.0),
+                                );
+                                if ui.small_button("Load").clicked() {
+                                    state.select_preset(i);
+                                }
+                                if ui.small_button("Delete").clicked() {
+                                    delete_brush = Some(i);
+                                }
+                            });
+                        }
+                    });
+                if let Some(i) = delete_brush {
+                    state.delete_preset(i);
+                }
+
+                ui.add_space(8.0);
+                ui.label(
+                    RichText::new("GRADIENT PRESETS")
+                        .size(9.5)
+                        .strong()
+                        .color(accent_c32),
+                );
+                let mut delete_gradient = None;
+                egui::ScrollArea::vertical()
+                    .max_height(130.0)
+                    .show(ui, |ui| {
+                        for i in 0..state.gradient_presets.len() {
+                            ui.horizontal(|ui| {
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut state.gradient_presets[i].name)
+                                        .desired_width(230.0),
+                                );
+                                if ui.small_button("Load").clicked() {
+                                    state.apply_gradient_preset(i);
+                                }
+                                if ui.small_button("Delete").clicked() {
+                                    delete_gradient = Some(i);
+                                }
+                            });
+                        }
+                    });
+                if let Some(i) = delete_gradient {
+                    state.delete_gradient_preset(i);
+                }
+
+                if let Some(error) = &state.preset_error {
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(error)
+                            .size(9.0)
+                            .color(Color32::from_rgb(224, 112, 92)),
+                    );
+                }
+                ui.add_space(8.0);
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui.button("Save changes").clicked() {
+                        if let Err(error) = state.save_preset_library() {
+                            state.preset_error = Some(error);
+                        }
+                    }
+                    if ui.button("Import").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Aurelia presets", &["aurp"])
+                            .pick_file()
+                        {
+                            if let Err(error) = state.import_preset_library(&path) {
+                                state.preset_error = Some(error);
+                            }
+                        }
+                    }
+                    if ui.button("Export").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Aurelia presets", &["aurp"])
+                            .set_file_name("presets.aurp")
+                            .save_file()
+                        {
+                            if let Err(error) = state.export_preset_library(&path) {
+                                state.preset_error = Some(error);
+                            }
+                        }
+                    }
+                    if ui.button("Reset to defaults").clicked() {
+                        state.reset_presets_to_default();
+                    }
+                    if ui.button("Close").clicked() {
+                        state.show_preset_manager = false;
                     }
                 });
             });

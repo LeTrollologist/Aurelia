@@ -783,6 +783,12 @@ pub struct AppState {
     pub active_preset_idx: Option<usize>,
     pub show_save_preset_dialog: bool,
     pub new_preset_name: String,
+    /// Durable user gradient presets.
+    pub gradient_presets: Vec<aurelia_core::brush::GradientPreset>,
+    pub active_gradient_preset_idx: Option<usize>,
+    /// Last preset import/save error, shown in the shelf instead of silently ignoring it.
+    pub preset_error: Option<String>,
+    pub show_preset_manager: bool,
 
     // ── Frame Animation & Timeline Strip ──
     pub timeline: aurelia_core::animation::AnimationTimeline,
@@ -1076,6 +1082,10 @@ impl AppState {
             active_preset_idx: Some(0),
             show_save_preset_dialog: false,
             new_preset_name: String::new(),
+            gradient_presets: aurelia_core::brush::GradientPreset::default_library(),
+            active_gradient_preset_idx: Some(0),
+            preset_error: None,
+            show_preset_manager: false,
 
             timeline: aurelia_core::animation::AnimationTimeline::new(width, height),
             show_export_animation_dialog: false,
@@ -1531,13 +1541,83 @@ impl AppState {
         }
         if imported > 0 {
             self.select_preset(self.presets.len() - 1);
+            self.persist_presets();
         }
         Ok(imported)
+    }
+
+    /// Load the durable preset library. A missing file keeps the factory defaults; a corrupt
+    /// file is reported and leaves the in-memory defaults untouched.
+    pub fn load_presets(&mut self) {
+        let path = Self::preset_path();
+        if !path.is_file() {
+            return;
+        }
+        match aurelia_core::load_library(&path) {
+            Ok(library) => {
+                self.presets = library.brushes;
+                self.gradient_presets = library.gradients;
+                self.active_preset_idx = if self.presets.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                };
+                self.active_gradient_preset_idx = if self.gradient_presets.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                };
+                self.preset_error = None;
+            }
+            Err(error) => {
+                self.preset_error = Some(format!("Could not load presets: {error}"));
+            }
+        }
+    }
+
+    pub fn preset_path() -> std::path::PathBuf {
+        Self::autosave_dir()
+            .parent()
+            .map(|dir| dir.join("presets.aurp"))
+            .unwrap_or_else(|| std::env::temp_dir().join("aurelia-presets.aurp"))
+    }
+
+    fn preset_library(&self) -> aurelia_core::PresetLibrary {
+        aurelia_core::PresetLibrary {
+            brushes: self.presets.clone(),
+            gradients: self.gradient_presets.clone(),
+        }
+    }
+
+    fn persist_presets(&mut self) -> bool {
+        match aurelia_core::save_library(&Self::preset_path(), &self.preset_library()) {
+            Ok(()) => {
+                self.preset_error = None;
+                true
+            }
+            Err(error) => {
+                self.preset_error = Some(format!("Could not save presets: {error}"));
+                false
+            }
+        }
+    }
+
+    /// Persist in-memory preset edits from the preset manager.
+    pub fn save_preset_library(&mut self) -> Result<(), String> {
+        if self.persist_presets() {
+            Ok(())
+        } else {
+            Err(self
+                .preset_error
+                .clone()
+                .unwrap_or_else(|| "Could not save presets".to_string()))
+        }
     }
 
     pub fn save_current_as_preset(&mut self, name: &str) {
         let name_trimmed = name.trim();
         if name_trimmed.is_empty() {
+            self.preset_error = Some("A preset name is required".to_string());
             return;
         }
         let icon = match self.brush.tool {
@@ -1557,13 +1637,149 @@ impl AppState {
         };
         self.presets.push(new_preset);
         self.active_preset_idx = Some(self.presets.len() - 1);
-        self.set_status(format!("Saved custom preset: {}", name_trimmed));
+        if self.persist_presets() {
+            self.set_status(format!("Saved custom preset: {name_trimmed}"));
+        }
+    }
+
+    pub fn delete_preset(&mut self, index: usize) {
+        if index >= self.presets.len() {
+            self.preset_error = Some("Preset no longer exists".to_string());
+            return;
+        }
+        let removed = self.presets.remove(index);
+        self.active_preset_idx = if self.presets.is_empty() {
+            None
+        } else {
+            Some(index.min(self.presets.len() - 1))
+        };
+        if self.persist_presets() {
+            self.set_status(format!("Deleted preset: {}", removed.name));
+        }
+    }
+
+    pub fn rename_preset(&mut self, index: usize, name: &str) {
+        let name = name.trim();
+        if name.is_empty() {
+            self.preset_error = Some("A preset name is required".to_string());
+            return;
+        }
+        let Some(preset) = self.presets.get_mut(index) else {
+            self.preset_error = Some("Preset no longer exists".to_string());
+            return;
+        };
+        preset.name = name.to_string();
+        if self.persist_presets() {
+            self.set_status(format!("Renamed preset: {name}"));
+        }
+    }
+
+    pub fn save_current_as_gradient_preset(&mut self, name: &str) {
+        let name = name.trim();
+        if name.is_empty() {
+            self.preset_error = Some("A preset name is required".to_string());
+            return;
+        }
+        self.gradient_presets
+            .push(aurelia_core::brush::GradientPreset {
+                name: name.to_string(),
+                description: "Custom gradient preset".to_string(),
+                gradient_type: self.brush.gradient_type,
+                dither: self.brush.gradient_dither,
+                primary_color: self.brush.primary_color,
+                secondary_color: self.brush.secondary_color,
+            });
+        self.active_gradient_preset_idx = Some(self.gradient_presets.len() - 1);
+        if self.persist_presets() {
+            self.set_status(format!("Saved gradient preset: {name}"));
+        }
+    }
+
+    pub fn apply_gradient_preset(&mut self, index: usize) {
+        let Some(preset) = self.gradient_presets.get(index).cloned() else {
+            self.preset_error = Some("Gradient preset no longer exists".to_string());
+            return;
+        };
+        self.brush.gradient_type = preset.gradient_type;
+        self.brush.gradient_dither = preset.dither;
+        self.brush.primary_color = preset.primary_color;
+        self.brush.secondary_color = preset.secondary_color;
+        self.active_gradient_preset_idx = Some(index);
+        self.set_status(format!("Loaded gradient preset: {}", preset.name));
+    }
+
+    pub fn delete_gradient_preset(&mut self, index: usize) {
+        if index >= self.gradient_presets.len() {
+            self.preset_error = Some("Gradient preset no longer exists".to_string());
+            return;
+        }
+        let removed = self.gradient_presets.remove(index);
+        self.active_gradient_preset_idx = if self.gradient_presets.is_empty() {
+            None
+        } else {
+            Some(index.min(self.gradient_presets.len() - 1))
+        };
+        if self.persist_presets() {
+            self.set_status(format!("Deleted gradient preset: {}", removed.name));
+        }
+    }
+
+    pub fn rename_gradient_preset(&mut self, index: usize, name: &str) {
+        let name = name.trim();
+        if name.is_empty() {
+            self.preset_error = Some("A preset name is required".to_string());
+            return;
+        }
+        let Some(preset) = self.gradient_presets.get_mut(index) else {
+            self.preset_error = Some("Gradient preset no longer exists".to_string());
+            return;
+        };
+        preset.name = name.to_string();
+        if self.persist_presets() {
+            self.set_status(format!("Renamed gradient preset: {name}"));
+        }
+    }
+
+    pub fn import_preset_library(&mut self, path: &std::path::Path) -> Result<(), String> {
+        let library = aurelia_core::load_library(path).map_err(|error| error.to_string())?;
+        self.presets = library.brushes;
+        self.gradient_presets = library.gradients;
+        self.active_preset_idx = if self.presets.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
+        self.active_gradient_preset_idx = if self.gradient_presets.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
+        if self.persist_presets() {
+            self.set_status("Imported preset library");
+            Ok(())
+        } else {
+            Err(self
+                .preset_error
+                .clone()
+                .unwrap_or_else(|| "Could not save imported presets".to_string()))
+        }
+    }
+
+    pub fn export_preset_library(&mut self, path: &std::path::Path) -> Result<(), String> {
+        aurelia_core::save_library(path, &self.preset_library())
+            .map_err(|error| error.to_string())?;
+        self.preset_error = None;
+        self.set_status("Exported preset library");
+        Ok(())
     }
 
     pub fn reset_presets_to_default(&mut self) {
         self.presets = aurelia_core::brush::BrushPreset::default_library();
+        self.gradient_presets = aurelia_core::brush::GradientPreset::default_library();
         self.active_preset_idx = Some(0);
+        self.active_gradient_preset_idx = Some(0);
         self.select_preset(0);
+        self.persist_presets();
         self.set_status("Reset preset shelf to factory defaults");
     }
 
@@ -3195,6 +3411,7 @@ impl AppState {
         if let Ok(text) = std::fs::read_to_string(Self::preferences_path()) {
             self.apply_preferences_text(&text);
         }
+        self.load_presets();
     }
 
     /// Applies a preferences file body.

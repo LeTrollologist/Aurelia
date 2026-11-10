@@ -3,7 +3,7 @@
 **Status:** v3.14.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
 Win32 + GDI, unsigned installer by permanent policy. v3.13.0 is the previous release.
 
-**Baseline:** 385 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
+**Baseline:** 390 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
 **0.60** budget on the last quality run. The GDI fallback remains an **8-bit presentation** of
 16-bit documents; the opt-in 10-bit canvas path shipped experimentally in v3.14.0.
@@ -52,12 +52,19 @@ claim.
 
 ---
 
+## Now — v3.15.0: Persistent presets (in progress)
+
+**Status:** the versioned `presets.aurp` format, atomic save/load, brush-stamp persistence,
+gradient presets, manager UI and import/export are implemented in the development tree. The
+release gate is the normal quality suite plus a restart/import/export check on Windows.
+
+- Version 1 header, bounded counts/strings/stamps and explicit corrupt/oversized/version errors.
+- `%LOCALAPPDATA%\Aurelia\presets.aurp`; unique temp file, `sync_all`, replacement, cleanup.
+- Brush and gradient preset manager, save/load, rename/delete, library import/export.
+
 ## Next — queued in order
 
-1. **Persistent brush and gradient preset library.** The import path now has an aggregate
-   decoded-memory budget and session-only stamps. The next step is a versioned, bounded preset
-   file with explicit import/export limits and migration tests.
-2. **PSD import feasibility spike.** Read-only first: layer structure, masks, groups, text and
+1. **PSD import feasibility spike.** Read-only first: layer structure, masks, groups, text and
    adjustment layers. A separate compatibility matrix and fixture corpus are prerequisites;
    writing PSD is out of scope for the spike.
 3. **Multi-document tabs.** A `DocumentSession` refactor; valuable, but it waits behind viewport

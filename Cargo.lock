@@ -299,6 +299,7 @@ dependencies = [
  "moxcms",
  "rayon",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 

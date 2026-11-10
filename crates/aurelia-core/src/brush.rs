@@ -661,6 +661,48 @@ impl BrushPreset {
     }
 }
 
+/// A reusable gradient tool configuration. Colors are the endpoints the gradient tool uses.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GradientPreset {
+    pub name: String,
+    pub description: String,
+    pub gradient_type: GradientType,
+    pub dither: bool,
+    pub primary_color: Color,
+    pub secondary_color: Color,
+}
+
+impl GradientPreset {
+    pub fn default_library() -> Vec<Self> {
+        vec![
+            Self {
+                name: "Gold to Ink".to_string(),
+                description: "Brand gold fading into the dark ink secondary".to_string(),
+                gradient_type: GradientType::Linear,
+                dither: true,
+                primary_color: Color::BRAND_GOLD,
+                secondary_color: Color::from_hex("#130f30").unwrap_or(Color::BLACK),
+            },
+            Self {
+                name: "Soft Light".to_string(),
+                description: "Radial white-to-transparent highlight".to_string(),
+                gradient_type: GradientType::Radial,
+                dither: true,
+                primary_color: Color::WHITE,
+                secondary_color: Color::TRANSPARENT,
+            },
+            Self {
+                name: "Warm Shadow".to_string(),
+                description: "Linear amber-to-black shading ramp".to_string(),
+                gradient_type: GradientType::Linear,
+                dither: true,
+                primary_color: Color::BRAND_AMBER,
+                secondary_color: Color::BLACK,
+            },
+        ]
+    }
+}
+
 /// Size multiplier for a stylus tilted by `(tilt_x, tilt_y)` degrees.
 ///
 /// A pen laid flatter spreads its tip over more pixels, so the stroke widens: at a
