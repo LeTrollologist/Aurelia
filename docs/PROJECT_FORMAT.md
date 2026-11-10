@@ -55,6 +55,8 @@ what the layers happen to hold:
   be a group, no layer may parent itself, cycles are rejected, and a chain may be at most
   **1024 parent links** deep. Violations return `CorruptData` before a `Document` is handed to
   the editor.
+- Layer names are UTF-8 and limited to **65,535 bytes**. Longer names are rejected with
+  `TextFieldTooLong` before the record is written; the editor truncates at a character boundary.
 - Truncated or malformed files return `CorruptData`; the reader does not guess a format.
 - 16-bit layers round-trip byte-exactly, and native 16-bit compositing output is available
   through `Document::composite_layers_srgb16` (#15).

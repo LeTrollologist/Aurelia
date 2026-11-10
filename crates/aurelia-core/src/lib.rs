@@ -29,7 +29,10 @@ pub use document::{
     CompositeError, Document, HierarchyError, MAX_LAYER_HIERARCHY_DEPTH,
 };
 pub use history::{Command, HistoryStack, LayerPixelsDeltaCommand, ProfileConversionCommand};
-pub use layer::{AdjustmentConfig, AdjustmentType, Layer, LayerId, LayerKind};
+pub use layer::{
+    AdjustmentConfig, AdjustmentType, Layer, LayerId, LayerKind, MAX_LAYER_NAME_BYTES,
+    truncate_layer_name,
+};
 pub use layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
 pub use perspective::{PerspectiveConfig, PerspectiveType};
 pub use rasterizer::StrokeRasterizer;

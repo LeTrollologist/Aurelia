@@ -304,20 +304,24 @@ unsafe fn get_clipboard_text(hwnd: HWND) -> Option<String> {
         CloseClipboard();
         return None;
     }
-    let ptr = GlobalLock(h_mem) as *const u16;
-    if ptr.is_null() {
-        CloseClipboard();
-        return None;
+
+    let ptr = GlobalLock(h_mem);
+    let size = GlobalSize(h_mem);
+    let result = if ptr.is_null() || size < 2 {
+        None
+    } else {
+        // The clipboard allocation is untrusted: never scan past GlobalSize. An
+        // unterminated block is rejected instead of reading adjacent heap memory.
+        let units = size as usize / 2;
+        let slice = std::slice::from_raw_parts(ptr as *const u16, units);
+        aurelia_core::clipboard::utf16_text_from_units(slice)
+    };
+
+    if !ptr.is_null() {
+        GlobalUnlock(h_mem);
     }
-    let mut len = 0;
-    while *ptr.add(len) != 0 {
-        len += 1;
-    }
-    let slice = std::slice::from_raw_parts(ptr, len);
-    let s = String::from_utf16_lossy(slice);
-    GlobalUnlock(h_mem);
     CloseClipboard();
-    Some(s)
+    result
 }
 
 unsafe fn set_clipboard_text(hwnd: HWND, text: &str) -> bool {
@@ -326,18 +330,34 @@ unsafe fn set_clipboard_text(hwnd: HWND, text: &str) -> bool {
     if OpenClipboard(hwnd) == 0 {
         return false;
     }
-    EmptyClipboard();
+    if EmptyClipboard() == 0 {
+        CloseClipboard();
+        return false;
+    }
+
     let h_mem = GlobalAlloc(0x0042 /* GMEM_MOVEABLE | GMEM_ZEROINIT */, bytes);
-    if !h_mem.is_null() {
-        let ptr = GlobalLock(h_mem) as *mut u16;
-        if !ptr.is_null() {
-            std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr, wide.len());
-            GlobalUnlock(h_mem);
-            SetClipboardData(13 /* CF_UNICODETEXT */, h_mem);
-        }
+    if h_mem.is_null() {
+        CloseClipboard();
+        return false;
+    }
+
+    let ptr = GlobalLock(h_mem) as *mut u16;
+    if ptr.is_null() {
+        GlobalFree(h_mem);
+        CloseClipboard();
+        return false;
+    }
+
+    std::ptr::copy_nonoverlapping(wide.as_ptr(), ptr, wide.len());
+    GlobalUnlock(h_mem);
+
+    let stored = !SetClipboardData(13 /* CF_UNICODETEXT */, h_mem).is_null();
+    if !stored {
+        // Ownership only transfers on success; release our allocation on failure.
+        GlobalFree(h_mem);
     }
     CloseClipboard();
-    true
+    stored
 }
 
 /// Publishes `bytes` under an already-empty clipboard. Must be called while the clipboard is open.

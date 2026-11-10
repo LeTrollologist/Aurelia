@@ -184,3 +184,11 @@ def test_scan_stage_advisory_records_but_allows(tmp_path, monkeypatch):
     result = stages._scan(ctx)
     assert result["scans"][0]["allowed"] is True
     assert result["scans"][0]["detections"] == 1
+
+
+def test_empty_virustotal_block_does_not_claim_a_scan():
+    block = stages._virustotal_block([])
+    assert "<!-- virustotal:begin -->" in block
+    assert "<!-- virustotal:end -->" in block
+    assert "No VirusTotal scan was performed" in block
+    assert "Artifacts were submitted" not in block

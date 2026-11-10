@@ -15,6 +15,16 @@
 use crate::layer::{Layer, LayerBuffer, PixelFormat};
 use crate::selection::SelectionMask;
 
+/// Decodes a UTF-16 block from the Windows clipboard.
+///
+/// Windows clipboard data is untrusted: another process can publish a block with no
+/// terminator inside its allocation. `None` means the block must be rejected rather than
+/// scanning past its end.
+pub fn utf16_text_from_units(units: &[u16]) -> Option<String> {
+    let end = units.iter().position(|unit| *unit == 0)?;
+    Some(String::from_utf16_lossy(&units[..end]))
+}
+
 /// A rectangular canvas-space region captured for paste.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClipboardImage {
@@ -770,6 +780,29 @@ mod dib_palette {
             overclaimed.extend_from_slice(&palette_entry(0, 0, 0));
         }
         assert!(decode_dib(&overclaimed).is_none());
+    }
+}
+
+#[cfg(test)]
+mod utf16_tests {
+    use super::utf16_text_from_units;
+
+    #[test]
+    fn clipboard_text_must_terminate_inside_the_allocation() {
+        assert_eq!(utf16_text_from_units(&[]), None);
+        assert_eq!(utf16_text_from_units(&[b'A' as u16, b'B' as u16]), None);
+    }
+
+    #[test]
+    fn clipboard_text_stops_at_the_first_terminator() {
+        let units = [b'A' as u16, 0, b'B' as u16, 0];
+        assert_eq!(utf16_text_from_units(&units).as_deref(), Some("A"));
+    }
+
+    #[test]
+    fn clipboard_text_without_terminator_is_rejected_not_scanned() {
+        let units = [b'o' as u16, b'k' as u16, b'!' as u16];
+        assert!(utf16_text_from_units(&units).is_none());
     }
 }
 

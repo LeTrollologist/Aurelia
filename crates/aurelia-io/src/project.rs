@@ -176,6 +176,13 @@ pub(crate) fn write_project_version<W: Write>(
         writer.write_all(&layer.id.to_le_bytes())?;
         
         let name_bytes = layer.name.as_bytes();
+        if name_bytes.len() > u16::MAX as usize {
+            return Err(ProjectError::TextFieldTooLong {
+                field: "layer name",
+                len: name_bytes.len(),
+                max: u16::MAX as usize,
+            });
+        }
         let name_len = name_bytes.len() as u16;
         writer.write_all(&name_len.to_le_bytes())?;
         writer.write_all(name_bytes)?;
@@ -1310,6 +1317,26 @@ mod tests {
         assert!(matches!(
             save_project_to_writer(&doc, &mut out),
             Err(ProjectError::TextTooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn layer_name_length_boundary_is_enforced() {
+        let mut doc = Document::new(1, 1);
+        doc.layers[0].name = "x".repeat(u16::MAX as usize);
+        let mut bytes = Vec::new();
+        save_project_to_writer(&doc, &mut bytes).expect("maximum name must save");
+        let loaded = load_project_from_reader(&bytes[..]).expect("maximum name must load");
+        assert_eq!(loaded.layers[0].name.len(), u16::MAX as usize);
+
+        doc.layers[0].name.push('x');
+        let mut out = Vec::new();
+        assert!(matches!(
+            save_project_to_writer(&doc, &mut out),
+            Err(ProjectError::TextFieldTooLong {
+                field: "layer name",
+                ..
+            })
         ));
     }
 

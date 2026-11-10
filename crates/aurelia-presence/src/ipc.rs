@@ -24,6 +24,34 @@ pub struct DiscordIpc {
     pipe: File,
 }
 
+const MAX_FRAME_BYTES: usize = 1_000_000;
+
+/// Parses the 8-byte Discord IPC header, enforcing the frame-size limit before any
+/// allocation. `expected_opcode` is used for the READY handshake; normal polling accepts
+/// any opcode and handles PING below.
+fn parse_frame_header(
+    header: &[u8; 8],
+    expected_opcode: Option<u32>,
+) -> io::Result<(u32, usize)> {
+    let opcode = u32::from_le_bytes(header[0..4].try_into().unwrap());
+    let length = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
+    if let Some(expected) = expected_opcode {
+        if opcode != expected {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unexpected Discord IPC opcode",
+            ));
+        }
+    }
+    if length > MAX_FRAME_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Discord IPC frame too large",
+        ));
+    }
+    Ok((opcode, length))
+}
+
 impl DiscordIpc {
     pub fn connect(client_id: &str) -> io::Result<Self> {
         let mut last_error = None;
@@ -82,14 +110,7 @@ impl DiscordIpc {
             }
             let mut header = [0u8; 8];
             self.pipe.read_exact(&mut header)?;
-            let opcode = u32::from_le_bytes(header[0..4].try_into().unwrap());
-            let length = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
-            if length > 1_000_000 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Discord IPC frame too large",
-                ));
-            }
+            let (opcode, length) = parse_frame_header(&header, None)?;
             let mut body = vec![0u8; length];
             self.pipe.read_exact(&mut body)?;
             if opcode == 3 {
@@ -103,20 +124,43 @@ impl DiscordIpc {
     /// Consume Discord's READY dispatch before the caller sends activity.
     fn wait_for_ready(&mut self) -> io::Result<()> {
         let deadline = Instant::now() + Duration::from_secs(5);
-        while self.available()? < 8 {
+        let mut header = [0u8; 8];
+        self.read_exact_before(&mut header, deadline)?;
+
+        // READY is a FRAME (opcode 1). Reject an oversized frame before allocating the
+        // body, and reject a non-FRAME frame instead of silently consuming it.
+        let (_opcode, length) = parse_frame_header(&header, Some(1))?;
+        let mut body = vec![0u8; length];
+        self.read_exact_before(&mut body, deadline)?;
+        Ok(())
+    }
+
+    /// Reads exactly `buffer.len()` bytes, polling the pipe so a partial frame cannot
+    /// block the caller past `deadline`.
+    fn read_exact_before(&mut self, buffer: &mut [u8], deadline: Instant) -> io::Result<()> {
+        let mut filled = 0usize;
+        while filled < buffer.len() {
             if Instant::now() >= deadline {
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "Discord did not send READY",
+                    "Discord IPC frame did not complete before the deadline",
                 ));
             }
-            std::thread::sleep(Duration::from_millis(10));
+            let available = self.available()? as usize;
+            if available == 0 {
+                std::thread::sleep(Duration::from_millis(10));
+                continue;
+            }
+            let want = available.min(buffer.len() - filled);
+            let read = self.pipe.read(&mut buffer[filled..filled + want])?;
+            if read == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "Discord IPC pipe closed mid-frame",
+                ));
+            }
+            filled += read;
         }
-        let mut header = [0u8; 8];
-        self.pipe.read_exact(&mut header)?;
-        let length = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
-        let mut body = vec![0u8; length];
-        self.pipe.read_exact(&mut body)?;
         Ok(())
     }
 
@@ -166,6 +210,13 @@ pub(crate) fn frame_bytes(opcode: u32, body: &[u8]) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    fn header(opcode: u32, length: usize) -> [u8; 8] {
+        let mut header = [0u8; 8];
+        header[0..4].copy_from_slice(&opcode.to_le_bytes());
+        header[4..8].copy_from_slice(&(length as u32).to_le_bytes());
+        header
+    }
+
     #[test]
     fn frames_use_little_endian_opcode_and_length() {
         let body = b"{\"cmd\":\"x\"}";
@@ -173,5 +224,26 @@ mod tests {
         assert_eq!(&frame[0..4], &1u32.to_le_bytes());
         assert_eq!(&frame[4..8], &(body.len() as u32).to_le_bytes());
         assert_eq!(&frame[8..], body);
+    }
+
+    #[test]
+    fn ready_frame_header_rejects_oversized_lengths_before_allocating() {
+        let error = parse_frame_header(&header(1, MAX_FRAME_BYTES + 1), Some(1))
+            .expect_err("oversized READY frame must be rejected");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn ready_frame_header_rejects_wrong_opcode() {
+        let error = parse_frame_header(&header(3, 0), Some(1))
+            .expect_err("a PING cannot satisfy the READY handshake");
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn ready_frame_header_accepts_a_valid_frame() {
+        let (opcode, length) =
+            parse_frame_header(&header(1, 128), Some(1)).expect("valid READY header");
+        assert_eq!((opcode, length), (1, 128));
     }
 }

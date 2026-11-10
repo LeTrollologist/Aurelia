@@ -34,10 +34,15 @@ every instruction executing in the process is memory-safe; the Win32/CRT/FFI lay
   2 GiB of decoded layer storage (pixels, masks, text and metadata). The budget is reserved before
   each buffer is allocated, so a small file cannot request an unbounded total by multiplying many
   layers.
-- Layer ids and `parent_id` values are validated after loading. Duplicate ids, missing or
+- Parent ids and layer names are validated as part of loading/saving. Duplicate ids, missing or
   non-group parents, self-parents, cycles and chains deeper than 1024 parent links are rejected
-  before a `Document` is returned, so visibility/opacity/descendant traversals always see a
-  forest.
+  before a `Document` is returned, and names longer than 65,535 bytes are rejected on save rather
+  than truncated.
+- Win32 clipboard text reads are bounded by `GlobalSize`; a block without a NUL terminator inside
+  its allocation is rejected. Clipboard allocations that fail or whose ownership is not
+  transferred are released.
+- Discord IPC frames are capped at 1 MB in both polling and the READY handshake. READY must be a
+  FRAME (opcode 1) and its body must arrive before the handshake deadline.
 - Image imports use the `image` crate decoders.
 - There is no plugin system and no executed project content.
 

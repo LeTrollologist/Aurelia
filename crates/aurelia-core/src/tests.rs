@@ -4,6 +4,7 @@ mod tests {
     use crate::brush::{BrushPoint, BrushSettings, ToolType};
     use crate::color::Color;
     use crate::document::{Document, HierarchyError, MAX_LAYER_HIERARCHY_DEPTH};
+    use crate::layer::{truncate_layer_name, MAX_LAYER_NAME_BYTES};
     use crate::rasterizer::StrokeRasterizer;
     use crate::selection::SelectionMask;
     use crate::symmetry::{SymmetryConfig, SymmetryMode};
@@ -749,6 +750,20 @@ mod tests {
         assert!(doc.get_layer(l1).is_none());
         assert!(doc.get_layer(l2).is_none());
         assert!(doc.get_layer(l3).is_none());
+    }
+
+    #[test]
+    fn layer_name_truncation_stops_at_the_byte_limit_and_a_char_boundary() {
+        let mut ascii = "x".repeat(MAX_LAYER_NAME_BYTES + 10);
+        truncate_layer_name(&mut ascii);
+        assert_eq!(ascii.len(), MAX_LAYER_NAME_BYTES);
+
+        // Three-byte characters force the truncation point to move backwards to a boundary.
+        let mut wide = "€".repeat(MAX_LAYER_NAME_BYTES / 3 + 1);
+        truncate_layer_name(&mut wide);
+        assert!(wide.len() <= MAX_LAYER_NAME_BYTES);
+        assert!(wide.is_char_boundary(wide.len()));
+        assert_eq!(wide.len() % 3, 0);
     }
 
     #[test]

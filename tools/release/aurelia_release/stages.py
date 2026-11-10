@@ -900,6 +900,19 @@ def _scan_verify(ctx: Context, outputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def _virustotal_block(scans: list[dict[str, Any]]) -> str:
+    if not scans:
+        return "\n".join(
+            [
+                "<!-- virustotal:begin -->",
+                "",
+                "## VirusTotal",
+                "",
+                "No VirusTotal scan was performed for this release because no API key was",
+                "available in the release environment. No detection verdicts are claimed.",
+                "",
+                "<!-- virustotal:end -->",
+            ]
+        )
     lines = [
         "<!-- virustotal:begin -->",
         "",

@@ -2357,6 +2357,11 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         let name_edit = egui::TextEdit::singleline(&mut state.document.layers[i].name)
                                             .desired_width(name_w);
                                         let response = ui.add(name_edit);
+                                        if response.changed() {
+                                            aurelia_core::layer::truncate_layer_name(
+                                                &mut state.document.layers[i].name,
+                                            );
+                                        }
                                         if response.clicked() || response.gained_focus() {
                                             state.document.active_layer_id = layer_id;
                                             if is_text {

@@ -4,6 +4,21 @@ use serde::{Deserialize, Serialize};
 
 pub type LayerId = u64;
 
+/// Maximum UTF-8 byte length of a layer name representable by AUR v3.
+pub const MAX_LAYER_NAME_BYTES: usize = u16::MAX as usize;
+
+/// Truncates a layer name to [`MAX_LAYER_NAME_BYTES`] without splitting a UTF-8 character.
+pub fn truncate_layer_name(name: &mut String) {
+    if name.len() <= MAX_LAYER_NAME_BYTES {
+        return;
+    }
+    let mut end = MAX_LAYER_NAME_BYTES;
+    while !name.is_char_boundary(end) {
+        end -= 1;
+    }
+    name.truncate(end);
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum LayerKind {
     #[default]
