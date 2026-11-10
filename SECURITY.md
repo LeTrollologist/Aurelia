@@ -38,10 +38,14 @@ manifest.
 
 ## VirusTotal policy
 
-VirusTotal is **advisory, not a release veto**. Unsigned software routinely triggers heuristic
-and ML engines; a detection count is not by itself evidence of malware.
+VirusTotal is **advisory, not a release veto**, but detections are published rather than
+dismissed. The v3.13.0 installer has four advisory findings out of 75 engines (APEX, Cylance,
+DeepInstinct and Skyhigh); the portable zip and unpacked executable are 0/75. Exact engine
+verdicts and hashes are in the [release notes](release-notes/v3.13.0.md#virustotal-verification).
+Use the portable archive if you want the smaller installer/trust surface.
 
-- Scanning is enabled only when `VIRUSTOTAL_API_KEY` is present.
+- Scanning is enabled only when `VIRUSTOTAL_API_KEY` is present; local secrets belong in the
+  gitignored `.env`.
 - `scan.mode` supports `off`, `advisory`, `threshold`, and `strict`; the current release uses
   `advisory`.
 - Reports are attached to the journal/release where available; quota limits are respected.

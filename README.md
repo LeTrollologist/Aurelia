@@ -4,7 +4,7 @@
 
 <img src="assets/banner.svg?v=3130" alt="Aurelia Banner" width="100%" />
 
-**A modern, high-performance, local-first digital illustration and animation studio built in Rust with a thin Win32 FFI layer.**
+**A Rust-first, high-performance, local-first digital illustration and animation studio with a narrow, explicitly documented Win32 FFI boundary.**
 
 <br />
 
@@ -91,7 +91,21 @@
 
 ## 🌟 Overview
 
-**Aurelia** is a lightweight, studio-grade digital illustration and raster graphics workbench engineered from the ground up in Rust. Designed for artists, concept designers, and technical illustrators who demand absolute precision, low latency, and deterministic offline reliability.
+**Aurelia** is a lightweight, studio-grade digital illustration and raster graphics workbench
+written in Rust, with a narrow Win32 FFI boundary for windowing, clipboard and shell integration.
+It is designed for artists, concept designers, and technical illustrators who demand precision,
+low latency, and deterministic offline reliability.
+
+## What v3.13.0 means
+
+Aurelia v3.13.0 focuses on production reliability. Existing projects remain compatible, malformed
+imports receive stricter validation, project saves have improved durability, and Windows
+distribution artifacts now include detached cryptographic signatures and SHA-256 checksums.
+
+The release also closes the audit findings around cyclic layer hierarchies, aggregate decode
+budgets, clipboard DIB limits, Win32 window-state ownership and release metadata. Detailed
+engineering notes are in the [v3.13.0 release notes](release-notes/v3.13.0.md); the engineering
+case study is in [PORTFOLIO.md](PORTFOLIO.md).
 
 ### Key Highlights
 
@@ -108,7 +122,10 @@
   ROADMAP.md.
  
 - 🖥 **Windows-Native Architecture (Win32 + GDI, thin FFI)**: A hand-rolled `GetMessageW` message loop and `SetDIBitsToDevice` blit feed a software framebuffer; `egui` 0.28 supplies widgets and layout on top. No C++ UI framework and no GPU driver dependency.
-  - **Safety boundary**: application logic and the renderer are safe Rust. The Win32/GDI/COM calls in `aurelia-app` and `rfd` are `unsafe` FFI, and the official Windows build links the MSVC C runtime; those layers are outside Rust's memory-safety guarantees. See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
+  - **Safety boundary**: Aurelia is Rust-first. Application logic and the renderer are safe Rust;
+    the Win32/GDI/COM calls in `aurelia-app` and `rfd`, and the MSVC C runtime linked by the
+    official Windows build, execute outside Rust's memory-safety guarantees. See
+    [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
   - **Per-Monitor V2 DPI Awareness**: `SetProcessDpiAwarenessContext` plus `egui` pixels-per-point, so the interface is crisp at 125–200 % scaling instead of bitmap-stretched.
   - **Portability-Ready Crate Split**: Windowing lives only in `aurelia-app`; `aurelia-core`, `aurelia-render`, `aurelia-io`, `aurelia-presence` and `aurelia-ui` are platform-agnostic, so the `eframe`/`winit` port in `ROADMAP.md` is a front-end swap rather than a rewrite.
 - 🎨 **Live Interactive Viewport with Real-Time Direct Drawing**:
@@ -152,7 +169,7 @@
 - ✍ **Stylus Pressure & Tilt**: Pen input is sampled through `WM_POINTER` / `GetPointerPenInfo`; real pressure drives brush size while the mouse path (and velocity dynamics) keeps working unchanged.
 - 🧠 **Memory-Bounded Undo**: The 50-step history also enforces a 512 MiB budget, evicting the oldest full-layer snapshots first so long sessions cannot balloon into multi-gigabyte RSS.
 - 📊 **Tone & Stylize Filters**: Levels (black/white/gamma), Colorize, Pixelate and Motion Blur alongside the existing blur/sharpen/grain/vignette/lens set — all with live, non-destructive previews and selection awareness.
-- 🔒 **Local-First & Chain of Trust**: Completely offline, zero telemetry, no trackers, and local project serialization via binary compressed archives (`.aur`, AUR v3) alongside SHA-256-verified, VirusTotal-scanned installer and portable releases.
+- 🔒 **Local-First & Chain of Trust**: Completely offline, zero telemetry, no trackers, and local project serialization via binary compressed archives (`.aur`, AUR v3) alongside signed, SHA-256-verified installer and portable releases with published VirusTotal results.
 
 ---
 
@@ -177,7 +194,7 @@ Aurelia/
 | Area | Supported | Limits |
 | :--- | :--- | :--- |
 | OS | Windows 10/11 x86-64 | No Linux/macOS build yet |
-| Project files | AUR v3 (`.aur`), legacy HCV v2–v5 (`.hcv`) | AUR v1/v2 are read-only compatibility formats; saves always write v3 |
+| Project files | AUR v3 (`.aur`) | current write format; AUR v1/v2 and HCV v2–v5 are read-only legacy formats |
 | Pixel formats | 8-bit and 16-bit sRGB documents; native 16-bit editing and compositing | Viewport presents an 8-bit image; mixed-format documents round-trip but are not created by the editor |
 | Layer features | Raster, groups, masks, adjustment layers, text, clipping | Animation is timeline-only; no video export |
 | Exports | PNG, JPEG, WebP, GIF, sprite sheets, frame sequences | PNG is 16-bit for 16-bit/mixed documents and 8-bit for 8-bit documents; JPEG/WebP encoders are 8-bit; document ICC profiles are embedded in PNG, JPEG and WebP; Display P3 and CMYK workflows are not implemented |
@@ -190,7 +207,8 @@ Authoritative details: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`do
 
 ## 🚀 Installation & Getting Started
 
-Aurelia ships as a **per-user Windows installer**, a portable zip, or a pure-Rust source build.
+Aurelia ships as a **per-user Windows installer**, a portable zip, or a **Rust source build** using
+the documented Win32 FFI boundary.
 Full details, silent-install switches and verification steps live in [`INSTALL.md`](INSTALL.md).
 
 > **v3.13.0 is the current release.** It supersedes v3.12.0; use the
@@ -198,7 +216,7 @@ Full details, silent-install switches and verification steps live in [`INSTALL.m
 
 ### Option 1: Installer (Recommended)
 
-1. Download [`Aurelia-Setup-3.13.0.exe`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0) from the release.
+1. Download [`Aurelia-Setup-3.13.0.exe`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/Aurelia-Setup-3.13.0.exe) from the latest release.
 2. Run it — it installs per user to `%LOCALAPPDATA%\Programs\Aurelia` (no administrator rights, no UAC prompt).
 3. Optionally keep *"Open Aurelia projects with Aurelia (.aur, .hcv)"* checked for double-click opening, and tick *Create a desktop shortcut*.
 4. Launch **Aurelia** from the Start menu.
@@ -215,7 +233,7 @@ Aurelia-Setup-3.13.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 
 No installer and no registry writes of its own:
 
-1. Download [`Aurelia-v3.13.0-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0) from the release.
+1. Download [`Aurelia-v3.13.0-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/Aurelia-v3.13.0-win64.zip) from the latest release.
 2. Extract it with PowerShell or Windows Explorer:
    ```powershell
    Expand-Archive -Path .\Aurelia-v3.13.0-win64.zip -DestinationPath .\Aurelia
@@ -228,7 +246,10 @@ and every release publishes a `SHA256SUMS.txt` for verification.
 ### Verifying a download
 
 Each release publishes `SHA256SUMS.txt`, a detached `.sig` for it and for every binary, and
-`aurelia-publisher-2026.pub`. The `.sig` files are raw 64-byte Ed25519 signatures — not hashes.
+`aurelia-publisher-2026.pub` ([public key](keys/aurelia-publisher-2026.pub)). The `.sig` files are
+raw 64-byte Ed25519 signatures — not hashes.
+
+[Download `SHA256SUMS.txt`](https://github.com/LeTrollologist/Aurelia/releases/latest/download/SHA256SUMS.txt)
 
 ```powershell
 Get-FileHash .\Aurelia-v3.13.0-win64.zip -Algorithm SHA256
@@ -250,9 +271,18 @@ print("signatures verified")
 The installer is **not Authenticode-signed** and this is a permanent distribution constraint:
 no public certificate path is available, and a self-signed certificate would not establish
 SmartScreen trust. Windows may warn; verify the SHA-256 and Ed25519 signature before running.
-VirusTotal results are advisory: unsigned software often trips heuristic/ML engines. A clean scan
-is not proof of safety; a matching Ed25519 signature is the integrity boundary. See
-[`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
+
+### Installer scan note
+
+The v3.13.0 installer has four advisory VirusTotal detections out of 75 engines: APEX
+(`Malicious`), Cylance (`Unsafe`), DeepInstinct (`MALICIOUS`) and Skyhigh
+(`BehavesLike.Win32.ObfuscatedPoly.rc`). The portable zip and the unpacked `aurelia.exe` scan
+clean (0/75). The reported verdicts are generic or behavioral; none names a specific malware
+family, but they are not dismissed. If you want the smallest trust surface, use the portable zip.
+The exact engine results and hashes are recorded in the
+[v3.13.0 release notes](release-notes/v3.13.0.md#virustotal-verification).
+A matching Ed25519 signature is the integrity boundary; a clean scan is not proof of safety.
+See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
 
 ---
 
