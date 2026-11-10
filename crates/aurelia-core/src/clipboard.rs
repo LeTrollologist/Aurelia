@@ -15,6 +15,9 @@
 use crate::layer::{Layer, LayerBuffer, PixelFormat};
 use crate::selection::SelectionMask;
 
+/// Upper bound accepted from an external clipboard image (64 megapixels).
+pub const MAX_CLIPBOARD_PIXELS: u64 = 64 * 1024 * 1024;
+
 /// Decodes a UTF-16 block from the Windows clipboard.
 ///
 /// Windows clipboard data is untrusted: another process can publish a block with no
@@ -382,13 +385,21 @@ pub fn decode_dib(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     let width = width as u32;
     let height = height_raw.unsigned_abs();
     let top_down = height_raw < 0;
-    let stride = (width as usize * bit_count as usize).div_ceil(32) * 4;
+    let pixel_count = (width as u64).checked_mul(height as u64)?;
+    if pixel_count > MAX_CLIPBOARD_PIXELS {
+        return None;
+    }
+    let stride = (width as usize)
+        .checked_mul(bit_count as usize)?
+        .div_ceil(32)
+        .checked_mul(4)?;
     let needed = pixel_offset.checked_add(stride.checked_mul(height as usize)?)?;
     if bytes.len() < needed {
         return None;
     }
     let pixels = &bytes[pixel_offset..needed];
-    let mut rgba = vec![0u8; (width * height * 4) as usize];
+    let rgba_len = usize::try_from(pixel_count.checked_mul(4)?).ok()?;
+    let mut rgba = vec![0u8; rgba_len];
 
     fn masked_channel(raw: u32, mask: u32) -> u8 {
         if mask == 0 {
@@ -615,6 +626,17 @@ mod tests {
         // DIB bytes are B,G,R: the first pixel is blue, the second red, both opaque.
         assert_eq!(&rgba[0..4], &[0, 0, 255, 255]);
         assert_eq!(&rgba[4..8], &[255, 0, 0, 255]);
+    }
+
+    #[test]
+    fn oversized_dib_is_rejected_before_allocating() {
+        let mut dib = vec![0u8; 40];
+        dib[0..4].copy_from_slice(&40u32.to_le_bytes());
+        dib[4..8].copy_from_slice(&10_000i32.to_le_bytes());
+        dib[8..12].copy_from_slice(&10_000i32.to_le_bytes());
+        dib[12..14].copy_from_slice(&1u16.to_le_bytes());
+        dib[14..16].copy_from_slice(&24u16.to_le_bytes());
+        assert!(decode_dib(&dib).is_none());
     }
 
     #[test]

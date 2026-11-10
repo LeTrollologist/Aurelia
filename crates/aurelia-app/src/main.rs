@@ -46,6 +46,9 @@ type WPARAM = usize;
 type LPARAM = isize;
 type WNDPROC = unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT;
 
+/// Per-window application-state pointer. The window owns the `Box<AureliaDesktopApp>`.
+const GWLP_USERDATA: i32 = -21;
+
 #[repr(C)]
 struct WNDCLASSEXW {
     cb_size: u32,
@@ -160,6 +163,8 @@ extern "system" {
     ) -> HWND;
     fn ShowWindow(hWnd: HWND, nCmdShow: i32) -> i32;
     fn UpdateWindow(hWnd: HWND) -> i32;
+    fn GetWindowLongPtrW(hWnd: HWND, nIndex: i32) -> isize;
+    fn SetWindowLongPtrW(hWnd: HWND, nIndex: i32, dwNewLong: isize) -> isize;
     fn DefWindowProcW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
     fn PostQuitMessage(nExitCode: i32);
     fn GetModuleHandleW(lpModuleName: *const u16) -> HMODULE;
@@ -515,8 +520,6 @@ fn paste_from_clipboard(app: &mut AureliaDesktopApp, hwnd: HWND) {
         }
     }
 }
-
-static mut GLOBAL_APP_PTR: *mut AureliaDesktopApp = std::ptr::null_mut();
 
 /// What the pointer is currently dragging on the measurement layer.
 #[derive(Debug, Clone, Copy)]
@@ -1356,6 +1359,7 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     const WM_DESTROY: UINT = 0x0002;
     const WM_CLOSE: UINT = 0x0010;
+    const WM_NCCREATE: UINT = 0x0081;
     const WM_POINTERUPDATE: UINT = 0x0245;
     const WM_POINTERDOWN: UINT = 0x0246;
     const WM_POINTERUP: UINT = 0x0247;
@@ -1375,6 +1379,23 @@ unsafe extern "system" fn window_proc(
     const WM_NCCALCSIZE: UINT = 0x0083;
     const WM_NCHITTEST: UINT = 0x0084;
     const WM_GETMINMAXINFO: UINT = 0x0024;
+
+    if msg == WM_NCCREATE {
+        // `lparam` points at CREATESTRUCTW, whose first field is lpCreateParams.
+        let app_ptr = *(lparam as *const *mut std::ffi::c_void);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, app_ptr as isize);
+        return 1;
+    }
+
+    if msg == WM_DESTROY {
+        let app_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AureliaDesktopApp;
+        if !app_ptr.is_null() {
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+            drop(Box::from_raw(app_ptr));
+        }
+        PostQuitMessage(0);
+        return 0;
+    }
 
     if msg == WM_GETMINMAXINFO && lparam != 0 {
         let info = &mut *(lparam as *mut MINMAXINFO);
@@ -1462,8 +1483,9 @@ unsafe extern "system" fn window_proc(
         return 1; // HTCLIENT
     }
 
-    let app = if !GLOBAL_APP_PTR.is_null() {
-        &mut *GLOBAL_APP_PTR
+    let app_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AureliaDesktopApp;
+    let app = if !app_ptr.is_null() {
+        &mut *app_ptr
     } else {
         return DefWindowProcW(hwnd, msg, wparam, lparam);
     };
@@ -1539,10 +1561,7 @@ unsafe extern "system" fn window_proc(
             }
             0
         }
-        WM_DESTROY => {
-            PostQuitMessage(0);
-            0
-        }
+        WM_DESTROY => 0,
         0x02E0 => {
             // WM_DPICHANGED: move to the suggested rect and rescale the UI.
             let new_scale = (wparam & 0xFFFF) as f32 / 96.0;
@@ -3945,7 +3964,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     egui_ctx.set_pixels_per_point(dpi_scale);
     configure_aurelia_style(&egui_ctx, app_state.theme_accent_color());
 
-    let mut desktop_app = Box::new(AureliaDesktopApp {
+    let desktop_app = Box::new(AureliaDesktopApp {
         state: app_state,
         presence: PresenceManager::new(discord_client_id),
         renderer: SoftwareRenderer::new(),
@@ -3993,10 +4012,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         last_window_title: String::new(),
         last_autosave_tick: Instant::now(),
     });
+    let app_ptr = Box::into_raw(desktop_app);
 
     unsafe {
-        GLOBAL_APP_PTR = &mut *desktop_app;
-
         let h_instance = GetModuleHandleW(std::ptr::null());
         let class_name = to_wide("AureliaStudio");
         let title = to_wide("Aurelia · Illustration & Animation Studio");
@@ -4034,10 +4052,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             h_instance,
-            std::ptr::null_mut(),
+            app_ptr as *mut std::ffi::c_void,
         );
 
         if hwnd.is_null() {
+            drop(Box::from_raw(app_ptr));
             eprintln!("Failed to create Win32 window.");
             return Ok(());
         }
@@ -4092,7 +4111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             DispatchMessageW(&msg);
 
             // Window title mirrors the active document (with a trailing `*` when dirty).
-            let app_ptr = GLOBAL_APP_PTR;
+            let app_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AureliaDesktopApp;
             if !app_ptr.is_null() {
                 let app = &mut *app_ptr;
                 let title = format!("Aurelia · {}", app.state.document_title());
@@ -4110,7 +4129,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        GLOBAL_APP_PTR = std::ptr::null_mut();
+        // Normal teardown frees the state in WM_DESTROY. This is a fallback for a
+        // message loop that exits without a destroy notification.
+        let leftover = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AureliaDesktopApp;
+        if !leftover.is_null() {
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+            drop(Box::from_raw(leftover));
+        }
     }
 
     Ok(())

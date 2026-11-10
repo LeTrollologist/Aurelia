@@ -40,7 +40,10 @@ every instruction executing in the process is memory-safe; the Win32/CRT/FFI lay
   than truncated.
 - Win32 clipboard text reads are bounded by `GlobalSize`; a block without a NUL terminator inside
   its allocation is rejected. Clipboard allocations that fail or whose ownership is not
-  transferred are released.
+  transferred are released. Clipboard PNG and DIB images are capped at 64 megapixels, with
+  checked width/height/stride/decoded-length arithmetic for DIBs.
+- The Win32 host stores its application state in `GWLP_USERDATA`; `WM_NCCREATE` installs the
+  owned pointer and `WM_DESTROY` clears and drops it, rather than using a mutable global.
 - Discord IPC frames are capped at 1 MB in both polling and the READY handshake. READY must be a
   FRAME (opcode 1) and its body must arrive before the handshake deadline.
 - Project saves use a unique sibling temporary file, call `sync_all` before replacement, and

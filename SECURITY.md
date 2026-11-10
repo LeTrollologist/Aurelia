@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are provided for the latest release only. The current release is
-[v3.13.0-beta.4](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.4).
+[v3.13.0](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.4).
 
 ## Reporting a vulnerability
 

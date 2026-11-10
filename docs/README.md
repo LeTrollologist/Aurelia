@@ -14,6 +14,7 @@ the contract.
 | [PERFORMANCE.md](PERFORMANCE.md) | Measured numbers and how to reproduce them |
 | [SECURITY_MODEL.md](SECURITY_MODEL.md) | Rust/FFI boundary, signing, VirusTotal, network policy |
 | [QUALITY.md](QUALITY.md) | Formatting, Clippy and test policy enforced by the release gate |
+| [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) | What is reproducible today and what a bit-for-bit release would require |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Installer, save, Discord and startup failures |
 
 Release mechanics live in [RELEASE_PROCESS.md](../RELEASE_PROCESS.md).

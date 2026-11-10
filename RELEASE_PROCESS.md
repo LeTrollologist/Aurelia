@@ -102,6 +102,15 @@ verify; `full` adds build, package, sign, scan and the GitHub release stages.
 The previous `keys/aurelia-publisher.pub` has no known private key and must not be used for new
 signatures.
 
+### Backup
+
+- Keep at least two encrypted offline copies of the private key in separate locations; never
+  commit it or store it in the repository directory.
+- Record the public-key fingerprint in the release journal and verify a test signature after
+  restoring each backup.
+- A backup is only useful if a restore has been tested; do not treat an unverified copy as a
+  recovery path.
+
 ### Rotation
 
 1. Generate a new Ed25519 keypair offline.

@@ -11,7 +11,7 @@
 <!-- Tier 1: Project Metadata & Quality Assurance Badges -->
 <p align="center">
   <a href="https://github.com/LeTrollologist/Aurelia/releases">
-    <img src="https://img.shields.io/badge/Release-3.13.0_beta.4-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
+    <img src="https://img.shields.io/badge/Release-3.13.0-F6C45A?style=for-the-badge&logo=github&logoColor=1A120B&labelColor=1A120B" alt="Release" />
   </a>
   <a href="crates/">
     <img src="https://img.shields.io/badge/Engine-Rust_%2B_Win32_FFI-E8963F?style=for-the-badge&logo=rust&logoColor=1A120B&labelColor=1A120B" alt="Engine: Rust with Win32 FFI" />
@@ -193,12 +193,12 @@ Authoritative details: [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and [`do
 Aurelia ships as a **per-user Windows installer**, a portable zip, or a pure-Rust source build.
 Full details, silent-install switches and verification steps live in [`INSTALL.md`](INSTALL.md).
 
-> **v3.13.0-beta.4 is a prerelease.** GitHub's "latest" link still points at stable v3.12.0; use the
-> explicit beta links below.
+> **v3.13.0 is the current release.** It supersedes v3.12.0; use the
+> explicit release links below.
 
 ### Option 1: Installer (Recommended)
 
-1. Download [`Aurelia-Setup-3.13.0-beta.4.exe`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.4) from the beta release.
+1. Download [`Aurelia-Setup-3.13.0-beta.4.exe`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.4) from the release.
 2. Run it — it installs per user to `%LOCALAPPDATA%\Programs\Aurelia` (no administrator rights, no UAC prompt).
 3. Optionally keep *"Open Aurelia projects with Aurelia (.aur, .hcv)"* checked for double-click opening, and tick *Create a desktop shortcut*.
 4. Launch **Aurelia** from the Start menu.
@@ -215,7 +215,7 @@ Aurelia-Setup-3.13.0-beta.4.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
 
 No installer and no registry writes of its own:
 
-1. Download [`Aurelia-v3.13.0-beta.4-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.4) from the beta release.
+1. Download [`Aurelia-v3.13.0-beta.4-win64.zip`](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.13.0-beta.4) from the release.
 2. Extract it with PowerShell or Windows Explorer:
    ```powershell
    Expand-Archive -Path .\Aurelia-v3.13.0-beta.4-win64.zip -DestinationPath .\Aurelia
