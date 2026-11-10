@@ -89,12 +89,18 @@ def test_prerelease_files_must_agree(tmp_path):
 
 
 def test_current_release_notes_are_rewritten_in_docs():
-    text = """**Status:** v3.13.0 · Windows
+    text = """Release-3.13.0-F6C45A
+**Status:** v3.13.0 · Windows
 ## Now — v3.13.0: Colour management (production)
+## What v3.13.0 means
+Aurelia v3.13.0 focuses on reliability.
 > **v3.13.0 is the current release.**
+The v3.13.0 installer is signed.
+See [v3.13.0 release notes](release-notes/v3.13.0.md).
 | Colour management (v3.13.0) | shipped |
+| Production hardening (v3.13.0) | shipped |
 """
     updated, count = normalize_text(text, "3.14.0")
-    assert count >= 4
+    assert count >= 9
     assert "v3.14.0" in updated
-    assert "v3.13.0" not in updated
+    assert "3.13.0" not in updated

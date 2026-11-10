@@ -192,3 +192,19 @@ def test_empty_virustotal_block_does_not_claim_a_scan():
     assert "<!-- virustotal:end -->" in block
     assert "No VirusTotal scan was performed" in block
     assert "Artifacts were submitted" not in block
+
+
+def test_virustotal_block_names_detecting_engines():
+    block = stages._virustotal_block(
+        [
+            {
+                "file": "Aurelia-Setup-3.13.0.exe",
+                "sha256": "a" * 64,
+                "detections": 2,
+                "engines_reporting": 75,
+                "engines": ["APEX", "Skyhigh"],
+            }
+        ]
+    )
+    assert "APEX, Skyhigh" in block
+    assert "Detected by engine:" in block

@@ -32,6 +32,21 @@ DECLARATION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?m)^(## Now . v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
     (re.compile(r"(> \*\*v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
     (re.compile(r"(\| Colour management \()v\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>v{v}"),
+    (re.compile(r"(Release-)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(?=-[0-9A-Fa-f]{6})"), r"\g<1>{v}"),
+    (re.compile(r"(?m)^(## What v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
+    (re.compile(r"(Aurelia v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
+    (re.compile(r"(release-notes/v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
+    (re.compile(r"(\[v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(?= release notes\])"), r"\g<1>{v}"),
+    (
+        re.compile(
+            r"(\[v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"
+            r"(\]\(https://github\.com/LeTrollologist/Aurelia/releases/tag/v)"
+        ),
+        r"\g<1>{v}\g<2>",
+    ),
+    (re.compile(r"(The v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(?= installer)"), r"\g<1>{v}"),
+    (re.compile(r"(process as v)\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>{v}"),
+    (re.compile(r"(\| Production hardening \()v\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?"), r"\g<1>v{v}"),
     (re.compile(r'(MyAppVersionNumeric ")\d+\.\d+\.\d+\.\d+(")'), r"\g<1>{base}.0\g<2>"),
     (re.compile(r'(MyAppVersion ")\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)(?:\.[0-9]+)?)?(")'), r"\g<1>{base}\g<2>"),
 ]

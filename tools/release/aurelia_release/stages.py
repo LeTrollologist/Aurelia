@@ -936,6 +936,12 @@ def _virustotal_block(scans: list[dict[str, Any]]) -> str:
     lines.extend(["", "SHA-256 of the scanned artifacts:", ""])
     for scan in scans:
         lines.append(f"- `{scan['sha256']}` — `{scan['file']}`")
+    detected = [scan for scan in scans if scan.get("engines")]
+    if detected:
+        lines.extend(["", "Detected by engine:", ""])
+        for scan in detected:
+            names = ", ".join(scan["engines"])
+            lines.append(f"- `{scan['file']}`: {names}")
     lines.extend(["", "<!-- virustotal:end -->"])
     return "\n".join(lines)
 
