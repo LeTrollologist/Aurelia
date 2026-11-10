@@ -916,7 +916,7 @@ def _virustotal_block(scans: list[dict[str, Any]]) -> str:
     lines = [
         "<!-- virustotal:begin -->",
         "",
-        "## 🛡️ VirusTotal verification",
+        "## VirusTotal verification",
         "",
         "Artifacts were submitted to the VirusTotal API v3 by the release pipeline; verdicts below",
         "are what the engines reported at scan time.",
@@ -927,15 +927,14 @@ def _virustotal_block(scans: list[dict[str, Any]]) -> str:
     for scan in scans:
         name = scan["file"]
         digest = scan["sha256"]
-        marker = "🟢" if scan["detections"] == 0 else "🔴"
         engines = scan.get("engines_reporting", 0)
         lines.append(
-            f"| `{name}` | {marker} {scan['detections']} | {engines} | "
+            f"| `{name}` | {scan['detections']} | {engines} | "
             f"[VirusTotal](https://www.virustotal.com/gui/file/{digest}) |"
         )
     lines.extend(["", "SHA-256 of the scanned artifacts:", ""])
     for scan in scans:
-        lines.append(f"- `{scan['sha256']}` — `{scan['file']}`")
+        lines.append(f"- `{scan['sha256']}` - `{scan['file']}`")
     detected = [scan for scan in scans if scan.get("engines")]
     if detected:
         lines.extend(["", "Detected by engine:", ""])

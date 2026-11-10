@@ -6,7 +6,7 @@ Win32 + GDI, unsigned installer by permanent policy. v3.13.0 is the previous rel
 **Baseline:** 385 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
 **0.60** budget on the last quality run. The GDI fallback remains an **8-bit presentation** of
-16-bit documents; the native 10-bit canvas path is in development for v3.14.0.
+16-bit documents; the opt-in 10-bit canvas path shipped experimentally in v3.14.0.
 
 **How to read this:** *Now* is the active maintenance/feature work, *Next* is queued in order,
 *Later* is designed but unscoped, and *Not now* is a closed decision. Every feature ships with
@@ -42,9 +42,9 @@ path remains the fallback. Visible scanout has not been verified on every GPU/dr
 discloses this and requires a restart.
 
 - D3D11 FL11.1 device, 10-bit composition and HWND swapchain present with an 8-bit fallback.
-- Integrate the canvas present path and decide the egui overlay path.
-- Gates: visible banding removed on 10-bit hardware, byte-identical 8-bit fallback, no startup or
-  performance regression, mixed-monitor and Remote Desktop safety.
+- Canvas present path integrated; egui/guides remain 8-bit and are expanded into the 10-bit frame.
+- Verified: 10-bit buffer precision, overlay blending, performance (1.05–1.07x render overhead),
+  GDI fallback, forced-path launch. Pending: visible scanout, mixed monitors, Remote Desktop.
 - Proposal and measurements: [docs/high-bit-depth-viewport.md](docs/high-bit-depth-viewport.md).
 
 Colour management and 10-bit presentation are paired: neither alone is a professional-colour
