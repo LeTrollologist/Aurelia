@@ -365,6 +365,8 @@ pub struct PreferencesDraft {
     pub undo_budget_mb: u32,
     pub jpeg_quality: u8,
     pub theme: aurelia_core::color::ThemeMode,
+    /// Opt-in experimental 10-bit presentation path.
+    pub tenbit_enabled: bool,
 }
 
 impl Default for PreferencesDraft {
@@ -375,6 +377,7 @@ impl Default for PreferencesDraft {
             undo_budget_mb: (HistoryStack::DEFAULT_MAX_BYTES / (1024 * 1024)) as u32,
             jpeg_quality: 90,
             theme: aurelia_core::color::ThemeMode::Dawn,
+            tenbit_enabled: false,
         }
     }
 }
@@ -387,6 +390,7 @@ impl PreferencesDraft {
             undo_budget_mb: state.undo_budget_mb,
             jpeg_quality: state.jpeg_quality,
             theme: state.document.theme,
+            tenbit_enabled: state.tenbit_enabled,
         }
     }
 
@@ -680,6 +684,8 @@ pub struct AppState {
     pub show_preferences_dialog: bool,
     pub preferences_draft: PreferencesDraft,
     pub preferences_error: Option<String>,
+    /// Opt-in experimental 10-bit presentation. Off by default; requires a 10-bit output.
+    pub tenbit_enabled: bool,
     /// Guide/ruler/grid changes are persisted, so they must participate in dirty tracking
     /// even though they do not create history entries.
     pub editor_dirty: bool,
@@ -990,6 +996,7 @@ impl AppState {
             show_preferences_dialog: false,
             preferences_draft: PreferencesDraft::default(),
             preferences_error: None,
+            tenbit_enabled: false,
             editor_dirty: false,
             discord_presence: false,
             discord_presence_configured: false,
@@ -3174,6 +3181,7 @@ impl AppState {
             .set_max_bytes(draft.undo_budget_mb as usize * 1024 * 1024);
         self.jpeg_quality = draft.jpeg_quality;
         self.document.theme = draft.theme;
+        self.tenbit_enabled = draft.tenbit_enabled;
     }
 
     pub fn preferences_path() -> PathBuf {
@@ -3218,6 +3226,7 @@ impl AppState {
                 "right_panel_locked" => self.right_panel_locked = value == "1",
                 "discord_presence" => self.discord_presence = value == "1",
                 "discord_show_project" => self.discord_show_project_name = value == "1",
+                "tenbit" => self.tenbit_enabled = value == "1",
                 "autosave_interval" => {
                     if let Ok(secs) = value.parse::<u64>() {
                         let (min, max) = AUTOSAVE_INTERVAL_RANGE;
@@ -3272,6 +3281,10 @@ impl AppState {
         out.push_str(&format!(
             "discord_show_project={}\n",
             if self.discord_show_project_name { 1 } else { 0 }
+        ));
+        out.push_str(&format!(
+            "tenbit={}\n",
+            if self.tenbit_enabled { 1 } else { 0 }
         ));
         out.push_str(&format!(
             "autosave_interval={}\n",
@@ -4223,6 +4236,7 @@ mod preferences_dialog {
             undo_budget_mb: 32,
             jpeg_quality: 55,
             theme: ThemeMode::Dusk,
+            tenbit_enabled: true,
         };
         state.apply_preferences_values();
 
@@ -4232,6 +4246,7 @@ mod preferences_dialog {
         assert_eq!(state.history.max_bytes(), 32 * 1024 * 1024);
         assert_eq!(state.jpeg_quality, 55);
         assert_eq!(state.document.theme, ThemeMode::Dusk);
+        assert!(state.tenbit_enabled);
         assert!(
             state.left_panel_locked,
             "unrelated persisted settings must survive"
@@ -4256,6 +4271,7 @@ mod preferences_dialog {
                 undo_budget_mb: 128,
                 jpeg_quality: 61,
                 theme: ThemeMode::Ember,
+                tenbit_enabled: false,
             }
         );
     }

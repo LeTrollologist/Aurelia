@@ -6417,7 +6417,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
     // ── 11b. PREFERENCES (#37) ──
     if state.show_preferences_dialog {
         egui::Window::new("⚙ Preferences")
-            .fixed_size(Vec2::new(400.0, 340.0))
+            .fixed_size(Vec2::new(400.0, 440.0))
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
@@ -6503,6 +6503,27 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         }
                     }
                 });
+
+                ui.add_space(6.0);
+                ui.label(
+                    RichText::new("EXPERIMENTAL")
+                        .size(9.5)
+                        .strong()
+                        .color(Color32::from_rgb(224, 150, 80)),
+                );
+                ui.checkbox(
+                    &mut draft.tenbit_enabled,
+                    "Enable experimental 10-bit canvas presentation",
+                );
+                ui.label(
+                    RichText::new(
+                        "Requires a 10-bit display and an app restart. The 10-bit path is \
+                         experimental: visible scanout has not been verified on every GPU/driver. \
+                         The GDI 8-bit path remains the fallback.",
+                    )
+                    .size(9.0)
+                    .color(design::TEXT_MUTED),
+                );
 
                 if let Some(error) = &state.preferences_error {
                     ui.add_space(6.0);

@@ -107,6 +107,10 @@ budgets, clipboard DIB limits, Win32 window-state ownership and release metadata
 engineering notes are in the [v3.13.0 release notes](release-notes/v3.13.0.md); the engineering
 case study is in [PORTFOLIO.md](PORTFOLIO.md).
 
+**10-bit canvas presentation is experimental and off by default.** On a 10-bit output it can be
+enabled in **Preferences → Experimental**, but visible scanout has not been verified on every
+GPU/driver. The GDI 8-bit path remains the fallback.
+
 ### Key Highlights
 
 - **Layer Raster Masks**: per-layer 8-bit masks created from the selection, with invert /

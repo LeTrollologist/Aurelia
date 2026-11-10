@@ -316,4 +316,14 @@ mod tests {
         assert!(presenter_allowed(10, false));
         assert!(presenter_allowed(8, true));
     }
+
+    #[test]
+    fn ten_bit_channel_has_1024_distinct_codes() {
+        let mut seen = std::collections::BTreeSet::new();
+        for step in 0..1024u32 {
+            let value = ((step * 65_535) / 1023) as u16;
+            seen.insert(channel16_to_10(value));
+        }
+        assert_eq!(seen.len(), 1024);
+    }
 }

@@ -1,9 +1,9 @@
 # Aurelia · Roadmap
 
-**Status:** v3.13.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
-Win32 + GDI, unsigned installer by permanent policy. v3.12.0 is the previous release.
+**Status:** v3.14.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
+Win32 + GDI, unsigned installer by permanent policy. v3.13.0 is the previous release.
 
-**Baseline:** 384 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
+**Baseline:** 385 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
 **0.60** budget on the last quality run. The GDI fallback remains an **8-bit presentation** of
 16-bit documents; the native 10-bit canvas path is in development for v3.14.0.
@@ -14,9 +14,9 @@ tests and a written gate; P3 work starts with a short proposal in `docs/` before
 
 ---
 
-## Maintenance — v3.13.x
+## Maintenance — v3.14.x
 
-**Status:** v3.13.0 is shipped; the audit milestone has no open issues. There is no scheduled
+**Status:** v3.14.0 is shipped; the audit milestone has no open issues. There is no scheduled
 feature work in this line: patch releases are reserved for regressions, security fixes and
 release-process defects.
 
@@ -32,13 +32,14 @@ release-process defects.
 
 ---
 
-## Now — v3.14.0: High-bit-depth presentation (in progress)
+## Shipped — v3.14.0: High-bit-depth presentation (experimental)
 
-**Status:** phase 2 is implemented in the development tree. The canvas and studio backdrop render
-from native RGBA16 into packed 10-bit pixels and present through a D3D11/DXGI flip-model
-swapchain when the output reports at least 10 bits per colour. Selection, tracing, onion-skin and
-soft-proof overlays are blended in 10-bit space; egui/guides stay 8-bit. The GDI path remains the
-fallback. The visible-banding gate still needs a 10-bit display chain.
+**Status:** shipped as an **opt-in experimental** setting, default off. The canvas and studio
+backdrop render from native RGBA16 into packed 10-bit pixels and present through a D3D11/DXGI
+flip-model swapchain when the output reports at least 10 bits per colour. Selection, tracing,
+onion-skin and soft-proof overlays are blended in 10-bit space; egui/guides stay 8-bit. The GDI
+path remains the fallback. Visible scanout has not been verified on every GPU/driver; the setting
+discloses this and requires a restart.
 
 - D3D11 FL11.1 device, 10-bit composition and HWND swapchain present with an 8-bit fallback.
 - Integrate the canvas present path and decide the egui overlay path.
@@ -112,6 +113,7 @@ claim.
 
 | Area | State |
 | :--- | :--- |
+| 10-bit presentation (v3.14.0, experimental) | Opt-in D3D11/DXGI flip-model present, native RGBA16 canvas -> 10-bit, 10-bit overlays, automatic GDI fallback; visible scanout not hardware-verified |
 | Production hardening (v3.13.0) | Invalid/cyclic hierarchies rejected; aggregate project/brush decode budgets; durable unique-temp saves; clipboard, DIB and Discord IPC bounds; owned `GWLP_USERDATA` window state; PE version metadata; release ledger |
 | Colour management (v3.13.0) | ICC attach/assign/convert with one undo step, AUR `AICC`, PNG/JPEG/WebP profile embed+input, cached approximate soft proof; production |
 | Clipboard, output & brushes (v3.12.0) | Paletted DIB and PNG clipboard, RGBA16 PNG export, styled clipping/Scale Styles/style-safe Merge Down, `.abr`/`.gbr` stamp import, presence-log privacy fix, full in-house quality gate |

@@ -1360,6 +1360,10 @@ impl AureliaDesktopApp {
 }
 
 fn refresh_tenbit(app: &mut AureliaDesktopApp, hwnd: HWND) {
+    if !app.tenbit_force && !app.state.tenbit_enabled {
+        app.tenbit = None;
+        return;
+    }
     let mut rc: RECT = unsafe { std::mem::zeroed() };
     unsafe {
         GetClientRect(hwnd, &mut rc);
@@ -3147,8 +3151,9 @@ unsafe extern "system" fn window_proc(
 
                 let is_16bit_doc = app.state.document.pixel_format
                     == aurelia_core::layer::PixelFormat::Srgb16;
+                let tenbit_enabled = app.state.tenbit_enabled || app.tenbit_force;
                 let mut high_depth =
-                    app.tenbit.is_some() && (is_16bit_doc || app.tenbit_force);
+                    app.tenbit.is_some() && tenbit_enabled && (is_16bit_doc || app.tenbit_force);
                 if high_depth {
                     app.tenbit_canvas.resize(app.win_w * app.win_h, 0);
                     high_depth = app.renderer.render_canvas_srgb16(
@@ -4161,12 +4166,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         DragAcceptFiles(hwnd, 1);
 
         let force_tenbit = (*app_ptr).tenbit_force;
-        (*app_ptr).tenbit = high_depth::TenBitPresenter::new(
-            windows::Win32::Foundation::HWND(hwnd),
-            initial_width as u32,
-            initial_height as u32,
-            force_tenbit,
-        );
+        (*app_ptr).tenbit = if force_tenbit || (*app_ptr).state.tenbit_enabled {
+            high_depth::TenBitPresenter::new(
+                windows::Win32::Foundation::HWND(hwnd),
+                initial_width as u32,
+                initial_height as u32,
+                force_tenbit,
+            )
+        } else {
+            None
+        };
 
         // Load and set custom Application & Taskbar Icon
         const APP_ICON_BYTES: &[u8] = include_bytes!("../../../assets/icon.png");
