@@ -21,12 +21,14 @@ unsupported layers or compression methods reject the file with an explicit statu
 | Common blend modes (`norm`, `mul`, `scrn`, `over`, `dark`, `lite`, `diff`, `lum`, etc.) | Yes |
 | Text layers (`TySh`) | Rejected |
 | Adjustment/fill layers (`SoCo`, `GdFl`, curves, levels, etc.) | Rejected |
+| Vector masks (`vmsk`/`vscg`) | Rejected |
+| Unknown additional-layer metadata blocks | Rejected |
 | Composite image (no layer records) | Imported as `Composite` |
 | Layer outside the canvas | Rejected |
 
-Unknown blend modes are rejected rather than silently converted to Normal. Unknown additional
-layer blocks are ignored only when they are metadata blocks the importer already recognizes as
-safe to skip.
+Unknown blend modes and unknown rendering-affecting metadata blocks are rejected rather than
+silently ignored. Only metadata blocks explicitly known to be safe (names, IDs, layer colour and
+section/clipping markers) are skipped.
 
 ## Limits
 
@@ -53,7 +55,12 @@ status/error path. Imported documents are not saved back to PSD; Save writes Aur
 - text and adjustment layers;
 - malformed signature, truncation and oversized canvas;
 - public `load_psd_document` path;
-- real PSD containers from the MIT-licensed `psd-tools` corpus (`0layers.psd`, `1layer.psd`,
-  `2layers.psd`, `empty-group.psd`).
+- real PSD containers from the MIT-licensed `psd-tools` corpus:
+  - supported: `0layers.psd`, `1layer.psd`, `2layers.psd`
+  - expected rejection: `empty-group.psd`, `group.psd`, `layer_mask_data.psd`,
+    `blend-and-clipping.psd`, `hidden-groups.psd`, `mask-density-layermask.psd`
+
+Expected-rejection fixtures assert `PsdError::Unsupported`; they are not counted as successful
+imports.
 
 The parser itself is in `crates/aurelia-io/src/psd.rs`.

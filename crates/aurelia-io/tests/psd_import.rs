@@ -270,10 +270,17 @@ fn text_and_adjustment_layers_are_rejected_explicitly() {
         Err(PsdError::Unsupported(_))
     ));
 
-    let mut adjustment = Layer::raster("Adjustment", rect);
+    let mut adjustment = Layer::raster("Adjustment", rect.clone());
     adjustment.unsupported = Some(*b"SoCo");
     assert!(matches!(
         parse_psd(&build(1, 1, &[adjustment], None)),
+        Err(PsdError::Unsupported(_))
+    ));
+
+    let mut unknown = Layer::raster("Unknown", rect);
+    unknown.unsupported = Some(*b"ZZZZ");
+    assert!(matches!(
+        parse_psd(&build(1, 1, &[unknown], None)),
         Err(PsdError::Unsupported(_))
     ));
 }
@@ -324,10 +331,6 @@ fn real_psd_fixtures_parse() {
             "0layers.psd",
             include_bytes!("fixtures/0layers.psd").as_slice(),
         ),
-        (
-            "empty-group.psd",
-            include_bytes!("fixtures/empty-group.psd").as_slice(),
-        ),
     ] {
         match parse_psd(bytes) {
             Ok(doc) => {
@@ -335,6 +338,39 @@ fn real_psd_fixtures_parse() {
                 assert!(imported.width > 0 && imported.height > 0, "{name}");
             }
             Err(error) => panic!("{name}: {error}"),
+        }
+    }
+}
+
+#[test]
+fn real_psd_unsupported_fixtures_are_rejected() {
+    for (name, bytes) in [
+        (
+            "empty-group.psd",
+            include_bytes!("fixtures/empty-group.psd").as_slice(),
+        ),
+        ("group.psd", include_bytes!("fixtures/group.psd").as_slice()),
+        (
+            "layer_mask_data.psd",
+            include_bytes!("fixtures/layer_mask_data.psd").as_slice(),
+        ),
+        (
+            "blend-and-clipping.psd",
+            include_bytes!("fixtures/blend-and-clipping.psd").as_slice(),
+        ),
+        (
+            "hidden-groups.psd",
+            include_bytes!("fixtures/hidden-groups.psd").as_slice(),
+        ),
+        (
+            "mask-density-layermask.psd",
+            include_bytes!("fixtures/mask-density-layermask.psd").as_slice(),
+        ),
+    ] {
+        match parse_psd(bytes) {
+            Err(PsdError::Unsupported(_)) => {}
+            Err(error) => panic!("{name}: unexpected error {error}"),
+            Ok(_) => panic!("{name} unexpectedly imported"),
         }
     }
 }

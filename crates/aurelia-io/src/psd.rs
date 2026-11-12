@@ -395,13 +395,21 @@ fn parse_extra(
                     }
                 }
             }
-            b"lnsr" | b"lyid" | b"lclr" | b"shmd" | b"fxrp" | b"vmsk" | b"vscg" => {}
+            b"lnsr" | b"lyid" | b"lclr" | b"shmd" | b"clbl" => {}
+            b"vmsk" | b"vscg" => {
+                return Err(PsdError::Unsupported("vector layer mask".into()));
+            }
             b"TySh" => return Err(PsdError::Unsupported("text layer".into())),
             b"SoCo" | b"GdFl" | b"brit" | b"levl" | b"curv" | b"hue " | b"blnc" | b"phfl"
             | b"expA" | b"vibA" | b"blwh" | b"nvrt" | b"post" | b"thrs" | b"mixr" | b"clrL" => {
                 return Err(PsdError::Unsupported("adjustment/fill layer".into()));
             }
-            _ => {}
+            other => {
+                return Err(PsdError::Unsupported(format!(
+                    "unknown additional-layer block {:?}",
+                    String::from_utf8_lossy(other)
+                )));
+            }
         }
     }
     Ok((unicode_name.unwrap_or(name), mask, section))
