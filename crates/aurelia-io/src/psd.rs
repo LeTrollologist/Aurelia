@@ -559,6 +559,7 @@ fn parse_layer_info(
     }
 
     let mut stack: Vec<(Vec<PsdNode>, Option<(String, f32, bool)>)> = vec![(Vec::new(), None)];
+    records.reverse();
     for record in records {
         match record.section {
             Some(1) => {
@@ -567,11 +568,12 @@ fn parse_layer_info(
                     Some((record.name.clone(), record.opacity, record.visible)),
                 ));
             }
-            Some(2) => {
+            Some(2) | Some(3) => {
                 if stack.len() <= 1 {
                     return Err(PsdError::Corrupt("group end without start".into()));
                 }
-                let (children, meta) = stack.pop().unwrap();
+                let (mut children, meta) = stack.pop().unwrap();
+                children.reverse();
                 let (name, opacity, visible) =
                     meta.ok_or_else(|| PsdError::Corrupt("group missing metadata".into()))?;
                 stack.last_mut().unwrap().0.push(PsdNode::Group {
@@ -671,7 +673,9 @@ fn parse_layer_info(
         return Err(PsdError::Corrupt("layer data overran its section".into()));
     }
     reader.skip(end - reader.position)?;
-    Ok(stack.pop().unwrap().0)
+    let mut roots = stack.pop().unwrap().0;
+    roots.reverse();
+    Ok(roots)
 }
 
 fn parse_composite(reader: &mut Reader<'_>, header: &ParsedHeader) -> Result<PsdNode, PsdError> {
@@ -679,27 +683,33 @@ fn parse_composite(reader: &mut Reader<'_>, header: &ParsedHeader) -> Result<Psd
     let height = header.height as usize;
     let compression = reader.u16()?;
     let mut channels: Vec<Vec<u8>> = Vec::new();
-    for _ in 0..header.channels {
-        let data = match compression {
-            0 => reader.take(width * height)?.to_vec(),
-            1 => {
-                let mut rows = Vec::with_capacity(height);
-                for _ in 0..height {
-                    rows.push(reader.u16()? as usize);
-                }
-                let mut out = Vec::with_capacity(width * height);
-                for count in rows {
-                    out.extend(decode_packbits(reader.take(count)?, width)?);
-                }
-                out
+    if compression == 1 {
+        // Composite PSD RLE stores all row byte counts for all channels first, then
+        // the compressed rows for channel 0, channel 1, ...
+        let mut counts = Vec::with_capacity(height * header.channels as usize);
+        for _ in 0..height * header.channels as usize {
+            counts.push(reader.u16()? as usize);
+        }
+        for channel in 0..header.channels as usize {
+            let mut out = Vec::with_capacity(width * height);
+            for row in 0..height {
+                let count = counts[channel * height + row];
+                out.extend(decode_packbits(reader.take(count)?, width)?);
             }
-            other => {
-                return Err(PsdError::Unsupported(format!(
-                    "composite compression method {other}"
-                )))
-            }
-        };
-        channels.push(data);
+            channels.push(out);
+        }
+    } else {
+        for _ in 0..header.channels {
+            let data = match compression {
+                0 => reader.take(width * height)?.to_vec(),
+                other => {
+                    return Err(PsdError::Unsupported(format!(
+                        "composite compression method {other}"
+                    )))
+                }
+            };
+            channels.push(data);
+        }
     }
     let mut rgba = vec![0u8; width * height * 4];
     for pixel in rgba.chunks_exact_mut(4) {

@@ -52,6 +52,8 @@ status/error path. Imported documents are not saved back to PSD; Save writes Aur
 - nested groups and a layer mask;
 - text and adjustment layers;
 - malformed signature, truncation and oversized canvas;
-- public `load_psd_document` path.
+- public `load_psd_document` path;
+- real PSD containers from the MIT-licensed `psd-tools` corpus (`0layers.psd`, `1layer.psd`,
+  `2layers.psd`, `empty-group.psd`).
 
 The parser itself is in `crates/aurelia-io/src/psd.rs`.

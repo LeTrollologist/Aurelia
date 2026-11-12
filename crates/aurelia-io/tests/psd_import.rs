@@ -230,11 +230,11 @@ fn nested_groups_and_masks_are_preserved() {
     child.mask = Some((rect.clone(), vec![128; 4]));
     child.channels.push((-2, vec![128; 4]));
     let group = vec![
-        Layer::group("Outer", 1),
-        Layer::group("Inner", 1),
-        child,
-        Layer::group("Inner end", 2),
         Layer::group("Outer end", 2),
+        Layer::group("Inner end", 2),
+        child,
+        Layer::group("Inner", 1),
+        Layer::group("Outer", 1),
     ];
     let doc = parse_psd(&build(2, 2, &group, None))
         .expect("parse")
@@ -307,6 +307,36 @@ fn rle_layer_channels_are_decoded() {
         .into_document();
     assert_eq!(doc.layers.len(), 1);
     assert_eq!(doc.layers[0].name, "RLE");
+}
+
+#[test]
+fn real_psd_fixtures_parse() {
+    for (name, bytes) in [
+        (
+            "1layer.psd",
+            include_bytes!("fixtures/1layer.psd").as_slice(),
+        ),
+        (
+            "2layers.psd",
+            include_bytes!("fixtures/2layers.psd").as_slice(),
+        ),
+        (
+            "0layers.psd",
+            include_bytes!("fixtures/0layers.psd").as_slice(),
+        ),
+        (
+            "empty-group.psd",
+            include_bytes!("fixtures/empty-group.psd").as_slice(),
+        ),
+    ] {
+        match parse_psd(bytes) {
+            Ok(doc) => {
+                let imported = doc.into_document();
+                assert!(imported.width > 0 && imported.height > 0, "{name}");
+            }
+            Err(error) => panic!("{name}: {error}"),
+        }
+    }
 }
 
 #[test]

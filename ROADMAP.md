@@ -3,7 +3,7 @@
 **Status:** v3.15.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
 Win32 + GDI, unsigned installer by permanent policy. v3.14.0 is the previous release.
 
-**Baseline:** 397 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
+**Baseline:** 398 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
 **0.60** budget on the last quality run. The GDI fallback remains an **8-bit presentation** of
 16-bit documents; the opt-in 10-bit canvas path shipped experimentally in v3.14.0.
