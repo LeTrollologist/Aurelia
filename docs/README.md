@@ -16,6 +16,7 @@ the contract.
 | [QUALITY.md](QUALITY.md) | Formatting, Clippy and test policy enforced by the release gate |
 | [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) | What is reproducible today and what a bit-for-bit release would require |
 | [PRESETS.md](PRESETS.md) | Versioned brush/gradient preset file, limits and recovery |
+| [PSD_IMPORT.md](PSD_IMPORT.md) | Read-only PSD import subset, limits and rejected features |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Installer, save, Discord and startup failures |
 
 Release mechanics live in [RELEASE_PROCESS.md](../RELEASE_PROCESS.md).

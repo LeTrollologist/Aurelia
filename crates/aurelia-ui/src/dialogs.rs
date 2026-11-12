@@ -5,6 +5,7 @@ pub fn open_project_dialog() -> Option<PathBuf> {
         .set_title("Open Aurelia Project")
         .add_filter("Aurelia Project (*.aur)", &["aur"])
         .add_filter("Legacy Hollow Canvas Project (*.hcv)", &["hcv"])
+        .add_filter("Photoshop Document (*.psd) — read-only", &["psd"])
         .pick_file()
 }
 

@@ -3,7 +3,7 @@
 **Status:** v3.15.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
 Win32 + GDI, unsigned installer by permanent policy. v3.14.0 is the previous release.
 
-**Baseline:** 390 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
+**Baseline:** 397 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
 **0.60** budget on the last quality run. The GDI fallback remains an **8-bit presentation** of
 16-bit documents; the opt-in 10-bit canvas path shipped experimentally in v3.14.0.
@@ -63,14 +63,19 @@ opt-in and default-off.
 - `%LOCALAPPDATA%\Aurelia\presets.aurp`; unique temp file, `sync_all`, replacement, cleanup.
 - Brush and gradient preset manager, save/load, rename/delete, library import/export.
 
+## Now — v3.16.0: PSD import spike (in progress)
+
+**Status:** the read-only parser, fixture tests and compatibility matrix are implemented for
+8-bit RGB PSD. Supported: raster layers, nested groups, masks, opacity/visibility/clipping,
+common blend modes and composite fallback. Explicitly rejected: PSB, 16/32-bit, non-RGB,
+ZIP/RLE-incompatible data, text layers and adjustment/fill layers. UI import is read-only and
+forces an unsaved document so Save As cannot overwrite the PSD.
+
 ## Next — queued in order
 
-1. **PSD import feasibility spike.** Read-only first: layer structure, masks, groups, text and
-   adjustment layers. A separate compatibility matrix and fixture corpus are prerequisites;
-   writing PSD is out of scope for the spike.
-3. **Multi-document tabs.** A `DocumentSession` refactor; valuable, but it waits behind viewport
+1. **Multi-document tabs.** A `DocumentSession` refactor; valuable, but it waits behind viewport
    and release reliability.
-4. **Layer style extensions.** Inner shadow/glow, bevel and presets; only after a measured style
+2. **Layer style extensions.** Inner shadow/glow, bevel and presets; only after a measured style
    pass, so effects are not added to a slow renderer.
 
 ---
@@ -121,6 +126,7 @@ opt-in and default-off.
 
 | Area | State |
 | :--- | :--- |
+| PSD import (v3.16.0, read-only) | 8-bit RGB parser, bounded budgets, raster layers, nested groups, masks, opacity/blend metadata, explicit unsupported rejection; no PSD writer |
 | Persistent presets (v3.15.0) | Versioned bounded `presets.aurp`, atomic save/load, brush-stamp persistence, gradient presets, manager rename/delete, library import/export |
 | 10-bit presentation (v3.14.0, experimental) | Opt-in D3D11/DXGI flip-model present, native RGBA16 canvas -> 10-bit, 10-bit overlays, automatic GDI fallback; visible scanout not hardware-verified |
 | Production hardening (v3.15.0) | Invalid/cyclic hierarchies rejected; aggregate project/brush decode budgets; durable unique-temp saves; clipboard, DIB and Discord IPC bounds; owned `GWLP_USERDATA` window state; PE version metadata; release ledger |

@@ -96,6 +96,8 @@ pub enum ProjectError {
     CorruptData,
     #[error("This project version cannot represent the document's storage format")]
     UnsupportedFormat,
+    #[error("PSD import failed: {0}")]
+    Psd(String),
     #[error("text layer content is {len} bytes; maximum is {max}")]
     TextTooLarge { len: usize, max: usize },
     #[error("{field} is {len} bytes; maximum is {max}")]
@@ -1410,6 +1412,15 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
 }
 
 pub fn load_project_file(path: impl AsRef<Path>) -> Result<Document, ProjectError> {
+    let path = path.as_ref();
+    if path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("psd"))
+    {
+        return crate::psd::load_psd_document(path)
+            .map_err(|error| ProjectError::Psd(error.to_string()));
+    }
     let file = File::open(path)?;
     load_project_from_reader(file)
 }

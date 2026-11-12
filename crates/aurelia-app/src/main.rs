@@ -3500,11 +3500,21 @@ unsafe extern "system" fn window_proc(
                     app.state.sync_editor_from_document();
                                     app.state.mark_canvas_dirty();
                                     app.state.history.clear();
-                                    app.state.document_path = Some(path.clone());
-                                    app.state.mark_saved();
-                                    app.state.note_recent_file(&path);
-                                    app.state.save_preferences();
-                                    app.state.set_status(format!("Loaded {}", path.display()));
+                                    if is_psd_path(&path) {
+                                        app.state.document_path = None;
+                                        app.state.mark_dirty();
+                                        app.state.note_recent_file(&path);
+                                        app.state.save_preferences();
+                                        app.state.set_status(
+                                            "Imported PSD (read-only) - use Save As to keep it",
+                                        );
+                                    } else {
+                                        app.state.document_path = Some(path.clone());
+                                        app.state.mark_saved();
+                                        app.state.note_recent_file(&path);
+                                        app.state.save_preferences();
+                                        app.state.set_status(format!("Loaded {}", path.display()));
+                                    }
                                 }
                                 Err(e) => app.state.set_status(format!("Load error: {}", e)),
                             }
@@ -3667,12 +3677,23 @@ unsafe extern "system" fn window_proc(
                     app.state.sync_editor_from_document();
                             app.state.mark_canvas_dirty();
                             app.state.history.clear();
-                            app.state.document_path = Some(path.clone());
-                            app.state.mark_saved();
-                            app.state.note_recent_file(&path);
-                            app.state.save_preferences();
-                            app.state.reset_view_centered(app.win_w as f32, app.win_h as f32);
-                            app.state.set_status(format!("Loaded project: {}", path.display()));
+                            if is_psd_path(&path) {
+                                app.state.document_path = None;
+                                app.state.mark_dirty();
+                                app.state.note_recent_file(&path);
+                                app.state.save_preferences();
+                                app.state.reset_view_centered(app.win_w as f32, app.win_h as f32);
+                                app.state.set_status(
+                                    "Imported PSD (read-only) - use Save As to keep it",
+                                );
+                            } else {
+                                app.state.document_path = Some(path.clone());
+                                app.state.mark_saved();
+                                app.state.note_recent_file(&path);
+                                app.state.save_preferences();
+                                app.state.reset_view_centered(app.win_w as f32, app.win_h as f32);
+                                app.state.set_status(format!("Loaded project: {}", path.display()));
+                            }
                         }
                         Err(e) => app.state.set_status(format!("Failed to load project: {}", e)),
                     }
@@ -3726,8 +3747,18 @@ unsafe extern "system" fn window_proc(
 fn is_project_path(path: &std::path::Path) -> bool {
     path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("aur") || e.eq_ignore_ascii_case("hcv"))
+        .map(|e| {
+            e.eq_ignore_ascii_case("aur")
+                || e.eq_ignore_ascii_case("hcv")
+                || e.eq_ignore_ascii_case("psd")
+        })
         .unwrap_or(false)
+}
+
+fn is_psd_path(path: &std::path::Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("psd"))
 }
 
 fn to_wide(s: &str) -> Vec<u16> {
@@ -3951,10 +3982,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match load_project_file(&initial_file) {
                 Ok(doc) => {
                     let mut s = AppState::from_document(doc);
-                    s.document_path = Some(initial_file.clone());
-                    s.mark_saved();
-                    s.note_recent_file(&initial_file);
-                    s.set_status(format!("Loaded project: {}", initial_file.display()));
+                    if is_psd_path(&initial_file) {
+                        s.document_path = None;
+                        s.mark_dirty();
+                        s.note_recent_file(&initial_file);
+                        s.set_status("Imported PSD (read-only) - use Save As to keep it");
+                    } else {
+                        s.document_path = Some(initial_file.clone());
+                        s.mark_saved();
+                        s.note_recent_file(&initial_file);
+                        s.set_status(format!("Loaded project: {}", initial_file.display()));
+                    }
                     s
                 }
                 Err(e) => {
