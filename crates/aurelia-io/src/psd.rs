@@ -364,6 +364,7 @@ fn parse_extra(
     let ranges_len = extra.u32()? as usize;
     extra.skip(ranges_len)?;
     let name = parse_name(&mut extra)?;
+    let mut unicode_name = None;
     let mut section = None;
     while extra.remaining() >= 12 {
         let signature = extra.take(4)?;
@@ -380,7 +381,21 @@ fn parse_extra(
                 }
                 section = Some(u32::from_be_bytes([data[0], data[1], data[2], data[3]]));
             }
-            b"luni" | b"lnsr" | b"lyid" | b"lclr" | b"shmd" | b"fxrp" | b"vmsk" | b"vscg" => {}
+            b"luni" => {
+                if data.len() >= 4 {
+                    let chars = data[4..]
+                        .chunks_exact(2)
+                        .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
+                        .collect::<Vec<_>>();
+                    if let Ok(value) = String::from_utf16(&chars) {
+                        let value = value.trim_end_matches('\0').to_string();
+                        if !value.trim().is_empty() {
+                            unicode_name = Some(value);
+                        }
+                    }
+                }
+            }
+            b"lnsr" | b"lyid" | b"lclr" | b"shmd" | b"fxrp" | b"vmsk" | b"vscg" => {}
             b"TySh" => return Err(PsdError::Unsupported("text layer".into())),
             b"SoCo" | b"GdFl" | b"brit" | b"levl" | b"curv" | b"hue " | b"blnc" | b"phfl"
             | b"expA" | b"vibA" | b"blwh" | b"nvrt" | b"post" | b"thrs" | b"mixr" | b"clrL" => {
@@ -389,7 +404,7 @@ fn parse_extra(
             _ => {}
         }
     }
-    Ok((name, mask, section))
+    Ok((unicode_name.unwrap_or(name), mask, section))
 }
 
 fn decode_packbits(data: &[u8], expected: usize) -> Result<Vec<u8>, PsdError> {
