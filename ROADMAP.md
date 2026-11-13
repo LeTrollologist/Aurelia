@@ -1,7 +1,7 @@
 # Aurelia · Roadmap
 
-**Status:** v3.15.0 is the production release, shipped 2026-11-10 · Windows 10/11 x86-64 ·
-Win32 + GDI, unsigned installer by permanent policy. v3.14.0 is the previous release.
+**Status:** v3.16.0 is the production release, shipped 2026-11-13 · Windows 10/11 x86-64 ·
+Win32 + GDI, unsigned installer by permanent policy. v3.15.0 is the previous release.
 
 **Baseline:** 399 tests passing, 2 ignored (soak and the sparse gate); formatting and Clippy
 correctness are enforced by `scripts/quality.py`. Sparse 16-bit composite **0.73** against the
@@ -14,9 +14,9 @@ tests and a written gate; P3 work starts with a short proposal in `docs/` before
 
 ---
 
-## Maintenance — v3.15.x
+## Maintenance — v3.16.x
 
-**Status:** v3.15.0 is shipped; the audit milestone has no open issues. There is no scheduled
+**Status:** v3.16.0 is shipped; the audit milestone has no open issues. There is no scheduled
 feature work in this line: patch releases are reserved for regressions, security fixes and
 release-process defects.
 
@@ -63,10 +63,9 @@ opt-in and default-off.
 - `%LOCALAPPDATA%\Aurelia\presets.aurp`; unique temp file, `sync_all`, replacement, cleanup.
 - Brush and gradient preset manager, save/load, rename/delete, library import/export.
 
-## Now — v3.16.0: PSD import spike (in progress)
+## Shipped — v3.16.0: Read-only PSD import
 
-**Status:** the read-only parser, fixture tests and compatibility matrix are implemented for
-8-bit RGB PSD. Supported: raster layers, nested groups, masks, opacity/visibility/clipping,
+**Status:** shipped as a read-only PSD import for 8-bit RGB PSD. Supported: raster layers, nested groups, masks, opacity/visibility/clipping,
 common blend modes and composite fallback. Explicitly rejected: PSB, 16/32-bit, non-RGB,
 ZIP/RLE-incompatible data, text layers, adjustment/fill layers, vector masks, unknown metadata
 blocks and out-of-canvas layers. UI import is read-only and forces an unsaved document so Save As

@@ -113,7 +113,8 @@ GPU/driver. The GDI 8-bit path remains the fallback.
 
 This release also adds a durable brush and gradient preset library at
 `%LOCALAPPDATA%\Aurelia\presets.aurp`, with bounded versioned storage, atomic saves and a preset
-manager for rename, delete and library import/export. See [docs/PRESETS.md](docs/PRESETS.md).
+manager for rename, delete and library import/export, plus a read-only PSD import path for
+8-bit RGB files. See [docs/PRESETS.md](docs/PRESETS.md) and [docs/PSD_IMPORT.md](docs/PSD_IMPORT.md).
 
 ### Key Highlights
 
