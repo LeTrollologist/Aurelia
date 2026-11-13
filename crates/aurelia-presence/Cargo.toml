@@ -1,6 +1,6 @@
 [package]
 name = "aurelia-presence"
-version = "3.15.0"
+version = "3.16.0"
 edition = "2021"
 rust-version = "1.87"
 description = "Optional Discord Rich Presence integration for Aurelia"
