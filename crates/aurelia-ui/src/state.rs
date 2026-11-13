@@ -3996,7 +3996,9 @@ mod document_format_ui {
             *layer.buffer_mut() = LayerBuffer::Srgb16(channels);
         }
 
-        let dir = std::env::temp_dir().join(format!("aurelia-format-ui-{}", std::process::id()));
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("aurelia-format-ui-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
         let path = dir.join("wide.aur");
@@ -5203,8 +5205,9 @@ mod layer_style_transactions {
             .expect("layer")
             .styles
             .stroke = Some(StrokeStyle::default());
-        let path =
-            std::env::temp_dir().join(format!("aurelia-style-save-{}.aur", std::process::id()));
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("aurelia-style-save-{}.aur", std::process::id()));
         state.save_project_to(&path).expect("save");
         let _ = std::fs::remove_file(&path);
         assert!(state.style_edit.is_none(), "save commits the open gesture");
@@ -5247,8 +5250,9 @@ mod autosave_paths {
         let untitled = state.autosave_path();
         assert_eq!(untitled, state.autosave_path());
 
-        let dir =
-            std::env::temp_dir().join(format!("aurelia-autosave-scan-{}", std::process::id()));
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(format!("aurelia-autosave-scan-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
         let snapshot = dir.join("poster-0123456789abcdef-autosave.aur");

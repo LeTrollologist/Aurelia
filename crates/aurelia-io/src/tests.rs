@@ -4,6 +4,21 @@ mod tests {
     use crate::ProjectError;
     use aurelia_core::document::{Document, MAX_LAYER_HIERARCHY_DEPTH};
     use std::io::Cursor;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    fn test_dir(label: &str) -> PathBuf {
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("io-test-tmp");
+        std::fs::create_dir_all(&base).expect("test base");
+        base.join(format!(
+            "{label}-{}-{}",
+            std::process::id(),
+            SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ))
+    }
 
     #[test]
     fn test_binary_hcv_project_archive_roundtrip() {
@@ -215,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_atomic_save_replaces_file_and_leaves_no_temp() {
-        let dir = std::env::temp_dir().join(format!("hc-atomic-{}", std::process::id()));
+        let dir = test_dir("atomic");
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("art.aur");
 
@@ -256,7 +271,7 @@ mod tests {
             }
         }
 
-        let dir = std::env::temp_dir().join(format!("hc-jpeg-{}", std::process::id()));
+        let dir = test_dir("jpeg");
         std::fs::create_dir_all(&dir).unwrap();
         let low = dir.join("q20.jpg");
         let high = dir.join("q95.jpg");
@@ -303,7 +318,7 @@ mod tests {
                 .collect()
         };
 
-        let dir = std::env::temp_dir().join(format!("hc-sheet-{}", std::process::id()));
+        let dir = test_dir("sheet");
         std::fs::create_dir_all(&dir).unwrap();
         let sheet_path = dir.join("sheet.png");
 
