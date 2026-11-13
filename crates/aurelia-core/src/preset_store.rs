@@ -488,13 +488,21 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn library_survives_save_and_reload_from_disk() {
-        let directory = std::env::temp_dir().join(format!(
-            "aurelia-preset-reload-{}-{}",
+    fn test_directory(label: &str) -> PathBuf {
+        let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("preset-store-tests");
+        std::fs::create_dir_all(&base).expect("test base directory");
+        base.join(format!(
+            "{label}-{}-{}",
             std::process::id(),
             SAVE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
-        ));
+        ))
+    }
+
+    #[test]
+    fn library_survives_save_and_reload_from_disk() {
+        let directory = test_directory("reload");
         std::fs::create_dir_all(&directory).expect("directory");
         let path = directory.join("presets.aurp");
         let library = sample_library();
@@ -506,11 +514,7 @@ mod tests {
 
     #[test]
     fn failed_save_preserves_the_previous_file() {
-        let directory = std::env::temp_dir().join(format!(
-            "aurelia-preset-test-{}-{}",
-            std::process::id(),
-            SAVE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
-        ));
+        let directory = test_directory("failed-save");
         std::fs::create_dir_all(&directory).expect("directory");
         let path = directory.join("presets.aurp");
         save_library(&path, &sample_library()).expect("first save");
