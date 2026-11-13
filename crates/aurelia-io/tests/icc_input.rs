@@ -6,7 +6,9 @@ use image::ImageDecoder;
 use std::path::PathBuf;
 
 fn temp_path(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("aurelia-icc-input-{}-{name}", std::process::id()))
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("aurelia-icc-input-{}-{name}", std::process::id()))
 }
 
 fn decoded_profile(path: &std::path::Path) -> Option<Vec<u8>> {

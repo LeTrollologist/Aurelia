@@ -383,7 +383,9 @@ fn imported_document_can_be_loaded_through_the_public_path() {
         bottom: 1,
         right: 1,
     };
-    let path = std::env::temp_dir().join(format!("aurelia-psd-import-{}.psd", std::process::id()));
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("aurelia-psd-import-{}.psd", std::process::id()));
     std::fs::write(&path, build(1, 1, &[Layer::raster("One", rect)], None)).expect("write");
     let doc = load_psd_document(&path).expect("load");
     assert_eq!(doc.layers.len(), 1);

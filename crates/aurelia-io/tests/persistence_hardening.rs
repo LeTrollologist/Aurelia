@@ -153,7 +153,9 @@ fn save_load_save_is_stable() {
 
 #[test]
 fn a_failed_atomic_save_keeps_the_previous_file() {
-    let dir = std::env::temp_dir().join(format!("aurelia-atomic-{}", std::process::id()));
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("aurelia-atomic-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("temp dir");
     let path = dir.join("atomic.aur");

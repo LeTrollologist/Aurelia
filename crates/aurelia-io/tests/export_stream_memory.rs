@@ -66,7 +66,9 @@ const FRAME_BYTES: usize = (SIDE * SIDE * 4) as usize;
 const TOTAL: usize = FRAMES * FRAME_BYTES;
 
 fn temp_dir(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("aurelia-export-mem-{tag}-{}", std::process::id()));
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("aurelia-export-mem-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("temp dir");
     dir

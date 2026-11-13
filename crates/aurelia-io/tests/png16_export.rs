@@ -8,7 +8,9 @@ use aurelia_io::export::{
 use std::path::PathBuf;
 
 fn temp_path(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("aurelia-png16-{}-{name}", std::process::id()))
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("aurelia-png16-{}-{name}", std::process::id()))
 }
 
 fn sixteen_bit_doc() -> Document {

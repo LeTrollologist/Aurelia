@@ -90,7 +90,9 @@ fn sixteen_bit_document() -> (Document, u64) {
 }
 
 fn temp_path() -> std::path::PathBuf {
-    std::env::temp_dir().join(format!("aurelia-soak-{}.aur", std::process::id()))
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!("aurelia-soak-{}.aur", std::process::id()))
 }
 
 #[test]

@@ -11,11 +11,13 @@ use aurelia_io::project::{load_project_file, save_project_file};
 use std::path::PathBuf;
 
 fn temp_path(tag: &str) -> PathBuf {
-    std::env::temp_dir().join(format!(
-        "aurelia-eviction-{}-{}.aur",
-        tag,
-        std::process::id()
-    ))
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(format!(
+            "aurelia-eviction-{}-{}.aur",
+            tag,
+            std::process::id()
+        ))
 }
 
 fn sixteen_bit_document() -> (Document, u64) {
