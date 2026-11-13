@@ -220,7 +220,7 @@ Aurelia ships as a **per-user Windows installer**, a portable zip, or a **Rust s
 the documented Win32 FFI boundary.
 Full details, silent-install switches and verification steps live in [`INSTALL.md`](INSTALL.md).
 
-> **v3.16.0 is the current release.** It supersedes v3.14.0; use the
+> **v3.16.0 is the current release.** It supersedes v3.15.0; use the
 > explicit release links below.
 
 ### Option 1: Installer (Recommended)
