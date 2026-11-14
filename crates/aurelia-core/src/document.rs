@@ -1426,7 +1426,7 @@ pub(crate) fn parallel_degree(pixels: u32) -> usize {
 /// of rows and writes only to its own slice of `out`, so the result cannot depend on
 /// scheduling - see `tests::parallel_compositing_matches_the_serial_reference`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn compose_layer<C: Channel, F>(
+fn compose_layer<C: Channel, F>(
     out: &mut [C],
     layer: &Layer,
     canvas_w: u32,
@@ -1494,7 +1494,7 @@ pub(crate) fn compose_layer<C: Channel, F>(
 /// `tests::general_compositing_is_bit_identical_to_the_reference`.
 #[allow(clippy::too_many_arguments)]
 #[inline]
-pub(crate) fn compose_rows<C: Channel, F>(
+fn compose_rows<C: Channel, F>(
     out: &mut [C],
     y_start: u32,
     y_end: u32,
