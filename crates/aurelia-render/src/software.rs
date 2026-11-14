@@ -692,14 +692,14 @@ impl SoftwareRenderer {
                     )
                 } else {
                     let idx = (doc_yi as usize * doc.width as usize + doc_xi as usize) * 4;
-                    if idx + 3 >= self.composite16.len() {
+                    if idx + 3 >= flat16.len() {
                         continue;
                     }
                     [
-                        self.composite16[idx],
-                        self.composite16[idx + 1],
-                        self.composite16[idx + 2],
-                        self.composite16[idx + 3],
+                        flat16[idx],
+                        flat16[idx + 1],
+                        flat16[idx + 2],
+                        flat16[idx + 3],
                     ]
                 };
                 let src_idx = (doc_yi as usize * doc.width as usize + doc_xi as usize) * 4;
@@ -2298,6 +2298,47 @@ mod soft_proof_viewport_tests {
             renderer.proof_cache_generation,
             generation + 1,
             "a document revision must invalidate the proof cache"
+        );
+    }
+
+    #[test]
+    fn soft_proof_applies_in_the_sixteen_bit_viewport_at_one_to_one() {
+        // The 16-bit present path samples the proofed buffer in its bilinear branch but must
+        // also use it in the nearest branch, which is the one used at 1:1 and above 2.5x.
+        let mut doc = Document::new(8, 8);
+        let p3 = moxcms::ColorProfile::new_display_p3().encode().expect("P3");
+        doc.set_icc_profile(p3).expect("attach P3");
+        let pixels = doc.layers[0].as_srgb8_mut().expect("8-bit");
+        for pixel in pixels.chunks_exact_mut(4) {
+            pixel.copy_from_slice(&[200, 100, 50, 255]);
+        }
+
+        let render = |renderer: &mut SoftwareRenderer| {
+            let mut buffer = vec![0u32; 32 * 32];
+            let ok = renderer.render_canvas_srgb16(
+                &mut buffer,
+                32,
+                32,
+                &doc,
+                Vec2::ZERO,
+                1.0,
+                Vec2::ZERO,
+                [0, 0, 32, 32],
+                None,
+                &[],
+                None,
+            );
+            assert!(ok, "16-bit present path must accept this frame");
+            buffer
+        };
+
+        let normal = render(&mut SoftwareRenderer::new());
+        let mut renderer = SoftwareRenderer::new();
+        renderer.soft_proof = Some(aurelia_core::IccProfile::srgb());
+        let proofed = render(&mut renderer);
+        assert_ne!(
+            normal, proofed,
+            "soft proof must alter the 16-bit viewport at 1:1"
         );
     }
 }
