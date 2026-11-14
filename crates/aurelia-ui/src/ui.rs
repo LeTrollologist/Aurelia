@@ -489,10 +489,30 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         {
                                             match aurelia_io::project::load_project_file(&path) {
                                                 Ok(doc) => {
+                                                    // An imported PSD is a read-only source: it opens
+                                                    // as an unsaved document so Save cannot write AUR
+                                                    // bytes over the original file. This mirrors the
+                                                    // File -> Open path in the host.
+                                                    let is_psd = path
+                                                        .extension()
+                                                        .and_then(|extension| extension.to_str())
+                                                        .is_some_and(|extension| {
+                                                            extension.eq_ignore_ascii_case("psd")
+                                                        });
                                                     state.document = doc;
+                                                    state.sync_editor_from_document();
+                                                    state.mark_canvas_dirty();
                                                     state.history.clear();
-                                                    state.document_path = Some(path.clone());
+                                                    state.selection = None;
+                                                    state.document_path = if is_psd {
+                                                        None
+                                                    } else {
+                                                        Some(path.clone())
+                                                    };
                                                     state.mark_saved();
+                                                    if is_psd {
+                                                        state.mark_dirty();
+                                                    }
                                                     state.note_recent_file(&path);
                                                     state.set_status(format!(
                                                         "Loaded {}",
