@@ -53,3 +53,25 @@ pub fn open_icc_dialog() -> Option<PathBuf> {
         .add_filter("ICC Profiles (*.icc, *.icm)", &["icc", "icm"])
         .pick_file()
 }
+
+pub fn import_preset_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Import Preset Library")
+        .add_filter("Aurelia presets (*.aurp)", &["aurp"])
+        .pick_file()
+}
+
+pub fn export_preset_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Export Preset Library")
+        .add_filter("Aurelia presets (*.aurp)", &["aurp"])
+        .set_file_name("presets.aurp")
+        .save_file()
+}
+
+pub fn open_font_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Load Custom Font")
+        .add_filter("Font Files (*.ttf, *.otf)", &["ttf", "otf"])
+        .pick_file()
+}

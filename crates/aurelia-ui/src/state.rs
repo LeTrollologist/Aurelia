@@ -336,6 +336,9 @@ pub enum PendingFileAction {
     ConvertToIccProfile,
     LoadProofProfile,
     ImportBrush,
+    ImportPresets,
+    ExportPresets,
+    LoadCustomFont,
     NewCanvas(NewCanvasSpec),
 }
 
@@ -664,6 +667,9 @@ pub struct AppState {
     pub is_space_panning: bool,
     pub pan_drag_start: Option<Vec2>,
     pub pending_file_action: Option<PendingFileAction>,
+    /// Project or PSD a menu asked to open. The host loads it after the frame, so the unsaved
+    /// changes prompt and the load never run inside the egui frame.
+    pub pending_open_path: Option<PathBuf>,
     /// Clipboard command requested by the Edit menu, processed by the host after the frame.
     pub pending_edit_action: Option<PendingEditAction>,
 
@@ -990,6 +996,7 @@ impl AppState {
             is_space_panning: false,
             pan_drag_start: None,
             pending_file_action: None,
+            pending_open_path: None,
             pending_edit_action: None,
             document_path: None,
             saved_generation: 0,
@@ -2831,6 +2838,10 @@ impl AppState {
             .and_then(SelectionMask::bounds)
             .unwrap_or((0, 0, width, height));
         let (x0, y0, x1, y1) = bounds;
+        // A selection can outlive the document it was made in (Open, canvas resize, crop), so
+        // clamp it to the canvas before it is used as a slice bound.
+        let (x0, y0) = (x0.min(width), y0.min(height));
+        let (x1, y1) = (x1.min(width), y1.min(height));
         if x1 <= x0 || y1 <= y0 {
             self.set_status("Nothing to copy: the selection is empty");
             return;

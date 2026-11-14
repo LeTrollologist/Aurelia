@@ -487,42 +487,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                             .on_hover_text(path.display().to_string())
                                             .clicked()
                                         {
-                                            match aurelia_io::project::load_project_file(&path) {
-                                                Ok(doc) => {
-                                                    // An imported PSD is a read-only source: it opens
-                                                    // as an unsaved document so Save cannot write AUR
-                                                    // bytes over the original file. This mirrors the
-                                                    // File -> Open path in the host.
-                                                    let is_psd = path
-                                                        .extension()
-                                                        .and_then(|extension| extension.to_str())
-                                                        .is_some_and(|extension| {
-                                                            extension.eq_ignore_ascii_case("psd")
-                                                        });
-                                                    state.document = doc;
-                                                    state.sync_editor_from_document();
-                                                    state.mark_canvas_dirty();
-                                                    state.history.clear();
-                                                    state.selection = None;
-                                                    state.document_path = if is_psd {
-                                                        None
-                                                    } else {
-                                                        Some(path.clone())
-                                                    };
-                                                    state.mark_saved();
-                                                    if is_psd {
-                                                        state.mark_dirty();
-                                                    }
-                                                    state.note_recent_file(&path);
-                                                    state.set_status(format!(
-                                                        "Loaded {}",
-                                                        path.display()
-                                                    ));
-                                                }
-                                                Err(e) => {
-                                                    state.set_status(format!("Load error: {}", e))
-                                                }
-                                            }
+                                            // The host loads it after the frame so the unsaved
+                                            // changes prompt and the file read never run inside
+                                            // an egui closure.
+                                            state.pending_open_path = Some(path.clone());
                                             ui.close_menu();
                                         }
                                     }
@@ -1596,25 +1564,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             state.show_preset_manager = true;
                         }
                         if ui.small_button("Export presets").clicked() {
-                            if let Some(path) = rfd::FileDialog::new()
-                                .add_filter("Aurelia presets", &["aurp"])
-                                .set_file_name("presets.aurp")
-                                .save_file()
-                            {
-                                if let Err(error) = state.export_preset_library(&path) {
-                                    state.preset_error = Some(error);
-                                }
-                            }
+                            state.pending_file_action = Some(PendingFileAction::ExportPresets);
                         }
                         if ui.small_button("Import presets").clicked() {
-                            if let Some(path) = rfd::FileDialog::new()
-                                .add_filter("Aurelia presets", &["aurp"])
-                                .pick_file()
-                            {
-                                if let Err(error) = state.import_preset_library(&path) {
-                                    state.preset_error = Some(error);
-                                }
-                            }
+                            state.pending_file_action = Some(PendingFileAction::ImportPresets);
                         }
                     });
                     if let Some(error) = &state.preset_error {
@@ -1683,12 +1636,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             ui.label(RichText::new(&state.text.font_name).size(10.0).strong().color(accent_c32));
 
                             if ui.button("📂 Load Custom Font (.ttf / .otf)...").on_hover_text("Browse computer for any custom TrueType or OpenType font file").clicked() {
-                                if let Some(path) = rfd::FileDialog::new()
-                                    .add_filter("Font Files (*.ttf, *.otf)", &["ttf", "otf"])
-                                    .pick_file()
-                                {
-                                    state.load_custom_font(&path.to_string_lossy());
-                                }
+                                state.pending_file_action = Some(PendingFileAction::LoadCustomFont);
                             }
 
                             ui.add_space(3.0);
@@ -5409,15 +5357,8 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         ))
                                         .clicked()
                                     {
-                                        if let Some(path) = rfd::FileDialog::new()
-                                            .add_filter(
-                                                "Font Files (*.ttf, *.otf)",
-                                                &["ttf", "otf"],
-                                            )
-                                            .pick_file()
-                                        {
-                                            state.load_custom_font(&path.to_string_lossy());
-                                        }
+                                        state.pending_file_action =
+                                            Some(PendingFileAction::LoadCustomFont);
                                     }
 
                                     ui.separator();
@@ -5725,25 +5666,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                         }
                     }
                     if ui.button("Import").clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .add_filter("Aurelia presets", &["aurp"])
-                            .pick_file()
-                        {
-                            if let Err(error) = state.import_preset_library(&path) {
-                                state.preset_error = Some(error);
-                            }
-                        }
+                        state.pending_file_action = Some(PendingFileAction::ImportPresets);
                     }
                     if ui.button("Export").clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .add_filter("Aurelia presets", &["aurp"])
-                            .set_file_name("presets.aurp")
-                            .save_file()
-                        {
-                            if let Err(error) = state.export_preset_library(&path) {
-                                state.preset_error = Some(error);
-                            }
-                        }
+                        state.pending_file_action = Some(PendingFileAction::ExportPresets);
                     }
                     if ui.button("Reset to defaults").clicked() {
                         state.reset_presets_to_default();

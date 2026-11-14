@@ -3505,6 +3505,10 @@ unsafe extern "system" fn window_proc_impl(
             if let Some(action) = app.state.pending_file_action.take() {
                 match action {
                     PendingFileAction::NewCanvas(spec) => {
+                        if !confirm_discard_unsaved(hwnd, &mut app.state) {
+                            app.state.set_status("New canvas cancelled");
+                            return 0;
+                        }
                         let mut doc = aurelia_core::document::Document::new_with_format(
                             spec.width,
                             spec.height,
@@ -3563,29 +3567,13 @@ unsafe extern "system" fn window_proc_impl(
                     }
                     PendingFileAction::OpenProject => {
                         if let Some(path) = aurelia_ui::open_project_dialog() {
-                            match load_project_file(&path) {
-                                Ok(doc) => {
-                                    app.state.document = doc;
-                    app.state.sync_editor_from_document();
-                                    app.state.mark_canvas_dirty();
-                                    app.state.history.clear();
-                                    if is_psd_path(&path) {
-                                        app.state.document_path = None;
-                                        app.state.mark_dirty();
-                                        app.state.note_recent_file(&path);
-                                        app.state.save_preferences();
-                                        app.state.set_status(
-                                            "Imported PSD (read-only) - use Save As to keep it",
-                                        );
-                                    } else {
-                                        app.state.document_path = Some(path.clone());
-                                        app.state.mark_saved();
-                                        app.state.note_recent_file(&path);
-                                        app.state.save_preferences();
-                                        app.state.set_status(format!("Loaded {}", path.display()));
-                                    }
-                                }
-                                Err(e) => app.state.set_status(format!("Load error: {}", e)),
+                            if confirm_discard_unsaved(hwnd, &mut app.state) {
+                                open_project_into(
+                                    &mut app.state,
+                                    &path,
+                                    app.win_w,
+                                    app.win_h,
+                                );
                             }
                         }
                     }
@@ -3726,46 +3714,57 @@ unsafe extern "system" fn window_proc_impl(
                             }
                         }
                     }
+                    PendingFileAction::ImportPresets => {
+                        if let Some(path) = aurelia_ui::import_preset_dialog() {
+                            if let Err(error) = app.state.import_preset_library(&path) {
+                                app.state.preset_error = Some(error);
+                            }
+                        }
+                    }
+                    PendingFileAction::ExportPresets => {
+                        if let Some(path) = aurelia_ui::export_preset_dialog() {
+                            if let Err(error) = app.state.export_preset_library(&path) {
+                                app.state.preset_error = Some(error);
+                            }
+                        }
+                    }
+                    PendingFileAction::LoadCustomFont => {
+                        if let Some(path) = aurelia_ui::open_font_dialog() {
+                            app.state.load_custom_font(&path.to_string_lossy());
+                        }
+                    }
                 }
-                InvalidateRect(hwnd, std::ptr::null(), 0);
             }
+            // A Recent Projects entry is opened here, after the egui frame and independently of
+            // any other pending action, so the unsaved-changes prompt and the file read never
+            // run inside a UI closure.
+            if let Some(path) = app.state.pending_open_path.take() {
+                if confirm_discard_unsaved(hwnd, &mut app.state) {
+                    open_project_into(&mut app.state, &path, app.win_w, app.win_h);
+                } else {
+                    app.state.set_status("Open cancelled");
+                }
+            }
+            InvalidateRect(hwnd, std::ptr::null(), 0);
 
             0
         }
         0x0233 /* WM_DROPFILES */ => {
             let hdrop = wparam as *mut std::ffi::c_void;
-            let mut buf = vec![0u16; 1024];
-            let len = DragQueryFileW(hdrop, 0, buf.as_mut_ptr(), 1024);
-            if len > 0 {
-                let path_str = String::from_utf16_lossy(&buf[..len as usize]);
+            // Query the length first. DragQueryFileW returns the required buffer size (with the
+            // terminator) when the buffer is too small, so that value must never be used as a
+            // slice bound directly.
+            let required = DragQueryFileW(hdrop, 0, std::ptr::null_mut(), 0);
+            if required > 0 {
+                let mut buf = vec![0u16; required as usize + 1];
+                let written = DragQueryFileW(hdrop, 0, buf.as_mut_ptr(), required + 1)
+                    .min(required) as usize;
+                let path_str = String::from_utf16_lossy(&buf[..written]);
                 let path = PathBuf::from(&path_str);
-                if is_project_path(&path) {
-                    match load_project_file(&path) {
-                        Ok(doc) => {
-                            app.state.document = doc;
-                    app.state.sync_editor_from_document();
-                            app.state.mark_canvas_dirty();
-                            app.state.history.clear();
-                            if is_psd_path(&path) {
-                                app.state.document_path = None;
-                                app.state.mark_dirty();
-                                app.state.note_recent_file(&path);
-                                app.state.save_preferences();
-                                app.state.reset_view_centered(app.win_w as f32, app.win_h as f32);
-                                app.state.set_status(
-                                    "Imported PSD (read-only) - use Save As to keep it",
-                                );
-                            } else {
-                                app.state.document_path = Some(path.clone());
-                                app.state.mark_saved();
-                                app.state.note_recent_file(&path);
-                                app.state.save_preferences();
-                                app.state.reset_view_centered(app.win_w as f32, app.win_h as f32);
-                                app.state.set_status(format!("Loaded project: {}", path.display()));
-                            }
-                        }
-                        Err(e) => app.state.set_status(format!("Failed to load project: {}", e)),
-                    }
+                if !confirm_discard_unsaved(hwnd, &mut app.state) {
+                    app.state.set_status("Open cancelled");
+                } else if is_project_path(&path) {
+                    open_project_into(&mut app.state, &path, app.win_w, app.win_h);
                 } else {
                     match load_image_with_profile(&path) {
                         Ok((w, h, rgba, embedded)) => {
@@ -3828,6 +3827,56 @@ fn is_psd_path(path: &std::path::Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| extension.eq_ignore_ascii_case("psd"))
+}
+
+/// Asks before an action replaces a document with unsaved changes.
+///
+/// Returns `true` when the caller may proceed. Every path that discards the current document
+/// (New, Open, Recent Projects and drag-and-drop) goes through here, so the prompt cannot be
+/// missed by one entry point.
+unsafe fn confirm_discard_unsaved(hwnd: HWND, state: &mut AppState) -> bool {
+    if !state.is_dirty() {
+        return true;
+    }
+    let text = to_wide("This artwork has unsaved changes.\n\nDiscard them and continue?");
+    let caption = to_wide("Aurelia");
+    // MB_YESNO | MB_ICONWARNING: yes discards, no cancels.
+    MessageBoxW(
+        hwnd,
+        text.as_ptr(),
+        caption.as_ptr(),
+        0x0000_0004 | 0x0000_0030,
+    ) == 6
+}
+
+/// Loads a project or PSD into the running session, applying the same rules everywhere:
+/// PSDs are read-only and open as unsaved documents, everything else keeps its path.
+fn open_project_into(state: &mut AppState, path: &std::path::Path, win_w: usize, win_h: usize) {
+    match load_project_file(path) {
+        Ok(doc) => {
+            state.document = doc;
+            state.sync_editor_from_document();
+            state.mark_canvas_dirty();
+            state.history.clear();
+            state.selection = None;
+            if is_psd_path(path) {
+                state.document_path = None;
+                state.mark_dirty();
+                state.note_recent_file(path);
+                state.save_preferences();
+                state.reset_view_centered(win_w as f32, win_h as f32);
+                state.set_status("Imported PSD (read-only) - use Save As to keep it");
+            } else {
+                state.document_path = Some(path.to_path_buf());
+                state.mark_saved();
+                state.note_recent_file(path);
+                state.save_preferences();
+                state.reset_view_centered(win_w as f32, win_h as f32);
+                state.set_status(format!("Loaded project: {}", path.display()));
+            }
+        }
+        Err(error) => state.set_status(format!("Load error: {error}")),
+    }
 }
 
 fn to_wide(s: &str) -> Vec<u16> {
