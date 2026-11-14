@@ -20,7 +20,9 @@ You should receive an acknowledgement within 48 hours.
 ## Artifact integrity
 
 - Release binaries and `SHA256SUMS.txt` carry detached Ed25519 signatures.
-- The public key is committed at `keys/aurelia-publisher-2026.pub` and attached to releases.
+- The public key is committed at `keys/aurelia-publisher-2026.pub`. It is published in the
+  repository (and in this release's `README.md` instructions); the release assets themselves
+  carry only the artifacts, `SHA256SUMS.txt` and their `.sig` files.
 - The private key is local, gitignored, and never committed. Rotation and loss procedures are in
   [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md).
 - The installer is **not Authenticode-signed**. This is a permanent distribution constraint:
@@ -32,17 +34,17 @@ certutil -hashfile Aurelia-Setup-3.16.0.exe SHA256
 Get-Content SHA256SUMS.txt
 ```
 
-Verify the `.sig` files against the included public key before running an installer. A matching
+Verify the `.sig` files against the public key in `keys/` before running an installer. A matching
 Ed25519 signature is the integrity boundary; a hash alone only proves the download matches the
 manifest.
 
 ## VirusTotal policy
 
 VirusTotal is **advisory, not a release veto**, but detections are published rather than
-dismissed. The v3.16.0 installer has four advisory findings out of 75 engines (APEX, Cylance,
-DeepInstinct and Skyhigh); the portable zip and unpacked executable are 0/75. Exact engine
-verdicts and hashes are in the [release notes](release-notes/v3.16.0.md#virustotal-verification).
-Use the portable archive if you want the smaller installer/trust surface.
+dismissed. **No scan was performed for v3.16.0** — no API key was available in the release
+environment — so no detection verdicts are claimed for its installer, portable zip or
+executable; the [release notes](release-notes/v3.16.0.md#virustotal) say the same. Results
+quoted for earlier releases describe those files and are not transferred forward.
 
 - Scanning is enabled only when `VIRUSTOTAL_API_KEY` is present; local secrets belong in the
   gitignored `.env`.

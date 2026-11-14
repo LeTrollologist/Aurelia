@@ -283,13 +283,11 @@ SmartScreen trust. Windows may warn; verify the SHA-256 and Ed25519 signature be
 
 ### Installer scan note
 
-The v3.16.0 installer has four advisory VirusTotal detections out of 75 engines: APEX
-(`Malicious`), Cylance (`Unsafe`), DeepInstinct (`MALICIOUS`) and Skyhigh
-(`BehavesLike.Win32.ObfuscatedPoly.rc`). The portable zip and the unpacked `aurelia.exe` scan
-clean (0/75). The reported verdicts are generic or behavioral; none names a specific malware
-family, but they are not dismissed. If you want the smallest trust surface, use the portable zip.
-The exact engine results and hashes are recorded in the
-[v3.16.0 release notes](release-notes/v3.16.0.md#virustotal-verification).
+No VirusTotal scan was performed for v3.16.0: no API key was available in the release
+environment, so no detection verdicts are claimed for these artifacts. The
+[v3.16.0 release notes](release-notes/v3.16.0.md#virustotal) record that explicitly.
+Results quoted elsewhere for earlier releases (for example v3.15.0) describe those files, not
+this one, and are advisory either way.
 A matching Ed25519 signature is the integrity boundary; a clean scan is not proof of safety.
 See [`docs/SECURITY_MODEL.md`](docs/SECURITY_MODEL.md).
 

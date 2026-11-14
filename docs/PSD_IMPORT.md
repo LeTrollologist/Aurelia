@@ -38,7 +38,12 @@ section/clipping markers) are skipped.
 - 4,096 layers
 - 1 GiB decoded-byte budget
 
-These are checked before allocating pixel buffers.
+These are checked before allocating pixel buffers. The 1 GiB decoded budget is charged with the
+*decoded* size of every canvas-sized buffer — including PackBits-expanded channel data, which can
+be up to 64x larger than the bytes on disk — so a small RLE file cannot request an unbounded
+amount of memory by declaring many channels or layers. Channels the importer does not consume
+(anything other than R/G/B, transparency and the layer mask) are consumed without being
+decompressed.
 
 ## UI
 
