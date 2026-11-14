@@ -1,5 +1,7 @@
-/target
-/dist
+# Build output. Per-crate `target/` trees are created by tests that keep their fixtures inside
+# the build tree, so this must match at any depth, not just the repository root.
+target/
+dist/
 **/*.rs.bk
 *.pdb
 *.exe
