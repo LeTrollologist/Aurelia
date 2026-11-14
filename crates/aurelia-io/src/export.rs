@@ -234,10 +234,10 @@ fn part_path(path: &Path) -> PathBuf {
 
 /// Moves a finished `.part` file onto its destination, replacing any previous export.
 fn commit_part(part: &Path, path: &Path) -> Result<(), ExportError> {
-    if path.exists() {
-        // Windows refuses to rename over an existing file.
-        std::fs::remove_file(path)?;
-    }
+    // `std::fs::rename` replaces an existing destination on Windows (it maps to
+    // `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`), so the previous export must not be
+    // deleted first: if the rename fails, the old file would be gone with nothing to replace
+    // it.
     std::fs::rename(part, path)?;
     Ok(())
 }

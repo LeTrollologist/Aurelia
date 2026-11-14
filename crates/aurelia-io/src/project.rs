@@ -1385,6 +1385,10 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
         }
     }
 
+    // `max_id` is seeded from the untrusted `active_layer_id`, so it can be `u64::MAX`;
+    // `max_id + 1` would panic with overflow checks on and wrap to 0 (re-issuing an existing
+    // id) in release builds.
+    let next_layer_id = max_id.checked_add(1).ok_or(ProjectError::CorruptData)?;
     let document = Document {
         width,
         height,
@@ -1393,7 +1397,7 @@ pub fn load_project_from_reader<R: Read>(mut reader: R) -> Result<Document, Proj
         background_value,
         is_transparent,
         theme,
-        next_layer_id: max_id + 1,
+        next_layer_id,
         // The tag is authoritative for new layers; per-layer tags above resolved to their own
         // formats, so a mixed file still loads exactly as it was saved.
         pixel_format: document_format,

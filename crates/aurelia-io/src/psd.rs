@@ -32,6 +32,43 @@ pub enum PsdError {
     Corrupt(String),
 }
 
+/// Aggregate budget for *decoded* PSD bytes.
+///
+/// `Reader::decoded` only counts bytes consumed from the file, which for PackBits RLE can be
+/// up to 64x smaller than the buffer it expands into. Every canvas-sized buffer the importer
+/// allocates is therefore charged here as well, so a small file cannot request an unbounded
+/// amount of memory by multiplying many channels or layers.
+#[derive(Debug, Default)]
+struct DecodedBudget {
+    bytes: u64,
+}
+
+impl DecodedBudget {
+    fn charge(&mut self, bytes: u64) -> Result<(), PsdError> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or_else(|| PsdError::TooLarge("decoded byte total overflow".into()))?;
+        if self.bytes > MAX_PSD_DECODED_BYTES {
+            return Err(PsdError::TooLarge(format!(
+                "decoded PSD data ({} bytes, budget {MAX_PSD_DECODED_BYTES})",
+                self.bytes
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// Allocates a zeroed buffer, reporting exhaustion as a parse error instead of aborting.
+fn zeroed_buffer(len: usize) -> Result<Vec<u8>, PsdError> {
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(len)
+        .map_err(|_| PsdError::TooLarge(format!("{len}-byte buffer cannot be allocated")))?;
+    buffer.resize(len, 0);
+    Ok(buffer)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Rect {
     top: i32,
@@ -448,12 +485,19 @@ fn decode_packbits(data: &[u8], expected: usize) -> Result<Vec<u8>, PsdError> {
     Ok(out)
 }
 
-fn decode_channel(data: &[u8], width: usize, height: usize) -> Result<Vec<u8>, PsdError> {
+fn decode_channel(
+    data: &[u8],
+    width: usize,
+    height: usize,
+    budget: &mut DecodedBudget,
+) -> Result<Vec<u8>, PsdError> {
     let mut reader = Reader::new(data);
     let compression = reader.u16()?;
     let expected = width
         .checked_mul(height)
         .ok_or_else(|| PsdError::TooLarge("channel dimensions overflow".into()))?;
+    // Charge the decoded size, not the bytes on disk: RLE expands up to 64x.
+    budget.charge(expected as u64)?;
     match compression {
         0 => {
             let bytes = reader.take(expected)?;
@@ -469,7 +513,9 @@ fn decode_channel(data: &[u8], width: usize, height: usize) -> Result<Vec<u8>, P
                     .ok_or_else(|| PsdError::TooLarge("RLE row total overflow".into()))?;
                 rows.push(count);
             }
-            let mut out = Vec::with_capacity(expected);
+            let mut out = Vec::new();
+            out.try_reserve_exact(expected)
+                .map_err(|_| PsdError::TooLarge(format!("{expected}-byte channel buffer")))?;
             for count in rows {
                 let row = reader.take(count)?;
                 out.extend(decode_packbits(row, width)?);
@@ -508,6 +554,7 @@ fn parse_layer_info(
     }
     let mut records = Vec::with_capacity(count as usize);
     let mut layer_pixels = 0u64;
+    let mut budget = DecodedBudget::default();
 
     for _ in 0..count {
         let rect = reader.rect()?;
@@ -575,9 +622,15 @@ fn parse_layer_info(
                 continue;
             }
             let data = reader.take(*len)?;
+            // Only the channels the importer consumes are worth decompressing. PackBits can
+            // expand 64x, so decoding an unused channel is pure amplification.
+            if !matches!(id, 0 | 1 | 2 | -1 | -2) {
+                record.channel_data.push((*id, Vec::new()));
+                continue;
+            }
             record
                 .channel_data
-                .push((*id, decode_channel(data, width, height)?));
+                .push((*id, decode_channel(data, width, height, &mut budget)?));
         }
     }
 
@@ -617,7 +670,8 @@ fn parse_layer_info(
                 }
                 let width = record.rect.width() as usize;
                 let height = record.rect.height() as usize;
-                let mut rgba = vec![0u8; width * height * 4];
+                budget.charge((width * height * 4) as u64)?;
+                let mut rgba = zeroed_buffer(width * height * 4)?;
                 for pixel in rgba.chunks_exact_mut(4) {
                     pixel[3] = 255;
                 }
@@ -701,7 +755,11 @@ fn parse_layer_info(
     Ok(roots)
 }
 
-fn parse_composite(reader: &mut Reader<'_>, header: &ParsedHeader) -> Result<PsdNode, PsdError> {
+fn parse_composite(
+    reader: &mut Reader<'_>,
+    header: &ParsedHeader,
+    budget: &mut DecodedBudget,
+) -> Result<PsdNode, PsdError> {
     let width = header.width as usize;
     let height = header.height as usize;
     let compression = reader.u16()?;
@@ -714,7 +772,21 @@ fn parse_composite(reader: &mut Reader<'_>, header: &ParsedHeader) -> Result<Psd
             counts.push(reader.u16()? as usize);
         }
         for channel in 0..header.channels as usize {
-            let mut out = Vec::with_capacity(width * height);
+            if channel > 3 {
+                // Alpha/spot channels past the first four are never merged into the RGBA
+                // buffer; consume their rows without decompressing them.
+                for row in 0..height {
+                    let count = counts[channel * height + row];
+                    reader.take(count)?;
+                }
+                channels.push(Vec::new());
+                continue;
+            }
+            budget.charge((width * height) as u64)?;
+            let mut out = Vec::new();
+            out.try_reserve_exact(width * height).map_err(|_| {
+                PsdError::TooLarge(format!("{}-byte channel buffer", width * height))
+            })?;
             for row in 0..height {
                 let count = counts[channel * height + row];
                 out.extend(decode_packbits(reader.take(count)?, width)?);
@@ -722,19 +794,26 @@ fn parse_composite(reader: &mut Reader<'_>, header: &ParsedHeader) -> Result<Psd
             channels.push(out);
         }
     } else {
-        for _ in 0..header.channels {
-            let data = match compression {
-                0 => reader.take(width * height)?.to_vec(),
+        for channel in 0..header.channels as usize {
+            match compression {
+                0 if channel > 3 => {
+                    reader.take(width * height)?;
+                    channels.push(Vec::new());
+                }
+                0 => {
+                    budget.charge((width * height) as u64)?;
+                    channels.push(reader.take(width * height)?.to_vec());
+                }
                 other => {
                     return Err(PsdError::Unsupported(format!(
                         "composite compression method {other}"
                     )))
                 }
-            };
-            channels.push(data);
+            }
         }
     }
-    let mut rgba = vec![0u8; width * height * 4];
+    budget.charge((width * height * 4) as u64)?;
+    let mut rgba = zeroed_buffer(width * height * 4)?;
     for pixel in rgba.chunks_exact_mut(4) {
         pixel[3] = 255;
     }
@@ -795,7 +874,8 @@ pub fn parse_psd(data: &[u8]) -> Result<PsdDocument, PsdError> {
         return Err(PsdError::Corrupt("truncated layer/mask section".into()));
     }
     let nodes = if nodes.is_empty() {
-        vec![parse_composite(&mut reader, &header)?]
+        let mut budget = DecodedBudget::default();
+        vec![parse_composite(&mut reader, &header, &mut budget)?]
     } else {
         nodes
     };

@@ -152,6 +152,21 @@ fn save_load_save_is_stable() {
 }
 
 #[test]
+fn maximum_active_layer_id_is_rejected_without_overflow() {
+    // Header layout: magic(4) width(4) height(4) active_layer_id(8) ...
+    // `active_layer_id` seeds `max_id`, so `max_id + 1` would overflow. With overflow checks on
+    // this panicked; in release it wrapped to 0 and re-issued an existing id.
+    let mut bytes = fixture_bytes();
+    bytes[12..20].copy_from_slice(&u64::MAX.to_le_bytes());
+
+    match load(&bytes) {
+        Err(aurelia_io::project::ProjectError::CorruptData) => {}
+        Err(other) => panic!("expected CorruptData, got {other:?}"),
+        Ok(_) => panic!("a layer id of u64::MAX cannot produce a valid next_layer_id"),
+    }
+}
+
+#[test]
 fn a_failed_atomic_save_keeps_the_previous_file() {
     let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target")

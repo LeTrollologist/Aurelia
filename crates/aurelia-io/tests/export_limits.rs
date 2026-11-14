@@ -134,6 +134,36 @@ fn aggregate_over_limit_is_rejected() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[test]
+fn exporting_over_an_existing_file_replaces_it() {
+    // `commit_part` used to delete the destination before renaming, on the false premise that
+    // Windows refuses to rename over an existing file. A rename failure then lost the previous
+    // export. `std::fs::rename` replaces atomically, so the old file must survive until the new
+    // one is in place.
+    fn filled(fill: u8) -> Document {
+        let mut doc = Document::new(4, 4);
+        doc.layers[0].set_pixels(vec![fill; 4 * 4 * 4]);
+        doc
+    }
+
+    let dir = temp_dir("replace");
+    let path = dir.join("a.png");
+
+    export_flat_image(&filled(0x11), &path, ExportFormat::Png, false).expect("first export");
+    let first_bytes = std::fs::read(&path).expect("read first export");
+
+    export_flat_image(&filled(0xEE), &path, ExportFormat::Png, false).expect("second export");
+    let second_bytes = std::fs::read(&path).expect("read second export");
+
+    assert_ne!(
+        first_bytes, second_bytes,
+        "a re-export must publish the new image, not leave the old one"
+    );
+    assert_no_part(&path);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// A sheet whose combined dimensions do not fit the container must be an error, not an
 /// overflow. Run in a debug build the unchecked multiplication this replaced would have
 /// panicked here; the limits are lifted so the sheet check is what rejects it.
