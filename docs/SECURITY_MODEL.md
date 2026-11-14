@@ -42,8 +42,18 @@ every instruction executing in the process is memory-safe; the Win32/CRT/FFI lay
   its allocation is rejected. Clipboard allocations that fail or whose ownership is not
   transferred are released. Clipboard PNG and DIB images are capped at 64 megapixels, with
   checked width/height/stride/decoded-length arithmetic for DIBs.
-- The Win32 host stores its application state in `GWLP_USERDATA`; `WM_NCCREATE` installs the
-  owned pointer and `WM_DESTROY` clears and drops it, rather than using a mutable global.
+- The Win32 host stores its application state in `GWLP_USERDATA`, rather than using a mutable
+  global. `WM_NCCREATE` installs the owned pointer once, only from the window-creation path, and
+  ignores a repeat that arrives with a pointer already installed. `WM_DESTROY` only stops the
+  message loop; the loop frees the state after the last dispatch, so a forged destroy message
+  cannot free memory a live frame still borrows.
+- Window messages are a local trust boundary. Messages below `WM_USER` pass the UIPI filter, so
+  any process in the same session can deliver `WM_CLOSE`, `WM_DESTROY` or pointer-carrying
+  messages such as `WM_GETMINMAXINFO` and `WM_DPICHANGED`, with attacker-chosen parameters. The
+  host refuses to re-install its state pointer and never frees state from a message, which
+  removes the corruption primitive; a forged message can still close the window, and pointer
+  parameters for the system-only messages are trusted as they arrive. Closing the window early is
+  accepted as a local denial of service, not a memory-safety issue.
 - Discord IPC frames are capped at 1 MB in both polling and the READY handshake. READY must be a
   FRAME (opcode 1) and its body must arrive before the handshake deadline.
 - Project saves use a unique sibling temporary file, call `sync_all` before replacement, and

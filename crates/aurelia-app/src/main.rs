@@ -1378,12 +1378,74 @@ fn refresh_tenbit(app: &mut AureliaDesktopApp, hwnd: HWND) {
     );
 }
 
+thread_local! {
+    /// Nesting depth of `window_proc` on this thread.
+    ///
+    /// Modal dialogs (`MessageBoxW`, `rfd` file dialogs) pump the message queue, so a second
+    /// invocation can arrive while the first still holds `&mut AureliaDesktopApp`. The inner
+    /// call must not bind a second `&mut` to the same state.
+    static WINDOW_PROC_DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+struct WindowProcGuard;
+
+impl Drop for WindowProcGuard {
+    fn drop(&mut self) {
+        WINDOW_PROC_DEPTH.with(|depth| depth.set(depth.get().saturating_sub(1)));
+    }
+}
+
+/// Window procedure.
+///
+/// A panic must never unwind into `user32`: the body runs inside `catch_unwind` and an
+/// internal error stops the message loop instead of aborting the process with no save prompt.
 unsafe extern "system" fn window_proc(
     hwnd: HWND,
     msg: UINT,
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| unsafe {
+        window_proc_impl(hwnd, msg, wparam, lparam)
+    })) {
+        Ok(result) => result,
+        Err(_) => {
+            eprintln!("Aurelia: internal error while handling window message 0x{msg:04X}");
+            PostQuitMessage(1);
+            0
+        }
+    }
+}
+
+unsafe extern "system" fn window_proc_impl(
+    hwnd: HWND,
+    msg: UINT,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    // Re-entrant dispatch: only validate the paint region and let the outer frame finish.
+    // Anything else would alias the live `&mut AureliaDesktopApp`.
+    let depth = WINDOW_PROC_DEPTH.with(|depth| {
+        let current = depth.get();
+        depth.set(current.saturating_add(1));
+        current
+    });
+    let _depth_guard = WindowProcGuard;
+    if depth > 0 {
+        if msg == 0x000F
+            /* WM_PAINT */
+            && !hwnd.is_null()
+        {
+            let mut paint: PAINTSTRUCT = std::mem::zeroed();
+            let hdc = BeginPaint(hwnd, &mut paint);
+            if !hdc.is_null() {
+                EndPaint(hwnd, &paint);
+            }
+            return 0;
+        }
+        return DefWindowProcW(hwnd, msg, wparam, lparam);
+    }
+
     const WM_DESTROY: UINT = 0x0002;
     const WM_CLOSE: UINT = 0x0010;
     const WM_NCCREATE: UINT = 0x0081;
@@ -1410,17 +1472,24 @@ unsafe extern "system" fn window_proc(
 
     if msg == WM_NCCREATE {
         // `lparam` points at CREATESTRUCTW, whose first field is lpCreateParams.
+        // Only the window creation path may install the state pointer: `WM_NCCREATE` can be
+        // sent again by any same-user process (messages below WM_USER pass UIPI), and
+        // re-installing whatever pointer it carries would hand out an arbitrary `&mut`.
+        if lparam == 0 {
+            return 0;
+        }
+        if GetWindowLongPtrW(hwnd, GWLP_USERDATA) != 0 {
+            return 1;
+        }
         let app_ptr = *(lparam as *const *mut std::ffi::c_void);
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, app_ptr as isize);
         return 1;
     }
 
     if msg == WM_DESTROY {
-        let app_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AureliaDesktopApp;
-        if !app_ptr.is_null() {
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
-            drop(Box::from_raw(app_ptr));
-        }
+        // The state is freed once, after the message loop, by the owner in `run()`. Freeing it
+        // here as well would make a forged `WM_DESTROY` (deliverable by any local process) a
+        // use-after-free of the live state, and would race the message loop's own pointer use.
         PostQuitMessage(0);
         return 0;
     }
@@ -4257,7 +4326,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Aurelia Window running successfully.");
 
         let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+        loop {
+            let result = GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0);
+            if result == 0 {
+                break; // WM_QUIT
+            }
+            if result == -1 {
+                eprintln!("Aurelia: GetMessageW failed; stopping the message loop");
+                break;
+            }
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
 
@@ -4280,8 +4357,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        // Normal teardown frees the state in WM_DESTROY. This is a fallback for a
-        // message loop that exits without a destroy notification.
+        // The message loop is the single owner of the state: `WM_DESTROY` only stops the loop,
+        // so the `Box` is freed exactly here, after every dispatch has returned.
         let leftover = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AureliaDesktopApp;
         if !leftover.is_null() {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
