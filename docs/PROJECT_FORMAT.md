@@ -154,3 +154,11 @@ Their names are `<stem>-<path-hash>-autosave.aur`, where the hash is FNV-1a over
 full document path; this keeps two projects with the same stem from sharing a snapshot. Startup
 offers snapshots newest-first, consumes the restored file, and deletes declined ones. Saving a
 document also removes the legacy `<stem>-autosave.aur` name written by v3.9 and earlier.
+
+## Layer and mask sizing
+
+Every raster and text layer is stored at canvas size, and a layer mask is stored as one
+`width * height` byte per layer using the document dimensions. A mask whose dimensions do not
+match the canvas cannot be represented: the writer refuses the save with a
+`MaskSizeMismatch` error naming the layer and both sizes, rather than writing "no mask" and
+silently deleting it.

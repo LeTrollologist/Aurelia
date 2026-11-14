@@ -106,6 +106,14 @@ pub enum ProjectError {
         len: usize,
         max: usize,
     },
+    #[error("layer {layer} mask is {mask_width}x{mask_height} but the canvas is {canvas_width}x{canvas_height}")]
+    MaskSizeMismatch {
+        layer: u64,
+        mask_width: u32,
+        mask_height: u32,
+        canvas_width: u32,
+        canvas_height: u32,
+    },
 }
 
 fn read_text_content<R: Read>(reader: &mut R) -> Result<String, ProjectError> {
@@ -384,18 +392,31 @@ pub(crate) fn write_project_version<W: Write>(
         }
 
         // Layer mask (AUR v2+): 0 = none, 1 = enabled flag + raw mask bytes.
+        //
+        // The format stores one canvas-sized mask, so a mask that no longer matches the canvas
+        // cannot be represented. Refuse instead of writing "no mask": silently deleting a
+        // user's mask is worse than a save error that names the layer.
         if version >= 2 {
             match &layer.mask {
-                Some(mask)
-                    if mask.pixels.len() == (doc.width as usize) * (doc.height as usize)
-                        && mask.width == doc.width
-                        && mask.height == doc.height =>
-                {
+                Some(mask) => {
+                    let expected = (doc.width as usize) * (doc.height as usize);
+                    if mask.width != doc.width
+                        || mask.height != doc.height
+                        || mask.pixels.len() != expected
+                    {
+                        return Err(ProjectError::MaskSizeMismatch {
+                            layer: layer.id,
+                            mask_width: mask.width,
+                            mask_height: mask.height,
+                            canvas_width: doc.width,
+                            canvas_height: doc.height,
+                        });
+                    }
                     writer.write_all(&[1u8])?;
                     writer.write_all(&[u8::from(mask.enabled)])?;
                     writer.write_all(&mask.pixels)?;
                 }
-                _ => writer.write_all(&[0u8])?,
+                None => writer.write_all(&[0u8])?,
             }
         }
     }

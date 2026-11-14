@@ -45,6 +45,16 @@ amount of memory by declaring many channels or layers. Channels the importer doe
 (anything other than R/G/B, transparency and the layer mask) are consumed without being
 decompressed.
 
+## Conversion to an Aurelia document
+
+AUR stores every raster layer at canvas size, with one canvas-sized mask per layer, so the
+importer expands each PSD layer rectangle into a canvas-sized RGBA buffer at the layer's offset
+and places its mask in the corresponding canvas position. The layer's on-screen position is
+unchanged. The expansion is charged to the 512 Mi-pixel budget, so a document with many layers
+on a very large canvas is rejected rather than materialising gigabytes of pixel buffers.
+
+Imported layers keep their blend mode, opacity, visibility and clipping state.
+
 ## UI
 
 `File → Open` accepts `.psd` with the **read-only** label. Import failures appear in the normal

@@ -167,6 +167,23 @@ fn maximum_active_layer_id_is_rejected_without_overflow() {
 }
 
 #[test]
+fn a_mask_that_does_not_match_the_canvas_is_refused() {
+    // The format stores one canvas-sized mask. Writing "no mask" for a mismatched one silently
+    // deleted user data; the save must fail and name the layer instead.
+    let mut doc = fixture_document();
+    doc.layers[0].mask = Some(aurelia_core::layer::LayerMask::full(10, 10, 255));
+
+    let mut bytes = Vec::new();
+    match save_project_to_writer(&doc, &mut bytes) {
+        Err(aurelia_io::project::ProjectError::MaskSizeMismatch { layer, .. }) => {
+            assert_eq!(layer, doc.layers[0].id);
+        }
+        Err(other) => panic!("expected MaskSizeMismatch, got {other:?}"),
+        Ok(_) => panic!("a canvas-sized mask is the only representable form"),
+    }
+}
+
+#[test]
 fn a_failed_atomic_save_keeps_the_previous_file() {
     let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target")

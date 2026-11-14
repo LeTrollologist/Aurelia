@@ -5737,3 +5737,87 @@ mod imported_stamp_brush {
         assert_eq!(right[0], 255);
     }
 }
+
+#[cfg(test)]
+mod canvas_lifecycle {
+    use crate::document::Document;
+
+    #[test]
+    fn masks_follow_canvas_resize_flip_rotation_and_scale() {
+        use crate::layer::{LayerMask, PixelFormat};
+
+        let mut doc = Document::new(4, 3);
+        let mut mask = LayerMask::full(4, 3, 255);
+        mask.pixels[0] = 10; // (0, 0)
+        doc.layers[0].mask = Some(mask);
+
+        doc.resize_canvas(6, 5, 0, 0);
+        let mask = doc.layers[0].mask.as_ref().expect("mask survives resize");
+        assert_eq!((mask.width, mask.height), (6, 5));
+        assert_eq!(mask.pixels.len(), 30);
+        assert_eq!(mask.pixels[0], 10, "existing coverage is preserved");
+        assert_eq!(mask.pixels[5], 255, "new columns are unmasked");
+
+        doc.flip(true);
+        let mask = doc.layers[0].mask.as_ref().unwrap();
+        assert_eq!(mask.pixels[5], 10, "flip mirrors the mask with the pixels");
+
+        doc.rotate_90(true);
+        let mask = doc.layers[0].mask.as_ref().unwrap();
+        assert_eq!((doc.width, doc.height), (5, 6));
+        assert_eq!((mask.width, mask.height), (5, 6));
+
+        doc.scale_canvas(10, 12, false);
+        let mask = doc.layers[0].mask.as_ref().unwrap();
+        assert_eq!((mask.width, mask.height), (10, 12));
+        assert_eq!(mask.pixels.len(), 120);
+
+        // The document format is irrelevant to the mask invariant.
+        doc.pixel_format = PixelFormat::Srgb8;
+    }
+
+    #[test]
+    fn sixteen_bit_clipped_adjustment_uses_the_base_layer_stride() {
+        use crate::layer::{AdjustmentType, Layer, PixelFormat};
+
+        let mut doc = Document::new(8, 8);
+        doc.pixel_format = PixelFormat::Srgb16;
+
+        // Base is smaller than the canvas, so its stride differs from the canvas width. Every
+        // base pixel is opaque, so a wrong stride shows up as a missing adjustment on row 1.
+        let mut base = Layer::new(1, "Base", 2, 2);
+        base.set_pixels(vec![
+            255, 0, 0, 255, // (0, 0)
+            0, 255, 0, 255, // (1, 0)
+            0, 0, 255, 255, // (0, 1)
+            255, 255, 0, 255, // (1, 1)
+        ]);
+        doc.layers = vec![base];
+
+        let adjustment = doc.add_adjustment_layer(
+            AdjustmentType::BrightnessContrast {
+                brightness: 50.0,
+                contrast: 0.0,
+            },
+            Some("Bright".into()),
+        );
+        if let Some(layer) = doc.layers.iter_mut().find(|l| l.id == adjustment) {
+            layer.clipping_mask = true;
+        }
+
+        let eight = doc.composite_layers(true);
+        let sixteen: Vec<u8> = doc
+            .composite_layers_srgb16(true)
+            .iter()
+            .map(|&value| crate::pixel::srgb16_to_srgb8(value))
+            .collect();
+
+        assert_eq!(eight.len(), sixteen.len());
+        for (index, (lhs, rhs)) in eight.iter().zip(&sixteen).enumerate() {
+            assert!(
+                lhs.abs_diff(*rhs) <= 1,
+                "8-bit and 16-bit clipping diverge at byte {index}: {lhs} vs {rhs}"
+            );
+        }
+    }
+}

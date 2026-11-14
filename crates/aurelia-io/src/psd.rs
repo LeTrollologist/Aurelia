@@ -178,28 +178,90 @@ fn add_node(doc: &mut Document, node: &PsdNode, parent: Option<LayerId>, next_id
             }
             let id = *next_id;
             *next_id += 1;
-            let mut layer = Layer::new(id, name, width, height);
+            // AUR stores every raster layer at canvas size, so expand the PSD layer rectangle
+            // into a canvas-sized buffer. A layer smaller than the canvas would otherwise be
+            // unrepresentable: saving it writes a short payload that the loader rejects.
+            let (canvas_w, canvas_h) = (doc.width, doc.height);
+            let expanded_len = (canvas_w as usize) * (canvas_h as usize) * 4;
+            let mut expanded = vec![0u8; expanded_len];
+            for y in 0..height as usize {
+                let canvas_y = rect.top as usize + y;
+                if canvas_y >= canvas_h as usize {
+                    break;
+                }
+                for x in 0..width as usize {
+                    let canvas_x = rect.left as usize + x;
+                    if canvas_x >= canvas_w as usize {
+                        break;
+                    }
+                    let source = (y * width as usize + x) * 4;
+                    let destination = (canvas_y * canvas_w as usize + canvas_x) * 4;
+                    if source + 3 < pixels.len() && destination + 3 < expanded.len() {
+                        expanded[destination..destination + 4]
+                            .copy_from_slice(&pixels[source..source + 4]);
+                    }
+                }
+            }
+            let mut layer = Layer::new(id, name, canvas_w, canvas_h);
             layer.parent_id = parent;
-            layer.offset_x = rect.left;
-            layer.offset_y = rect.top;
+            layer.offset_x = 0;
+            layer.offset_y = 0;
             layer.opacity = *opacity;
             layer.blend_mode = *blend;
             layer.visible = *visible;
             layer.clipping_mask = *clipping;
-            layer.set_pixels(pixels.clone());
+            layer.set_pixels(expanded);
             if let Some(mask) = mask {
                 if let Some(pixels) = &mask.pixels {
+                    // Aurelia keeps one canvas-sized mask per layer; the PSD mask is scoped to
+                    // the layer rectangle. Place it in a canvas buffer so resizing, compositing
+                    // and saving keep it instead of dropping it as a dimension mismatch.
+                    let (canvas_w, canvas_h) = (doc.width, doc.height);
+                    let mask_w = mask.rect.width();
+                    let mask_h = mask.rect.height();
+                    let invert = mask.flags & 0x04 != 0;
+                    let mut canvas_mask = LayerMask::full(canvas_w, canvas_h, 255);
+                    for y in 0..mask_h {
+                        let canvas_y = mask.rect.top + y as i32;
+                        if canvas_y < 0 || canvas_y >= canvas_h as i32 {
+                            continue;
+                        }
+                        for x in 0..mask_w {
+                            let canvas_x = mask.rect.left + x as i32;
+                            if canvas_x < 0 || canvas_x >= canvas_w as i32 {
+                                continue;
+                            }
+                            let Some(&value) =
+                                pixels.get((y as usize) * (mask_w as usize) + x as usize)
+                            else {
+                                continue;
+                            };
+                            canvas_mask.pixels
+                                [(canvas_y as usize) * (canvas_w as usize) + canvas_x as usize] =
+                                if invert { 255 - value } else { value };
+                        }
+                    }
                     layer.mask = Some(LayerMask {
-                        width: mask.rect.width(),
-                        height: mask.rect.height(),
-                        pixels: pixels.clone(),
                         enabled: mask.flags & 0x02 == 0,
+                        ..canvas_mask
                     });
                 }
             }
             doc.layers.push(layer);
         }
     }
+}
+
+/// Number of raster layers in the parsed tree, which is how many canvas-sized buffers
+/// `into_document` will allocate.
+fn count_raster_layers(nodes: &[PsdNode]) -> u64 {
+    nodes
+        .iter()
+        .map(|node| match node {
+            PsdNode::Raster { .. } => 1,
+            PsdNode::Group { children, .. } => count_raster_layers(children),
+        })
+        .sum()
 }
 
 struct Reader<'a> {
@@ -879,6 +941,19 @@ pub fn parse_psd(data: &[u8]) -> Result<PsdDocument, PsdError> {
     } else {
         nodes
     };
+
+    // Layers are expanded to canvas size (`into_document`), so the decoded budget must cover
+    // that expansion, not just the sum of the layer rectangles.
+    let canvas_pixels = header.width as u64 * header.height as u64;
+    let raster_layers = count_raster_layers(&nodes);
+    if canvas_pixels
+        .checked_mul(raster_layers)
+        .is_none_or(|expanded| expanded > MAX_PSD_PIXELS)
+    {
+        return Err(PsdError::TooLarge(format!(
+            "{raster_layers} layer(s) at canvas size exceed the pixel budget"
+        )));
+    }
     Ok(PsdDocument {
         width: header.width,
         height: header.height,

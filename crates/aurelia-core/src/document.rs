@@ -727,6 +727,19 @@ impl Document {
         self.height = new_h;
         for layer in &mut self.layers {
             layer.resize(new_w, new_h);
+            if let Some(mask) = layer.mask.as_mut() {
+                mask.pixels = cropped_mask(
+                    &mask.pixels,
+                    mask.width as i32,
+                    mask.height as i32,
+                    new_w,
+                    new_h,
+                    0,
+                    0,
+                );
+                mask.width = new_w;
+                mask.height = new_h;
+            }
         }
     }
 
@@ -741,6 +754,12 @@ impl Document {
                 |bytes| flipped_channels(bytes, w, h, horizontal),
                 |channels| flipped_channels(channels, w, h, horizontal),
             );
+            // A mask is canvas-sized, so it must be mirrored with the pixels it masks.
+            if let Some(mask) = layer.mask.as_mut() {
+                mask.pixels = flipped_mask(&mask.pixels, w, h, horizontal);
+                mask.width = w;
+                mask.height = h;
+            }
         }
     }
 
@@ -757,6 +776,11 @@ impl Document {
             );
             layer.width = old_h;
             layer.height = old_w;
+            if let Some(mask) = layer.mask.as_mut() {
+                mask.pixels = rotated_mask(&mask.pixels, old_w, old_h, clockwise);
+                mask.width = old_h;
+                mask.height = old_w;
+            }
         }
 
         self.width = old_h;
@@ -784,6 +808,19 @@ impl Document {
             );
             layer.width = new_w;
             layer.height = new_h;
+            if let Some(mask) = layer.mask.as_mut() {
+                mask.pixels = cropped_mask(
+                    &mask.pixels,
+                    mask.width as i32,
+                    mask.height as i32,
+                    new_w,
+                    new_h,
+                    offset_x,
+                    offset_y,
+                );
+                mask.width = new_w;
+                mask.height = new_h;
+            }
         }
 
         self.width = new_w;
@@ -829,6 +866,18 @@ impl Document {
             layer.width = new_w;
             layer.height = new_h;
             *layer.buffer_mut() = resampled;
+            if let Some(mask) = layer.mask.as_mut() {
+                mask.pixels = resample_mask(
+                    &mask.pixels,
+                    mask.width,
+                    mask.height,
+                    new_w,
+                    new_h,
+                    bilinear,
+                );
+                mask.width = new_w;
+                mask.height = new_h;
+            }
         }
 
         if scale_styles && old_w > 0 && old_h > 0 {
@@ -1379,6 +1428,126 @@ fn resample_channels<C: Channel>(
     out
 }
 
+/// Crops or pads a single-channel mask with the same anchor as [`cropped_channels`].
+///
+/// Area outside the previous canvas is filled with `255` (unmasked): a resized canvas must not
+/// hide the pixels it just added.
+fn cropped_mask(
+    source: &[u8],
+    old_w: i32,
+    old_h: i32,
+    new_w: u32,
+    new_h: u32,
+    offset_x: i32,
+    offset_y: i32,
+) -> Vec<u8> {
+    let mut out = vec![255u8; (new_w as usize) * (new_h as usize)];
+    if old_w <= 0 || old_h <= 0 {
+        return out;
+    }
+    for ny in 0..new_h as i32 {
+        let oy = ny - offset_y;
+        if oy < 0 || oy >= old_h {
+            continue;
+        }
+        for nx in 0..new_w as i32 {
+            let ox = nx - offset_x;
+            if ox < 0 || ox >= old_w {
+                continue;
+            }
+            let src_idx = (oy as usize) * (old_w as usize) + ox as usize;
+            if let Some(&value) = source.get(src_idx) {
+                out[(ny as usize) * (new_w as usize) + nx as usize] = value;
+            }
+        }
+    }
+    out
+}
+
+/// Resamples a single-channel mask with the same kernel as [`resample_channels`].
+fn resample_mask(
+    source: &[u8],
+    old_w: u32,
+    old_h: u32,
+    new_w: u32,
+    new_h: u32,
+    bilinear: bool,
+) -> Vec<u8> {
+    let mut out = vec![255u8; (new_w as usize) * (new_h as usize)];
+    if old_w == 0 || old_h == 0 {
+        return out;
+    }
+    let scale_x = old_w as f32 / new_w as f32;
+    let scale_y = old_h as f32 / new_h as f32;
+    let pixel = |x: u32, y: u32| -> f32 {
+        source
+            .get((y as usize) * (old_w as usize) + x as usize)
+            .copied()
+            .unwrap_or(255) as f32
+    };
+    for ny in 0..new_h {
+        for nx in 0..new_w {
+            let value = if bilinear {
+                let gx = (nx as f32 + 0.5) * scale_x - 0.5;
+                let gy = (ny as f32 + 0.5) * scale_y - 0.5;
+                let x0 = (gx.floor() as i32).clamp(0, old_w as i32 - 1) as u32;
+                let y0 = (gy.floor() as i32).clamp(0, old_h as i32 - 1) as u32;
+                let x1 = (x0 + 1).min(old_w - 1);
+                let y1 = (y0 + 1).min(old_h - 1);
+                let fx = (gx - gx.floor()).clamp(0.0, 1.0);
+                let fy = (gy - gy.floor()).clamp(0.0, 1.0);
+                let top = pixel(x0, y0) * (1.0 - fx) + pixel(x1, y0) * fx;
+                let bottom = pixel(x0, y1) * (1.0 - fx) + pixel(x1, y1) * fx;
+                (top * (1.0 - fy) + bottom * fy).round().clamp(0.0, 255.0) as u8
+            } else {
+                let ox = ((nx as f32 * scale_x).floor() as u32).min(old_w - 1);
+                let oy = ((ny as f32 * scale_y).floor() as u32).min(old_h - 1);
+                pixel(ox, oy) as u8
+            };
+            out[(ny as usize) * (new_w as usize) + nx as usize] = value;
+        }
+    }
+    out
+}
+
+/// Mirrors a mask exactly like [`flipped_channels`] mirrors layer pixels.
+fn flipped_mask(source: &[u8], w: u32, h: u32, horizontal: bool) -> Vec<u8> {
+    let mut out = vec![255u8; (w as usize) * (h as usize)];
+    for y in 0..h {
+        for x in 0..w {
+            let (sx, sy) = if horizontal {
+                (w - 1 - x, y)
+            } else {
+                (x, h - 1 - y)
+            };
+            if let Some(&value) = source.get((sy as usize) * (w as usize) + sx as usize) {
+                out[(y as usize) * (w as usize) + x as usize] = value;
+            }
+        }
+    }
+    out
+}
+
+/// Rotates a mask exactly like [`rotated_channels`] rotates layer pixels.
+fn rotated_mask(source: &[u8], old_w: u32, old_h: u32, clockwise: bool) -> Vec<u8> {
+    let (new_w, new_h) = (old_h, old_w);
+    let mut out = vec![255u8; (new_w as usize) * (new_h as usize)];
+    for y in 0..old_h {
+        for x in 0..old_w {
+            let Some(&value) = source.get((y as usize) * (old_w as usize) + x as usize) else {
+                continue;
+            };
+            let (dst_x, dst_y) = if clockwise {
+                (old_h - 1 - y, x)
+            } else {
+                (y, old_w - 1 - x)
+            };
+            out[(dst_y as usize) * (new_w as usize) + dst_x as usize] = value;
+        }
+    }
+    out
+}
+
 /// Read-only view of the layer a clipping layer is clipped to.
 #[derive(Clone, Copy)]
 struct ClipBase<'a, C> {
@@ -1858,16 +2027,19 @@ fn apply_adjustment_u16(
                 opacity *= mask.alpha_at(x as u32, y as u32) as f32 / 255.0;
             }
             if let (Some(base), Some(pixels)) = (clip_layer, clip_pixels) {
-                let bx = x - base.offset_x;
-                let by = y - base.offset_y;
-                let base_alpha = if bx >= 0 && bx < w && by >= 0 && by < h {
-                    pixels
-                        .get(((by * w + bx) * 4) as usize + 3)
-                        .map(|channel| channel.to_f32())
-                        .unwrap_or(0.0)
-                } else {
-                    0.0
-                };
+                // The base buffer is the layer's own size, not the canvas size: bounds and the
+                // stride must both come from `base`, exactly like the 8-bit `get_pixel` path.
+                let bx = x as i32 - base.offset_x;
+                let by = y as i32 - base.offset_y;
+                let base_alpha =
+                    if bx >= 0 && bx < base.width as i32 && by >= 0 && by < base.height as i32 {
+                        pixels
+                            .get(((by as usize) * (base.width as usize) + bx as usize) * 4 + 3)
+                            .map(|channel| channel.to_f32())
+                            .unwrap_or(0.0)
+                    } else {
+                        0.0
+                    };
                 opacity *= base_alpha * clip_opacity;
             }
             if opacity <= 0.001 {

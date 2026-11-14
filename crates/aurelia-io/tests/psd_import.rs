@@ -391,3 +391,44 @@ fn imported_document_can_be_loaded_through_the_public_path() {
     assert_eq!(doc.layers.len(), 1);
     let _ = std::fs::remove_file(path);
 }
+
+#[test]
+fn layer_mask_is_placed_in_a_canvas_sized_buffer() {
+    // PSD masks are scoped to the layer rectangle; Aurelia stores one canvas-sized mask per
+    // layer. The importer must place the PSD mask into that buffer, or the mask is lost at the
+    // next save (the AUR format cannot represent a differently sized mask).
+    let rect = Rect {
+        top: 1,
+        left: 1,
+        bottom: 3,
+        right: 3,
+    };
+    let mut layer = Layer::raster("Masked", rect.clone());
+    layer.mask = Some((rect, vec![0u8, 64, 128, 255]));
+    layer.channels.push((-2, vec![0u8, 64, 128, 255]));
+
+    let psd = build(5, 5, &[layer], None);
+    let document = parse_psd(&psd)
+        .expect("masked layer parses")
+        .into_document();
+    let imported = document.layers.first().expect("layer");
+    let mask = imported.mask.as_ref().expect("mask is kept");
+    assert_eq!((mask.width, mask.height), (5, 5));
+    assert_eq!(mask.pixels.len(), 25);
+    assert_eq!(mask.pixels[0], 255, "outside the layer mask is unmasked");
+    assert_eq!(mask.pixels[5 + 1], 0, "(1, 1) keeps the PSD value");
+    assert_eq!(mask.pixels[5 + 2], 64);
+    assert_eq!(mask.pixels[2 * 5 + 1], 128);
+    assert_eq!(mask.pixels[2 * 5 + 2], 255);
+
+    // The canvas-sized mask is representable, so save/load keeps it.
+    let mut bytes = Vec::new();
+    aurelia_io::save_project_to_writer(&document, &mut bytes).expect("save with a PSD mask");
+    let reloaded = aurelia_io::load_project_from_reader(std::io::Cursor::new(bytes))
+        .expect("reload saved project");
+    let mask = reloaded.layers[0]
+        .mask
+        .as_ref()
+        .expect("mask survives the round trip");
+    assert_eq!((mask.width, mask.height), (5, 5));
+}
