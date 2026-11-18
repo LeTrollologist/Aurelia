@@ -1,8 +1,47 @@
 {
   "product": "Aurelia",
   "source": "https://github.com/LeTrollologist/Aurelia/releases",
-  "generated_at": "2026-11-18T14:49:10+00:00",
+  "generated_at": "2026-11-18T15:03:04+00:00",
   "releases": [
+    {
+      "tag": "v3.17.2",
+      "version": "3.17.2",
+      "published_at": "2026-11-18T15:00:29Z",
+      "prerelease": false,
+      "url": "https://github.com/LeTrollologist/Aurelia/releases/tag/v3.17.2",
+      "assets": [
+        {
+          "name": "Aurelia-Setup-3.17.2.exe",
+          "bytes": 4919502,
+          "sha256": "f9642e03a38c09a21835230d1ea68606321d3eac300d0bccacd7ad138e961f2b"
+        },
+        {
+          "name": "Aurelia-Setup-3.17.2.exe.sig",
+          "bytes": 64,
+          "sha256": "ed8aa269ffb8ae7a8d6fea9b03b83d6b0885a1c5542d780634be99e6565a9013"
+        },
+        {
+          "name": "Aurelia-v3.17.2-win64.zip",
+          "bytes": 3832479,
+          "sha256": "b1daed05902d479b2a51be1ab9fa847203edc82e6b98d8f16c694bcaabed7b90"
+        },
+        {
+          "name": "Aurelia-v3.17.2-win64.zip.sig",
+          "bytes": 64,
+          "sha256": "6bbfffb904b863319ec817120ba967ae16c38d98d587adddc66db7bc6c51aaba"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "bytes": 183,
+          "sha256": "f3835318e83706428452b14865be7ae231b18e7ee98280cd72fb98015fcf32a5"
+        },
+        {
+          "name": "SHA256SUMS.txt.sig",
+          "bytes": 64,
+          "sha256": "35784dabca4f0785fdaf95834789d79e007cbd39dbfffaab23f11084fe48dbe0"
+        }
+      ]
+    },
     {
       "tag": "v3.17.1",
       "version": "3.17.1",
