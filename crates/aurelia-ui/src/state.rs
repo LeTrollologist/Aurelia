@@ -5567,15 +5567,22 @@ impl AppState {
         Some(new_id)
     }
 
-    /// Ungroups a folder. The hierarchy change is marked dirty, but it is not undoable yet;
-    /// an undo step would have to restore the folder and every child's parent id.
+    /// Ungroups a folder as one undoable step: undo restores the folder and re-parents its
+    /// direct children to it.
     pub fn ungroup_undoable(&mut self, id: u64) -> bool {
-        let changed = self.document.ungroup(id);
-        if changed {
-            self.mark_editor_dirty();
-            self.set_status("Ungrouped folder");
-        }
-        changed
+        let Some(capture) = self.document.ungroup_capturing(id) else {
+            return false;
+        };
+        self.history
+            .push(Box::new(aurelia_core::history::UngroupCommand {
+                group: capture.group,
+                target_parent: capture.target_parent,
+                children: capture.children,
+                active_before: capture.active_before,
+                active_after: capture.active_after,
+            }));
+        self.set_status("Ungrouped folder");
+        true
     }
 
     /// Applies a discrete panel change (visibility, blend, clipping, folder membership) with an
@@ -5838,18 +5845,102 @@ mod layer_lifecycle_tests {
     }
 
     #[test]
-    fn ungrouping_marks_the_document_dirty() {
+    fn ungroup_is_undoable_and_dirty() {
         let mut state = AppState::new(32, 32);
         let group = state.add_group_undoable(None);
-        state.add_layer_undoable(Some(group));
+        let child = state.add_layer_undoable(Some(group));
+        let group_index = state
+            .document
+            .layers
+            .iter()
+            .position(|layer| layer.id == group)
+            .expect("group index");
         state.mark_saved();
 
         assert!(state.ungroup_undoable(group));
-        assert!(
-            state.is_dirty(),
-            "an ungroup is unsaved work even without an undo step"
-        );
+        assert!(state.is_dirty(), "an ungroup is unsaved work");
         assert!(state.document.get_layer(group).is_none());
+        assert_eq!(
+            state
+                .document
+                .get_layer(child)
+                .and_then(|layer| layer.parent_id),
+            None,
+            "children are released to the folder's parent"
+        );
+
+        state.history.undo(&mut state.document);
+        assert!(
+            state.document.get_layer(group).is_some(),
+            "undo restores the folder"
+        );
+        assert_eq!(
+            state
+                .document
+                .layers
+                .iter()
+                .position(|layer| layer.id == group),
+            Some(group_index),
+            "the folder returns to its original index"
+        );
+        assert_eq!(
+            state
+                .document
+                .get_layer(child)
+                .and_then(|layer| layer.parent_id),
+            Some(group),
+            "children are re-parented to the restored folder"
+        );
+
+        state.history.redo(&mut state.document);
+        assert!(
+            state.document.get_layer(group).is_none(),
+            "redo ungroups again"
+        );
+        assert_eq!(
+            state
+                .document
+                .get_layer(child)
+                .and_then(|layer| layer.parent_id),
+            None
+        );
+    }
+
+    #[test]
+    fn ungroup_undo_restores_a_nested_folder() {
+        let mut state = AppState::new(32, 32);
+        let outer = state.add_group_undoable(None);
+        let inner = state.add_group_undoable(Some(outer));
+        let child = state.add_layer_undoable(Some(inner));
+        state.mark_saved();
+
+        assert!(state.ungroup_undoable(inner));
+        assert!(state.document.get_layer(inner).is_none());
+        assert_eq!(
+            state
+                .document
+                .get_layer(child)
+                .and_then(|layer| layer.parent_id),
+            Some(outer),
+            "children move up into the outer folder"
+        );
+
+        state.history.undo(&mut state.document);
+        assert!(state.document.get_layer(inner).is_some());
+        assert_eq!(
+            state
+                .document
+                .get_layer(child)
+                .and_then(|layer| layer.parent_id),
+            Some(inner)
+        );
+        assert_eq!(
+            state
+                .document
+                .get_layer(inner)
+                .and_then(|layer| layer.parent_id),
+            Some(outer)
+        );
     }
 }
 

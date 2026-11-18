@@ -1614,3 +1614,47 @@ impl Command for LayerDiscreteCommand {
         }
     }
 }
+
+/// Reverses a folder ungroup: the folder is reinserted at its index and its direct children are
+/// re-parented to it. The captured `target_parent` is where the children were released to.
+#[derive(Debug)]
+pub struct UngroupCommand {
+    pub group: (usize, Layer),
+    pub target_parent: Option<LayerId>,
+    pub children: Vec<LayerId>,
+    pub active_before: LayerId,
+    pub active_after: LayerId,
+}
+
+impl Command for UngroupCommand {
+    fn name(&self) -> &'static str {
+        "Ungroup"
+    }
+
+    fn cost(&self) -> usize {
+        self.group.1.storage_len()
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        let (index, layer) = &self.group;
+        doc.layers
+            .insert((*index).min(doc.layers.len()), layer.clone());
+        for child in &self.children {
+            if let Some(child_layer) = doc.get_layer_mut(*child) {
+                child_layer.parent_id = Some(layer.id);
+            }
+        }
+        doc.active_layer_id = self.active_before;
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        for child in &self.children {
+            if let Some(child_layer) = doc.get_layer_mut(*child) {
+                child_layer.parent_id = self.target_parent;
+            }
+        }
+        doc.layers
+            .retain(|candidate| candidate.id != self.group.1.id);
+        doc.active_layer_id = self.active_after;
+    }
+}

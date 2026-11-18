@@ -68,6 +68,16 @@ pub enum HierarchyError {
     },
 }
 
+/// Everything an undo of [`Document::ungroup_capturing`] needs.
+#[derive(Debug, Clone)]
+pub struct UngroupCapture {
+    pub group: (usize, Layer),
+    pub target_parent: Option<LayerId>,
+    pub children: Vec<LayerId>,
+    pub active_before: LayerId,
+    pub active_after: LayerId,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Document {
     pub width: u32,
@@ -482,6 +492,38 @@ impl Document {
             }
         }
         self.delete_layer(group_id).is_some()
+    }
+
+    /// Ungroups a folder while capturing what an undo needs: the folder itself with its index,
+    /// the parent its children were released to, and the ids of those direct children.
+    pub fn ungroup_capturing(&mut self, group_id: LayerId) -> Option<UngroupCapture> {
+        if self.layers.len() <= 1 {
+            return None;
+        }
+        let index = self.layers.iter().position(|layer| layer.id == group_id)?;
+        let group = self.layers[index].clone();
+        if !group.is_group() {
+            return None;
+        }
+        let target_parent = group.parent_id;
+        let children: Vec<LayerId> = self
+            .layers
+            .iter()
+            .filter(|layer| layer.parent_id == Some(group_id))
+            .map(|layer| layer.id)
+            .collect();
+        let active_before = self.active_layer_id;
+        if !self.ungroup(group_id) {
+            return None;
+        }
+        let active_after = self.active_layer_id;
+        Some(UngroupCapture {
+            group: (index, group),
+            target_parent,
+            children,
+            active_before,
+            active_after,
+        })
     }
 
     pub fn duplicate_active_layer(&mut self) -> Option<LayerId> {
