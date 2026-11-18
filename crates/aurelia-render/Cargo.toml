@@ -1,12 +1,12 @@
 [package]
 name = "aurelia-render"
-version = "3.17.2"
+version = "3.17.3"
 edition = "2021"
 rust-version = "1.87"
 description = "Fast software rasterizer and egui primitive compositing engine for Aurelia"
 
 [dependencies]
-aurelia-core = { path = "../aurelia-core", version = "3.17.2" }
+aurelia-core = { path = "../aurelia-core", version = "3.17.3" }
 egui = { workspace = true }
 glam = { workspace = true }
 log = { workspace = true }

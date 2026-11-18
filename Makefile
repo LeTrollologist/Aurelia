@@ -1,6 +1,6 @@
 # Aurelia Local Release & Packaging (adopted from the Morrow pipeline)
 # Stages: preflight -> version -> build -> test -> package -> verify -> publish -> ship
-TAG ?= v3.17.2
+TAG ?= v3.17.3
 
 .PHONY: release check version build test package portable scan verify ship republish dry-run clean
 
