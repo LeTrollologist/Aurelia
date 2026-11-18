@@ -1,5 +1,5 @@
 use crate::document::Document;
-use crate::layer::Layer;
+use crate::layer::{Layer, LayerId};
 
 pub trait Command: std::fmt::Debug + Send + Sync {
     fn name(&self) -> &'static str;
@@ -1437,5 +1437,171 @@ mod eviction_integrity {
         )));
         assert!(!stack.can_redo(), "a new edit must invalidate redo");
         assert_eq!(stack.redo_retained_bytes(), 0);
+    }
+}
+
+/// Layers removed by one structural edit (delete, or a folder delete), with their indices.
+///
+/// A group delete removes the folder *and* every descendant, so a single `Layer` cannot
+/// describe the step. `removed` is ascending by index, which makes undo a straight reinsertion
+/// and redo a straight removal.
+#[derive(Debug)]
+pub struct LayersRemovedCommand {
+    pub description: &'static str,
+    pub removed: Vec<(usize, Layer)>,
+    pub active_before: LayerId,
+    pub active_after: LayerId,
+}
+
+impl Command for LayersRemovedCommand {
+    fn name(&self) -> &'static str {
+        self.description
+    }
+
+    fn cost(&self) -> usize {
+        self.removed
+            .iter()
+            .map(|(_, layer)| layer.storage_len())
+            .sum()
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        for (index, layer) in &self.removed {
+            doc.layers
+                .insert((*index).min(doc.layers.len()), layer.clone());
+        }
+        doc.active_layer_id = self.active_before;
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        for (_, layer) in self.removed.iter().rev() {
+            doc.layers.retain(|candidate| candidate.id != layer.id);
+        }
+        doc.active_layer_id = self.active_after;
+    }
+}
+
+/// Layers added by one structural edit (new layer, add to folder, duplicate), with indices.
+#[derive(Debug)]
+pub struct LayersInsertedCommand {
+    pub description: &'static str,
+    pub inserted: Vec<(usize, Layer)>,
+    pub active_before: LayerId,
+    pub active_after: LayerId,
+}
+
+impl Command for LayersInsertedCommand {
+    fn name(&self) -> &'static str {
+        self.description
+    }
+
+    fn cost(&self) -> usize {
+        self.inserted
+            .iter()
+            .map(|(_, layer)| layer.storage_len())
+            .sum()
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        for (_, layer) in self.inserted.iter().rev() {
+            doc.layers.retain(|candidate| candidate.id != layer.id);
+        }
+        doc.active_layer_id = self.active_before;
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        for (index, layer) in &self.inserted {
+            doc.layers
+                .insert((*index).min(doc.layers.len()), layer.clone());
+        }
+        doc.active_layer_id = self.active_after;
+    }
+}
+
+/// Replaces a layer's mask (create, remove, invert or enable toggle).
+#[derive(Debug)]
+pub struct LayerMaskCommand {
+    pub description: &'static str,
+    pub layer_id: LayerId,
+    pub before: Option<crate::layer::LayerMask>,
+    pub after: Option<crate::layer::LayerMask>,
+}
+
+impl Command for LayerMaskCommand {
+    fn name(&self) -> &'static str {
+        self.description
+    }
+
+    fn cost(&self) -> usize {
+        let size = |mask: &Option<crate::layer::LayerMask>| {
+            mask.as_ref().map(|mask| mask.pixels.len()).unwrap_or(0)
+        };
+        size(&self.before) + size(&self.after)
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            layer.mask = self.before.clone();
+        }
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            layer.mask = self.after.clone();
+        }
+    }
+}
+
+/// The light, non-pixel layer fields a panel toggle can change.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LayerDiscreteProperties {
+    pub visible: bool,
+    pub clipping_mask: bool,
+    pub blend_mode: crate::blend::BlendMode,
+    pub parent_id: Option<LayerId>,
+}
+
+impl LayerDiscreteProperties {
+    pub fn of(layer: &Layer) -> Self {
+        Self {
+            visible: layer.visible,
+            clipping_mask: layer.clipping_mask,
+            blend_mode: layer.blend_mode,
+            parent_id: layer.parent_id,
+        }
+    }
+
+    fn apply(self, layer: &mut Layer) {
+        layer.visible = self.visible;
+        layer.clipping_mask = self.clipping_mask;
+        layer.blend_mode = self.blend_mode;
+        layer.parent_id = self.parent_id;
+    }
+}
+
+/// A discrete layer-panel change: visibility, clipping, blend mode or folder membership.
+#[derive(Debug)]
+pub struct LayerDiscreteCommand {
+    pub description: &'static str,
+    pub layer_id: LayerId,
+    pub before: LayerDiscreteProperties,
+    pub after: LayerDiscreteProperties,
+}
+
+impl Command for LayerDiscreteCommand {
+    fn name(&self) -> &'static str {
+        self.description
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            self.before.apply(layer);
+        }
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            self.after.apply(layer);
+        }
     }
 }

@@ -5458,3 +5458,397 @@ mod text_tool_lifecycle {
         );
     }
 }
+
+/// Layer operations that keep the history stack and the dirty flag honest.
+///
+/// Structural edits (delete, duplicate, add) and panel toggles (visibility, blend, mask,
+/// folder membership) used to mutate the document directly: they were invisible to
+/// `is_dirty()`, so closing the window after deleting a layer never prompted, and undo could
+/// not restore what was deleted.
+impl AppState {
+    fn layer_ids(&self) -> Vec<u64> {
+        self.document.layers.iter().map(|layer| layer.id).collect()
+    }
+
+    fn layers_not_in(&self, before: &[u64]) -> Vec<(usize, Layer)> {
+        self.document
+            .layers
+            .iter()
+            .enumerate()
+            .filter(|(_, layer)| !before.contains(&layer.id))
+            .map(|(index, layer)| (index, layer.clone()))
+            .collect()
+    }
+
+    fn push_inserted_layers(
+        &mut self,
+        description: &'static str,
+        before_ids: &[u64],
+        active_before: u64,
+    ) {
+        let inserted = self.layers_not_in(before_ids);
+        if inserted.is_empty() {
+            return;
+        }
+        let active_after = self.document.active_layer_id;
+        self.history
+            .push(Box::new(aurelia_core::history::LayersInsertedCommand {
+                description,
+                inserted,
+                active_before,
+                active_after,
+            }));
+    }
+
+    /// Deletes a layer or folder (with descendants) as one undoable step.
+    pub fn delete_layer_undoable(&mut self, id: u64) -> bool {
+        let Some((removed, active_before)) = self.document.delete_layer_capturing(id) else {
+            return false;
+        };
+        let active_after = self.document.active_layer_id;
+        self.history
+            .push(Box::new(aurelia_core::history::LayersRemovedCommand {
+                description: "Delete Layer",
+                removed,
+                active_before,
+                active_after,
+            }));
+        self.set_status("Deleted layer");
+        true
+    }
+
+    /// Adds a raster layer, optionally inside a folder, as one undoable step.
+    pub fn add_layer_undoable(&mut self, parent: Option<u64>) -> u64 {
+        let active_before = self.document.active_layer_id;
+        let before_ids = self.layer_ids();
+        let id = self.document.add_layer(None);
+        if let Some(parent) = parent {
+            self.document.set_layer_parent(id, Some(parent));
+        }
+        self.push_inserted_layers("Add Layer", &before_ids, active_before);
+        self.set_status(format!("Added Layer {id}"));
+        id
+    }
+
+    /// Adds a group folder as one undoable step.
+    pub fn add_group_undoable(&mut self, parent: Option<u64>) -> u64 {
+        let active_before = self.document.active_layer_id;
+        let before_ids = self.layer_ids();
+        let id = self.document.add_group(None);
+        if let Some(parent) = parent {
+            self.document.set_layer_parent(id, Some(parent));
+        }
+        self.push_inserted_layers("Add Folder", &before_ids, active_before);
+        self.set_status(format!("Added Folder {id}"));
+        id
+    }
+
+    /// Adds an adjustment layer as one undoable step.
+    pub fn add_adjustment_layer_undoable(
+        &mut self,
+        kind: aurelia_core::layer::AdjustmentType,
+        name: Option<String>,
+    ) -> u64 {
+        let active_before = self.document.active_layer_id;
+        let before_ids = self.layer_ids();
+        let id = self.document.add_adjustment_layer(kind, name);
+        self.push_inserted_layers("Add Adjustment Layer", &before_ids, active_before);
+        self.set_status(format!("Added Adjustment Layer {id}"));
+        id
+    }
+
+    /// Duplicates a layer (or a folder with its descendants) as one undoable step.
+    pub fn duplicate_layer_undoable(&mut self, id: u64) -> Option<u64> {
+        let active_before = self.document.active_layer_id;
+        let before_ids = self.layer_ids();
+        self.document.active_layer_id = id;
+        let new_id = self.document.duplicate_active_layer()?;
+        self.push_inserted_layers("Duplicate Layer", &before_ids, active_before);
+        Some(new_id)
+    }
+
+    /// Ungroups a folder. The hierarchy change is marked dirty, but it is not undoable yet;
+    /// an undo step would have to restore the folder and every child's parent id.
+    pub fn ungroup_undoable(&mut self, id: u64) -> bool {
+        let changed = self.document.ungroup(id);
+        if changed {
+            self.mark_editor_dirty();
+            self.set_status("Ungrouped folder");
+        }
+        changed
+    }
+
+    /// Applies a discrete panel change (visibility, blend, clipping, folder membership) with an
+    /// undo step.
+    pub fn edit_layer_discrete(
+        &mut self,
+        id: u64,
+        description: &'static str,
+        edit: impl FnOnce(&mut Layer),
+    ) {
+        let Some(layer) = self.document.get_layer_mut(id) else {
+            return;
+        };
+        let before = aurelia_core::history::LayerDiscreteProperties::of(layer);
+        edit(layer);
+        let after = aurelia_core::history::LayerDiscreteProperties::of(layer);
+        if before == after {
+            return;
+        }
+        self.history
+            .push(Box::new(aurelia_core::history::LayerDiscreteCommand {
+                description,
+                layer_id: id,
+                before,
+                after,
+            }));
+    }
+
+    /// Current discrete properties of a layer, for callers that mutate a widget in place.
+    pub fn layer_discrete(
+        &self,
+        id: u64,
+    ) -> Option<aurelia_core::history::LayerDiscreteProperties> {
+        self.document
+            .get_layer(id)
+            .map(aurelia_core::history::LayerDiscreteProperties::of)
+    }
+
+    /// Records a discrete change the widget already applied, given the before-snapshot.
+    pub fn record_layer_discrete(
+        &mut self,
+        id: u64,
+        description: &'static str,
+        before: aurelia_core::history::LayerDiscreteProperties,
+    ) {
+        let Some(after) = self.layer_discrete(id) else {
+            return;
+        };
+        if before == after {
+            return;
+        }
+        self.history
+            .push(Box::new(aurelia_core::history::LayerDiscreteCommand {
+                description,
+                layer_id: id,
+                before,
+                after,
+            }));
+    }
+    /// Applies a mask change (create, invert, enable/disable, remove) with an undo step.
+    pub fn edit_layer_mask(
+        &mut self,
+        id: u64,
+        description: &'static str,
+        edit: impl FnOnce(&mut Document),
+    ) {
+        let before = self
+            .document
+            .get_layer(id)
+            .and_then(|layer| layer.mask.clone());
+        edit(&mut self.document);
+        let after = self
+            .document
+            .get_layer(id)
+            .and_then(|layer| layer.mask.clone());
+        if before == after {
+            return;
+        }
+        self.mask_overlay_dirty = true;
+        self.history
+            .push(Box::new(aurelia_core::history::LayerMaskCommand {
+                description,
+                layer_id: id,
+                before,
+                after,
+            }));
+    }
+
+    /// Creates a layer mask from the current selection, undoably.
+    pub fn add_layer_mask_undoable(&mut self, id: u64) {
+        let selection = self.selection.clone();
+        self.edit_layer_mask(id, "Add Layer Mask", |document| {
+            document.add_layer_mask(id, selection.as_ref());
+        });
+        self.set_status("Layer mask created");
+    }
+
+    /// Inverts a layer mask, undoably.
+    pub fn invert_layer_mask_undoable(&mut self, id: u64) {
+        self.edit_layer_mask(id, "Invert Layer Mask", |document| {
+            document.invert_layer_mask(id);
+        });
+        self.set_status("Layer mask inverted");
+    }
+
+    /// Enables or disables a layer mask, undoably.
+    pub fn toggle_layer_mask_undoable(&mut self, id: u64) {
+        let next = !self
+            .document
+            .get_layer(id)
+            .and_then(|layer| layer.mask.as_ref())
+            .map(|mask| mask.enabled)
+            .unwrap_or(false);
+        self.edit_layer_mask(id, "Toggle Layer Mask", |document| {
+            document.set_layer_mask_enabled(id, next);
+        });
+        self.set_status(if next {
+            "Layer mask enabled"
+        } else {
+            "Layer mask disabled"
+        });
+    }
+
+    /// Removes a layer mask, undoably.
+    pub fn remove_layer_mask_undoable(&mut self, id: u64) {
+        self.edit_layer_mask(id, "Remove Layer Mask", |document| {
+            document.remove_layer_mask(id);
+        });
+        if self.mask_editing {
+            self.mask_editing = false;
+        }
+        self.set_status("Layer mask removed");
+    }
+}
+
+#[cfg(test)]
+mod layer_lifecycle_tests {
+    use super::AppState;
+    use aurelia_core::selection::SelectionMask;
+
+    /// Regression for the Copy Merged panic: a selection can outlive the document it was made
+    /// in (Open, canvas resize, crop), and the region must be clamped to the canvas instead of
+    /// slicing past the composite buffer.
+    #[test]
+    fn copy_merged_clamps_a_stale_selection_to_the_canvas() {
+        let mut state = AppState::new(64, 64);
+        let mut selection = SelectionMask::new(100, 100);
+        selection.mask.fill(255);
+        selection.has_active_selection = true;
+        state.selection = Some(selection);
+
+        state.copy_merged();
+
+        let image = state
+            .clipboard
+            .as_ref()
+            .expect("a clamped region is copied");
+        assert_eq!((image.width, image.height), (64, 64));
+    }
+
+    #[test]
+    fn deleting_a_layer_is_undoable_and_dirty() {
+        let mut state = AppState::new(32, 32);
+        let id = state.add_layer_undoable(None);
+        state.mark_saved();
+        let count = state.document.layers.len();
+
+        assert!(state.delete_layer_undoable(id));
+        assert!(state.is_dirty(), "a delete must be unsaved work");
+        assert_eq!(state.document.layers.len(), count - 1);
+
+        state.history.undo(&mut state.document);
+        assert_eq!(state.document.layers.len(), count);
+        assert!(
+            state.document.get_layer(id).is_some(),
+            "undo restores the layer"
+        );
+    }
+
+    #[test]
+    fn deleting_a_folder_restores_its_children_on_undo() {
+        let mut state = AppState::new(32, 32);
+        let group = state.add_group_undoable(None);
+        let child = state.add_layer_undoable(Some(group));
+        assert_eq!(
+            state.document.get_layer(child).and_then(|l| l.parent_id),
+            Some(group)
+        );
+        state.mark_saved();
+        let count = state.document.layers.len();
+
+        assert!(state.delete_layer_undoable(group));
+        assert!(
+            state.document.get_layer(child).is_none(),
+            "children are removed too"
+        );
+
+        state.history.undo(&mut state.document);
+        assert_eq!(state.document.layers.len(), count);
+        assert!(state.document.get_layer(group).is_some());
+        assert!(state.document.get_layer(child).is_some());
+        assert_eq!(
+            state.document.get_layer(child).and_then(|l| l.parent_id),
+            Some(group)
+        );
+    }
+
+    #[test]
+    fn adding_and_duplicating_layers_are_undoable() {
+        let mut state = AppState::new(32, 32);
+        let base = state.document.layers[0].id;
+        let count = state.document.layers.len();
+
+        state.add_layer_undoable(None);
+        assert!(state.is_dirty());
+        assert_eq!(state.document.layers.len(), count + 1);
+        state.history.undo(&mut state.document);
+        assert_eq!(state.document.layers.len(), count);
+
+        let duplicate = state.duplicate_layer_undoable(base).expect("duplicate");
+        assert_eq!(state.document.layers.len(), count + 1);
+        state.history.undo(&mut state.document);
+        assert_eq!(state.document.layers.len(), count);
+        assert!(state.document.get_layer(duplicate).is_none());
+    }
+
+    #[test]
+    fn mask_and_visibility_changes_are_undoable_and_dirty() {
+        let mut state = AppState::new(32, 32);
+        let id = state.document.layers[0].id;
+        state.mark_saved();
+
+        state.add_layer_mask_undoable(id);
+        assert!(state
+            .document
+            .get_layer(id)
+            .is_some_and(|l| l.mask.is_some()));
+        assert!(state.is_dirty());
+        state.history.undo(&mut state.document);
+        assert!(state
+            .document
+            .get_layer(id)
+            .is_some_and(|l| l.mask.is_none()));
+
+        let visible = state
+            .document
+            .get_layer(id)
+            .map(|l| l.visible)
+            .unwrap_or(true);
+        state.edit_layer_discrete(id, "Layer Visibility", |layer| layer.visible = !visible);
+        assert_ne!(
+            state.document.get_layer(id).map(|l| l.visible),
+            Some(visible)
+        );
+        state.history.undo(&mut state.document);
+        assert_eq!(
+            state.document.get_layer(id).map(|l| l.visible),
+            Some(visible)
+        );
+    }
+
+    #[test]
+    fn ungrouping_marks_the_document_dirty() {
+        let mut state = AppState::new(32, 32);
+        let group = state.add_group_undoable(None);
+        state.add_layer_undoable(Some(group));
+        state.mark_saved();
+
+        assert!(state.ungroup_undoable(group));
+        assert!(
+            state.is_dirty(),
+            "an ungroup is unsaved work even without an undo step"
+        );
+        assert!(state.document.get_layer(group).is_none());
+    }
+}

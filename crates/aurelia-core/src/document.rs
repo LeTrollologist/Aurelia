@@ -521,6 +521,36 @@ impl Document {
         }
     }
 
+    /// Deletes a layer (and a folder's descendants) while capturing every removed layer with
+    /// the index it occupied, so an undo command can restore the exact stack.
+    ///
+    /// Returns `None` when the delete is refused (the document keeps at least one layer).
+    pub fn delete_layer_capturing(
+        &mut self,
+        id: LayerId,
+    ) -> Option<(Vec<(usize, Layer)>, LayerId)> {
+        if self.layers.len() <= 1 {
+            return None;
+        }
+        let active_before = self.active_layer_id;
+        let descendants = self.all_descendants(id);
+        let mut removed = Vec::new();
+        for (index, layer) in self.layers.iter().enumerate() {
+            if layer.id == id || descendants.contains(&layer.id) {
+                removed.push((index, layer.clone()));
+            }
+        }
+        self.delete_layer(id)?;
+        Some((removed, active_before))
+    }
+
+    /// Reinserts captured layers at their original indices (ascending), used by undo/redo.
+    pub fn insert_layers_at(&mut self, entries: &[(usize, Layer)]) {
+        for (index, layer) in entries {
+            self.layers
+                .insert((*index).min(self.layers.len()), layer.clone());
+        }
+    }
     pub fn delete_layer(&mut self, id: LayerId) -> Option<Layer> {
         if self.layers.len() <= 1 {
             return None; // Maintain at least 1 layer

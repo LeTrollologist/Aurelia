@@ -2504,47 +2504,45 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 .selected_text("+ Adj")
                                 .show_ui(ui, |ui| {
                                     if ui.selectable_label(false, "☀️ Brightness / Contrast").clicked() {
-                                        let id = state.document.add_adjustment_layer(aurelia_core::layer::AdjustmentType::BrightnessContrast { brightness: 0.0, contrast: 0.0 }, None);
+                                        let id = state.add_adjustment_layer_undoable(aurelia_core::layer::AdjustmentType::BrightnessContrast { brightness: 0.0, contrast: 0.0 }, None);
                                         state.active_adjustment_modal = Some(id);
                                         state.set_status(format!("Added Brightness/Contrast Adjustment Layer {}", id));
                                     }
                                     if ui.selectable_label(false, "🎨 HSL").clicked() {
-                                        let id = state.document.add_adjustment_layer(aurelia_core::layer::AdjustmentType::Hsl { hue_shift: 0.0, saturation: 1.0, lightness: 0.0 }, None);
+                                        let id = state.add_adjustment_layer_undoable(aurelia_core::layer::AdjustmentType::Hsl { hue_shift: 0.0, saturation: 1.0, lightness: 0.0 }, None);
                                         state.active_adjustment_modal = Some(id);
                                         state.set_status(format!("Added HSL Adjustment Layer {}", id));
                                     }
                                     if ui.selectable_label(false, "⚖️ Color Balance").clicked() {
-                                        let id = state.document.add_adjustment_layer(aurelia_core::layer::AdjustmentType::ColorBalance { cyan_red: 0.0, magenta_green: 0.0, yellow_blue: 0.0 }, None);
+                                        let id = state.add_adjustment_layer_undoable(aurelia_core::layer::AdjustmentType::ColorBalance { cyan_red: 0.0, magenta_green: 0.0, yellow_blue: 0.0 }, None);
                                         state.active_adjustment_modal = Some(id);
                                         state.set_status(format!("Added Color Balance Adjustment Layer {}", id));
                                     }
                                     if ui.selectable_label(false, "🔄 Invert").clicked() {
-                                        let id = state.document.add_adjustment_layer(aurelia_core::layer::AdjustmentType::Invert, None);
+                                        let id = state.add_adjustment_layer_undoable(aurelia_core::layer::AdjustmentType::Invert, None);
                                         state.set_status(format!("Added Invert Adjustment Layer {}", id));
                                     }
                                     if ui.selectable_label(false, "🎚️ Posterize").clicked() {
-                                        let id = state.document.add_adjustment_layer(aurelia_core::layer::AdjustmentType::Posterize { levels: 6 }, None);
+                                        let id = state.add_adjustment_layer_undoable(aurelia_core::layer::AdjustmentType::Posterize { levels: 6 }, None);
                                         state.active_adjustment_modal = Some(id);
                                         state.set_status(format!("Added Posterize Adjustment Layer {}", id));
                                     }
                                     if ui.selectable_label(false, "🌓 Threshold").clicked() {
-                                        let id = state.document.add_adjustment_layer(aurelia_core::layer::AdjustmentType::Threshold { cutoff: 128 }, None);
+                                        let id = state.add_adjustment_layer_undoable(aurelia_core::layer::AdjustmentType::Threshold { cutoff: 128 }, None);
                                         state.active_adjustment_modal = Some(id);
                                         state.set_status(format!("Added Threshold Adjustment Layer {}", id));
                                     }
                                     if ui.selectable_label(false, "🎞️ Sepia").clicked() {
-                                        let id = state.document.add_adjustment_layer(aurelia_core::layer::AdjustmentType::Sepia { strength: 1.0 }, None);
+                                        let id = state.add_adjustment_layer_undoable(aurelia_core::layer::AdjustmentType::Sepia { strength: 1.0 }, None);
                                         state.active_adjustment_modal = Some(id);
                                         state.set_status(format!("Added Sepia Adjustment Layer {}", id));
                                     }
                                 });
                             if ui.button("📁+ Folder").on_hover_text("Create a new Layer Group Folder").clicked() {
-                                let gid = state.document.add_group(None);
-                                state.set_status(format!("Created Folder Group {}", gid));
+                                state.add_group_undoable(None);
                             }
                             if ui.button("➕ Layer").on_hover_text("Add a new drawing layer").clicked() {
-                                let id = state.document.add_layer(None);
-                                state.set_status(format!("Added Layer {}", id));
+                                state.add_layer_undoable(None);
                             }
                         });
                     });
@@ -2642,7 +2640,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         // Visibility toggle
                                         let vis_icon = if state.document.layers[i].visible { "👁" } else { "⊘" };
                                         if ui.button(vis_icon).clicked() {
-                                            state.document.layers[i].visible = !state.document.layers[i].visible;
+                                            let next = !state.document.layers[i].visible;
+                                            state.edit_layer_discrete(layer_id, "Layer Visibility", |layer| {
+                                                layer.visible = next;
+                                            });
                                         }
                                         if ui
                                             .selectable_label(is_active, "◉")
@@ -2786,7 +2787,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                 }
                                                 if state.document.layers[i].parent_id.is_some() {
                                                     if ui.button("⮯").on_hover_text("Remove from folder (move to top level)").clicked() {
-                                                        state.document.layers[i].parent_id = None;
+                                                        state.edit_layer_discrete(layer_id, "Remove From Folder", |layer| layer.parent_id = None);
                                                     }
                                                 }
                                             }
@@ -2795,6 +2796,8 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                                     if is_active {
                                         if !is_adj && !is_group {
+                                            let blend_before = state.layer_discrete(layer_id);
+                                            let blend_new;
                                             ui.horizontal(|ui| {
                                                 ui.label(RichText::new("Blend:").size(9.5).color(Color32::from_rgb(172, 161, 130)));
                                                 egui::ComboBox::from_id_source(format!("blend_mode_{}", layer_id))
@@ -2808,10 +2811,19 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                         }
                                                     });
                                             });
+                                            blend_new = state.document.layers[i].blend_mode;
+                                            if let Some(before) = blend_before {
+                                                if before.blend_mode != blend_new {
+                                                    state.record_layer_discrete(layer_id, "Blend Mode", before);
+                                                }
+                                            }
                                         }
 
                                         ui.horizontal(|ui| {
                                             if ui.add(egui::Slider::new(&mut state.document.layers[i].opacity, 0.0..=1.0).text("Opacity")).changed() {
+                                                // Continuous edit: dirty is enough here; one undo
+                                                // step per drag is still a follow-up gap.
+                                                state.mark_editor_dirty();
                                                 ctx.request_repaint();
                                             }
                                         });
@@ -2947,7 +2959,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                     for command in layer_commands {
                         match command {
                             LayerCommand::Delete(id) => {
-                                state.document.delete_layer(id);
+                                state.delete_layer_undoable(id);
                             }
                             LayerCommand::MoveUp(id) | LayerCommand::MoveDown(id) => {
                                 let Some(from_index) = state
@@ -2976,48 +2988,27 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 }
                             }
                             LayerCommand::Ungroup(id) => {
-                                state.document.ungroup(id);
+                                state.ungroup_undoable(id);
                             }
                             LayerCommand::AddChild(parent) => {
-                                let new_id = state.document.add_layer(None);
-                                state.document.set_layer_parent(new_id, Some(parent));
+                                state.add_layer_undoable(Some(parent));
                             }
                             LayerCommand::Duplicate(id) => {
                                 // Duplicate the row that was clicked, not whatever happened
                                 // to be active.
-                                state.document.active_layer_id = id;
-                                state.document.duplicate_active_layer();
+                                state.duplicate_layer_undoable(id);
                             }
                             LayerCommand::MaskFromSelection(id) => {
-                                // Clone the selection so the document can borrow mutably.
-                                let selection = state.selection.clone();
-                                state.document.add_layer_mask(id, selection.as_ref());
-                                state.mask_overlay_dirty = true;
-                                state.set_status("Layer mask created");
+                                state.add_layer_mask_undoable(id);
                             }
                             LayerCommand::MaskInvert(id) => {
-                                state.document.invert_layer_mask(id);
-                                state.mask_overlay_dirty = true;
-                                state.set_status("Layer mask inverted");
+                                state.invert_layer_mask_undoable(id);
                             }
                             LayerCommand::MaskToggle(id) => {
-                                let next = !state
-                                    .document
-                                    .get_layer(id)
-                                    .and_then(|l| l.mask.as_ref())
-                                    .map(|m| m.enabled)
-                                    .unwrap_or(false);
-                                state.document.set_layer_mask_enabled(id, next);
-                                state.mask_overlay_dirty = true;
-                                state.set_status(if next { "Layer mask enabled" } else { "Layer mask disabled" });
+                                state.toggle_layer_mask_undoable(id);
                             }
                             LayerCommand::MaskRemove(id) => {
-                                state.document.remove_layer_mask(id);
-                                if state.mask_editing {
-                                    state.mask_editing = false;
-                                }
-                                state.mask_overlay_dirty = true;
-                                state.set_status("Layer mask removed");
+                                state.remove_layer_mask_undoable(id);
                             }
                             LayerCommand::RasterizeActiveText => {
                                 state.rasterize_active_text_layer();
