@@ -3,7 +3,7 @@
 ## Supported versions
 
 Security fixes are provided for the latest release only. The current release is
-[v3.17.4](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.17.4).
+[v3.17.5](https://github.com/LeTrollologist/Aurelia/releases/tag/v3.17.5).
 
 ## Reporting a vulnerability
 
@@ -30,7 +30,7 @@ You should receive an acknowledgement within 48 hours.
   SmartScreen trust. SmartScreen reputation is independent of the artifact signature.
 
 ```powershell
-certutil -hashfile Aurelia-Setup-3.17.4.exe SHA256
+certutil -hashfile Aurelia-Setup-3.17.5.exe SHA256
 Get-Content SHA256SUMS.txt
 ```
 
@@ -43,7 +43,7 @@ manifest.
 VirusTotal is **advisory, not a release veto**, but detections are published rather than
 dismissed. **No scan was performed for v3.16.0** — no API key was available in the release
 environment — so no detection verdicts are claimed for its installer, portable zip or
-executable; the [release notes](release-notes/v3.17.4.md#virustotal) say the same. Results
+executable; the [release notes](release-notes/v3.17.5.md#virustotal) say the same. Results
 quoted for earlier releases describe those files and are not transferred forward.
 
 - Scanning is enabled only when `VIRUSTOTAL_API_KEY` is present; local secrets belong in the
