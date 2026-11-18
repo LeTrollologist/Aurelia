@@ -5852,3 +5852,49 @@ mod layer_lifecycle_tests {
         assert!(state.document.get_layer(group).is_none());
     }
 }
+
+#[cfg(test)]
+mod layer_flag_tests {
+    use super::AppState;
+
+    #[test]
+    fn lock_and_clip_toggles_are_undoable_and_dirty() {
+        let mut state = AppState::new(16, 16);
+        let id = state.document.layers[0].id;
+        state.mark_saved();
+        let before = state.layer_discrete(id).expect("layer");
+
+        state.edit_layer_discrete(id, "Layer Flags", |layer| {
+            layer.locked = true;
+            layer.alpha_locked = true;
+        });
+        assert!(state.is_dirty(), "lock changes are unsaved work");
+        let layer = state.document.get_layer(id).expect("layer");
+        assert!(layer.locked && layer.alpha_locked);
+
+        state.history.undo(&mut state.document);
+        assert_eq!(state.layer_discrete(id), Some(before));
+    }
+
+    #[test]
+    fn moving_a_layer_between_folders_is_undoable() {
+        let mut state = AppState::new(16, 16);
+        let base = state.document.layers[0].id;
+        let group = state.add_group_undoable(None);
+        state.mark_saved();
+        let before = state.layer_discrete(base).expect("layer");
+        assert_eq!(before.parent_id, None);
+
+        state.edit_layer_discrete(base, "Move To Folder", |layer| {
+            layer.parent_id = Some(group);
+        });
+        assert!(state.is_dirty());
+        assert_eq!(
+            state.document.get_layer(base).and_then(|l| l.parent_id),
+            Some(group)
+        );
+
+        state.history.undo(&mut state.document);
+        assert_eq!(state.layer_discrete(base), Some(before));
+    }
+}

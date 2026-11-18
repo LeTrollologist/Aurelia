@@ -1557,6 +1557,9 @@ impl Command for LayerMaskCommand {
 pub struct LayerDiscreteProperties {
     pub visible: bool,
     pub clipping_mask: bool,
+    pub locked: bool,
+    pub alpha_locked: bool,
+    pub is_reference: bool,
     pub blend_mode: crate::blend::BlendMode,
     pub parent_id: Option<LayerId>,
 }
@@ -1566,6 +1569,9 @@ impl LayerDiscreteProperties {
         Self {
             visible: layer.visible,
             clipping_mask: layer.clipping_mask,
+            locked: layer.locked,
+            alpha_locked: layer.alpha_locked,
+            is_reference: layer.is_reference,
             blend_mode: layer.blend_mode,
             parent_id: layer.parent_id,
         }
@@ -1574,6 +1580,9 @@ impl LayerDiscreteProperties {
     fn apply(self, layer: &mut Layer) {
         layer.visible = self.visible;
         layer.clipping_mask = self.clipping_mask;
+        layer.locked = self.locked;
+        layer.alpha_locked = self.alpha_locked;
+        layer.is_reference = self.is_reference;
         layer.blend_mode = self.blend_mode;
         layer.parent_id = self.parent_id;
     }

@@ -2871,7 +2871,10 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                                         if is_adj {
                                             ui.horizontal(|ui| {
-                                                ui.checkbox(&mut state.document.layers[i].clipping_mask, "Clip");
+                                                let mut clip_flag = state.document.layers[i].clipping_mask;
+                                                if ui.checkbox(&mut clip_flag, "Clip").changed() {
+                                                    state.edit_layer_discrete(layer_id, "Layer Flags", |layer| layer.clipping_mask = clip_flag);
+                                                }
                                                 if ui.small_button("⚙ Edit Filter Parameters...").clicked() {
                                                     state.active_adjustment_modal = Some(layer_id);
                                                 }
@@ -2890,12 +2893,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                         .selected_text(current_name)
                                                         .show_ui(ui, |ui| {
                                                             if ui.selectable_label(current_parent_id.is_none(), "Root (No Folder)").clicked() {
-                                                                state.document.set_layer_parent(layer_id, None);
+                                                                state.edit_layer_discrete(layer_id, "Move To Folder", |layer| layer.parent_id = None);
                                                             }
                                                             for (gid, gname) in &group_options {
                                                                 if *gid != layer_id {
                                                                     if ui.selectable_label(current_parent_id == Some(*gid), format!("📁 {}", gname)).clicked() {
-                                                                        state.document.set_layer_parent(layer_id, Some(*gid));
+                                                                        state.edit_layer_discrete(layer_id, "Move To Folder", |layer| layer.parent_id = Some(*gid));
                                                                     }
                                                                 }
                                                             }
@@ -2914,12 +2917,24 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                             });
                                         } else if !is_group {
                                             ui.horizontal(|ui| {
-                                                ui.checkbox(&mut state.document.layers[i].alpha_locked, "α Lock");
-                                                ui.checkbox(&mut state.document.layers[i].clipping_mask, "Clip");
-                                                ui.checkbox(&mut state.document.layers[i].locked, "Lock");
+                                                let mut alpha_locked_flag = state.document.layers[i].alpha_locked;
+                                                if ui.checkbox(&mut alpha_locked_flag, "α Lock").changed() {
+                                                    state.edit_layer_discrete(layer_id, "Layer Flags", |layer| layer.alpha_locked = alpha_locked_flag);
+                                                }
+                                                let mut clip_flag = state.document.layers[i].clipping_mask;
+                                                if ui.checkbox(&mut clip_flag, "Clip").changed() {
+                                                    state.edit_layer_discrete(layer_id, "Layer Flags", |layer| layer.clipping_mask = clip_flag);
+                                                }
+                                                let mut locked_flag = state.document.layers[i].locked;
+                                                if ui.checkbox(&mut locked_flag, "Lock").changed() {
+                                                    state.edit_layer_discrete(layer_id, "Layer Flags", |layer| layer.locked = locked_flag);
+                                                }
                                             });
                                             ui.horizontal(|ui| {
-                                                ui.checkbox(&mut state.document.layers[i].is_reference, "Ref Boundary");
+                                                let mut reference_flag = state.document.layers[i].is_reference;
+                                                if ui.checkbox(&mut reference_flag, "Ref Boundary").changed() {
+                                                    state.edit_layer_discrete(layer_id, "Layer Flags", |layer| layer.is_reference = reference_flag);
+                                                }
                                             });
 
                                             // Folder parent assignment selector
@@ -2935,12 +2950,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                         .selected_text(current_name)
                                                         .show_ui(ui, |ui| {
                                                             if ui.selectable_label(current_parent_id.is_none(), "Root (No Folder)").clicked() {
-                                                                state.document.set_layer_parent(layer_id, None);
+                                                                state.edit_layer_discrete(layer_id, "Move To Folder", |layer| layer.parent_id = None);
                                                             }
                                                             for (gid, gname) in &group_options {
                                                                 if *gid != layer_id {
                                                                     if ui.selectable_label(current_parent_id == Some(*gid), format!("📁 {}", gname)).clicked() {
-                                                                        state.document.set_layer_parent(layer_id, Some(*gid));
+                                                                        state.edit_layer_discrete(layer_id, "Move To Folder", |layer| layer.parent_id = Some(*gid));
                                                                     }
                                                                 }
                                                             }
