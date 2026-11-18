@@ -839,10 +839,16 @@ fn hit_test_text_layer_at(
             let max_x = config.pos_x + text_box_w;
             let max_y = config.pos_y + text_box_h;
 
-            if canvas_pos.x >= min_x
-                && canvas_pos.x <= max_x
-                && canvas_pos.y >= min_y
-                && canvas_pos.y <= max_y
+            // A few pixels of slack so the box edge and just outside it still grab the layer
+            // instead of starting a new one.
+            // Slack so the box edge and just outside it still grab the layer instead of
+            // starting a new one. It is specified in screen pixels and converted back to
+            // canvas units, so it stays grabbable when zoomed out.
+            let hit_slack = 8.0 / state.zoom.max(0.05);
+            if canvas_pos.x >= min_x - hit_slack
+                && canvas_pos.x <= max_x + hit_slack
+                && canvas_pos.y >= min_y - hit_slack
+                && canvas_pos.y <= max_y + hit_slack
             {
                 return Some(layer.id);
             }
@@ -2325,7 +2331,14 @@ unsafe extern "system" fn window_proc_impl(
                     return 0;
                 }
 
-                // 3. Clicked empty canvas -> create new text layer
+                // 3. Clicked empty canvas. If a text layer is being edited, this click commits
+                // it (discarding an empty one) instead of stacking another empty layer on top;
+                // the next click starts a new one, as Photoshop and GIMP do.
+                if app.state.active_text_layer_id.is_some() {
+                    app.state.commit_active_text();
+                    InvalidateRect(hwnd, std::ptr::null(), 0);
+                    return 0;
+                }
                 let _new_id = app.state.create_text_layer_at(canvas_pos, None);
                 app.state.text_box_resizing_handle = Some(2); // BottomRight handle
                 app.state.text_drag_start = Some(canvas_pos);
@@ -4181,12 +4194,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Offer crash-recovery snapshots left behind by a previous session. This scans the whole
     // autosave directory, not just the current document: a fresh launch has no document path,
-    // so looking only at `autosave_path()` would never find a named project's snapshot. The list
-    // is collected once so a snapshot that cannot be deleted cannot make this loop forever.
-    for recovery_path in AppState::autosave_snapshots() {
+    // so looking only at `autosave_path()` would never find a named project's snapshot. One
+    // prompt covers every snapshot — asking per file made a normal launch look like it had
+    // hung behind a second dialog.
+    let mut snapshots = AppState::autosave_snapshots();
+    snapshots.sort_by_key(|path| {
+        std::fs::metadata(path)
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .map(std::cmp::Reverse)
+    });
+    if !snapshots.is_empty() {
+        let list = snapshots
+            .iter()
+            .take(5)
+            .map(|path| format!("  {}", path.display()))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let more = if snapshots.len() > 5 {
+            format!("\n  ... and {} more", snapshots.len() - 5)
+        } else {
+            String::new()
+        };
         let text = to_wide(&format!(
-            "A crash-recovery snapshot was found:\n{}\n\nRestore it?\n\nYes = open the snapshot\nNo = discard it and check the next one",
-            recovery_path.display()
+            "{} crash-recovery snapshot(s) were found:\n{list}{more}\n\nRestore the most recent one?\n\nYes = open the newest snapshot\nNo = discard all of them",
+            snapshots.len()
         ));
         let caption = to_wide("Aurelia · Recover artwork");
         let answer = unsafe {
@@ -4198,25 +4230,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
         };
         if answer == 6 {
-            match load_project_file(&recovery_path) {
-                Ok(doc) => {
-                    app_state = AppState::from_document(doc);
-                    app_state.load_preferences();
-                    app_state.mark_dirty();
-                    // Consume the snapshot: it is now the open document and has been marked
-                    // dirty, so it will be re-saved if the user keeps working.
-                    let _ = std::fs::remove_file(&recovery_path);
-                    app_state.set_status("Recovered autosave snapshot - use Save As to keep it");
-                    break;
+            let mut recovered = false;
+            for recovery_path in &snapshots {
+                match load_project_file(recovery_path) {
+                    Ok(doc) => {
+                        app_state = AppState::from_document(doc);
+                        app_state.load_preferences();
+                        app_state.mark_dirty();
+                        app_state
+                            .set_status("Recovered autosave snapshot - use Save As to keep it");
+                        recovered = true;
+                        break;
+                    }
+                    Err(error) => {
+                        eprintln!("Failed to restore autosave snapshot: {error}");
+                    }
                 }
-                Err(error) => {
-                    eprintln!("Failed to restore autosave snapshot: {error}");
-                    // A corrupt snapshot should not block recovery of the others.
-                    let _ = std::fs::remove_file(&recovery_path);
+            }
+            if recovered {
+                for recovery_path in &snapshots {
+                    let _ = std::fs::remove_file(recovery_path);
                 }
             }
         } else {
-            let _ = std::fs::remove_file(&recovery_path);
+            for recovery_path in &snapshots {
+                let _ = std::fs::remove_file(recovery_path);
+            }
         }
     }
 

@@ -1196,12 +1196,11 @@ impl AppState {
             Some(sz) => (sz.x.max(0.0), sz.y.max(0.0)),
             None => (0.0, 0.0),
         };
-        let mut config = aurelia_core::layer::TextLayerConfig {
-            content: if self.text.content.trim().is_empty() {
-                "Double-click to edit text".to_string()
-            } else {
-                self.text.content.clone()
-            },
+        // A new type layer starts empty, like Photoshop's Type tool: the previous text is not
+        // copied into it, and nothing is rendered until the user types.
+        self.text.content.clear();
+        let config = aurelia_core::layer::TextLayerConfig {
+            content: String::new(),
             font_family: self.text.font_name.clone(),
             font_size: self.text.font_size,
             color: self.brush.primary_color.to_rgba8(),
@@ -1213,17 +1212,35 @@ impl AppState {
             pos_x: pos.x,
             pos_y: pos.y,
         };
-        if config.content == "Aurelia" {
-            config.content = "Text Layer".to_string();
-        }
         let id = self.document.add_text_layer(None, config.clone(), None);
         if let Some(font) = &self.text_font {
             self.document.update_text_layer_config(id, config, font);
         }
         self.select_text_layer(id);
         self.mark_canvas_dirty();
-        self.set_status("Created new interactive Text Layer");
+        self.set_status("Text layer created - type to add text");
         id
+    }
+
+    /// Ends text editing, discarding an empty type layer.
+    ///
+    /// Clicking away from a text box must not leave a blank layer behind (Photoshop and GIMP
+    /// both drop an empty type layer on commit), and it must not stack a new empty layer on
+    /// top of the one being edited.
+    pub fn commit_active_text(&mut self) {
+        let Some(id) = self.active_text_layer_id.take() else {
+            return;
+        };
+        let empty = self
+            .document
+            .get_layer(id)
+            .and_then(|layer| layer.text.as_ref())
+            .map(|config| config.content.trim().is_empty())
+            .unwrap_or(false);
+        if empty {
+            let _ = self.document.delete_layer(id);
+        }
+        self.mark_canvas_dirty();
     }
 
     pub fn sync_active_text_layer(&mut self) {
@@ -5386,5 +5403,58 @@ mod clipboard_16bit_round_trip {
         let image = state.clipboard.as_ref().expect("clipboard");
         assert_eq!(image.format, PixelFormat::Srgb16);
         assert!(matches!(image.pixels, LayerBuffer::Srgb16(_)));
+    }
+}
+
+#[cfg(test)]
+mod text_tool_lifecycle {
+    use super::AppState;
+    use glam::Vec2;
+
+    #[test]
+    fn a_new_text_layer_starts_empty() {
+        let mut state = AppState::new(64, 64);
+        let id = state.create_text_layer_at(Vec2::new(8.0, 8.0), None);
+        let config = state
+            .document
+            .get_layer(id)
+            .and_then(|layer| layer.text.as_ref())
+            .expect("text config");
+        assert!(
+            config.content.is_empty(),
+            "a stray click must not create visible text"
+        );
+        assert_eq!(state.active_text_layer_id, Some(id));
+    }
+
+    #[test]
+    fn committing_an_empty_text_layer_discards_it() {
+        let mut state = AppState::new(64, 64);
+        let before = state.document.layers.len();
+        state.create_text_layer_at(Vec2::new(8.0, 8.0), None);
+        assert_eq!(state.document.layers.len(), before + 1);
+        state.commit_active_text();
+        assert_eq!(
+            state.document.layers.len(),
+            before,
+            "empty type layer is dropped"
+        );
+        assert_eq!(state.active_text_layer_id, None);
+    }
+
+    #[test]
+    fn committing_a_filled_text_layer_keeps_it() {
+        let mut state = AppState::new(64, 64);
+        let id = state.create_text_layer_at(Vec2::new(8.0, 8.0), None);
+        state.text.content = "Hello".to_string();
+        state.sync_active_text_layer();
+        let before = state.document.layers.len();
+        state.commit_active_text();
+        assert_eq!(state.document.layers.len(), before, "typed text survives");
+        assert_eq!(state.active_text_layer_id, None);
+        assert_eq!(
+            state.document.get_layer(id).map(|l| l.text.is_some()),
+            Some(true)
+        );
     }
 }
