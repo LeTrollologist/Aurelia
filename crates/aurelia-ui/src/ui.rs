@@ -2743,6 +2743,12 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                 &mut state.document.layers[i].name,
                                             );
                                         }
+                                        if response.gained_focus() {
+                                            state.begin_layer_property_edit(layer_id, "Rename Layer");
+                                        }
+                                        if response.lost_focus() {
+                                            state.commit_layer_property_edit();
+                                        }
                                         if response.clicked() || response.gained_focus() {
                                             state.document.active_layer_id = layer_id;
                                             if is_text {
@@ -2820,11 +2826,15 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                         }
 
                                         ui.horizontal(|ui| {
-                                            if ui.add(egui::Slider::new(&mut state.document.layers[i].opacity, 0.0..=1.0).text("Opacity")).changed() {
-                                                // Continuous edit: dirty is enough here; one undo
-                                                // step per drag is still a follow-up gap.
-                                                state.mark_editor_dirty();
+                                            let response = ui.add(egui::Slider::new(&mut state.document.layers[i].opacity, 0.0..=1.0).text("Opacity"));
+                                            if response.drag_started() {
+                                                state.begin_layer_property_edit(layer_id, "Layer Opacity");
+                                            }
+                                            if response.changed() {
                                                 ctx.request_repaint();
+                                            }
+                                            if response.drag_stopped() {
+                                                state.commit_layer_property_edit();
                                             }
                                         });
 
@@ -5960,6 +5970,9 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
     // ── 9. FLOATING ADJUSTMENT LAYER SETTINGS INSPECTOR ──
     if let Some(adj_id) = state.active_adjustment_modal {
+        // One transaction for the whole inspector visit: dragging several sliders commits as a
+        // single undo step when the inspector closes (or when another edit begins).
+        state.begin_layer_property_edit(adj_id, "Adjustment Layer");
         let mut close_modal = false;
         let mut title = "✨ Adjustment Layer Settings".to_string();
         if let Some(layer) = state.document.get_layer(adj_id) {
@@ -6040,6 +6053,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
             });
 
         if close_modal || !is_open {
+            state.commit_layer_property_edit();
             state.active_adjustment_modal = None;
         }
     }

@@ -1658,3 +1658,58 @@ impl Command for UngroupCommand {
         doc.active_layer_id = self.active_after;
     }
 }
+
+/// The light, editable layer properties a panel edit can change continuously.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LayerPropertiesSnapshot {
+    pub name: String,
+    pub opacity: f32,
+    pub adjustment: Option<crate::layer::AdjustmentConfig>,
+}
+
+impl LayerPropertiesSnapshot {
+    pub fn of(layer: &Layer) -> Self {
+        Self {
+            name: layer.name.clone(),
+            opacity: layer.opacity,
+            adjustment: layer.adjustment.clone(),
+        }
+    }
+}
+
+/// One coalesced property-edit transaction (a drag of the opacity slider, a rename, a set of
+/// adjustment sliders). The UI opens a session on interaction start and commits it on release
+/// or focus loss, so the whole gesture is a single undo step.
+#[derive(Debug)]
+pub struct LayerPropertiesCommand {
+    pub description: &'static str,
+    pub layer_id: LayerId,
+    pub before: LayerPropertiesSnapshot,
+    pub after: LayerPropertiesSnapshot,
+}
+
+impl Command for LayerPropertiesCommand {
+    fn name(&self) -> &'static str {
+        self.description
+    }
+
+    fn cost(&self) -> usize {
+        self.before.name.len() + self.after.name.len()
+    }
+
+    fn undo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            layer.name = self.before.name.clone();
+            layer.opacity = self.before.opacity;
+            layer.adjustment = self.before.adjustment.clone();
+        }
+    }
+
+    fn redo(&mut self, doc: &mut Document) {
+        if let Some(layer) = doc.get_layer_mut(self.layer_id) {
+            layer.name = self.after.name.clone();
+            layer.opacity = self.after.opacity;
+            layer.adjustment = self.after.adjustment.clone();
+        }
+    }
+}

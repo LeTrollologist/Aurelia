@@ -22,6 +22,14 @@ pub struct SelectionEdit {
     pub after: Option<SelectionMask>,
 }
 
+/// One in-progress coalesced property edit (rename, opacity drag, adjustment sliders), so a
+/// whole gesture becomes a single undo step.
+#[derive(Debug, Clone)]
+pub struct PropertyEditSession {
+    pub layer_id: u64,
+    pub description: &'static str,
+    pub before: aurelia_core::history::LayerPropertiesSnapshot,
+}
 /// One in-progress layer-style edit gesture, so dragging a slider produces one undo step.
 #[derive(Debug, Clone)]
 pub struct StyleEditSession {
@@ -675,6 +683,8 @@ pub struct AppState {
     pub stroke_pixels_backup: Option<Vec<u8>>,
     pub is_space_panning: bool,
     pub pan_drag_start: Option<Vec2>,
+    /// Open coalesced property-edit transaction, if any.
+    pub property_session: Option<PropertyEditSession>,
     pub pending_file_action: Option<PendingFileAction>,
     /// Installed fonts the host discovered at startup, sorted by family name. The text tool
     /// lists these; the host resolves the path when one is chosen.
@@ -1007,6 +1017,7 @@ impl AppState {
             stroke_pixels_backup: None,
             is_space_panning: false,
             pan_drag_start: None,
+            property_session: None,
             pending_file_action: None,
             pending_open_path: None,
             system_fonts: Vec::new(),
@@ -3297,6 +3308,7 @@ impl AppState {
         // but the undo command must be recorded before the saved generation is captured, or a
         // later finish would mark the just-saved document dirty again.
         self.finish_layer_style_edit();
+        self.commit_layer_property_edit();
         // Snapshot the recovery path before the document gains its real name, so an
         // untitled document's snapshot is also cleaned up after "Save As".
         let previous_autosave = self.autosave_path();
@@ -5987,5 +5999,194 @@ mod layer_flag_tests {
 
         state.history.undo(&mut state.document);
         assert_eq!(state.layer_discrete(base), Some(before));
+    }
+}
+
+/// Coalesced property-edit transactions: one undo step per gesture.
+impl AppState {
+    /// Opens (or switches) a property-edit transaction. A session on a different layer or of a
+    /// different kind is committed first, so a step can never span two layers.
+    pub fn begin_layer_property_edit(&mut self, id: u64, description: &'static str) {
+        if self
+            .property_session
+            .as_ref()
+            .is_some_and(|session| session.layer_id == id && session.description == description)
+        {
+            return;
+        }
+        self.commit_layer_property_edit();
+        let Some(layer) = self.document.get_layer(id) else {
+            return;
+        };
+        self.property_session = Some(PropertyEditSession {
+            layer_id: id,
+            description,
+            before: aurelia_core::history::LayerPropertiesSnapshot::of(layer),
+        });
+    }
+
+    /// Commits the open transaction as one undo step. A gesture that changed nothing records
+    /// nothing, so clicking into a slider without moving it does not add an empty step.
+    pub fn commit_layer_property_edit(&mut self) {
+        let Some(session) = self.property_session.take() else {
+            return;
+        };
+        let Some(layer) = self.document.get_layer(session.layer_id) else {
+            return;
+        };
+        let after = aurelia_core::history::LayerPropertiesSnapshot::of(layer);
+        if after == session.before {
+            return;
+        }
+        self.history
+            .push(Box::new(aurelia_core::history::LayerPropertiesCommand {
+                description: session.description,
+                layer_id: session.layer_id,
+                before: session.before,
+                after,
+            }));
+    }
+
+    /// True while a property transaction is open for this layer.
+    pub fn property_edit_open_for(&self, id: u64) -> bool {
+        self.property_session
+            .as_ref()
+            .is_some_and(|session| session.layer_id == id)
+    }
+}
+
+#[cfg(test)]
+mod property_transaction_tests {
+    use super::AppState;
+
+    #[test]
+    fn an_opacity_drag_is_one_undo_step() {
+        let mut state = AppState::new(16, 16);
+        let id = state.document.layers[0].id;
+        state.mark_saved();
+        let generation_before = state.history.generation();
+
+        state.begin_layer_property_edit(id, "Layer Opacity");
+        for value in [0.9, 0.7, 0.5] {
+            state.document.layers[0].opacity = value;
+        }
+        state.commit_layer_property_edit();
+
+        assert_eq!(
+            state.history.generation(),
+            generation_before + 1,
+            "one step"
+        );
+        assert!(state.is_dirty());
+        assert_eq!(
+            state.history.undo_entries().last().map(|entry| entry.label),
+            Some("Layer Opacity")
+        );
+
+        state.history.undo(&mut state.document);
+        assert_eq!(state.document.layers[0].opacity, 1.0);
+    }
+
+    #[test]
+    fn a_rename_is_one_undo_step() {
+        let mut state = AppState::new(16, 16);
+        let id = state.document.layers[0].id;
+        state.mark_saved();
+
+        state.begin_layer_property_edit(id, "Rename Layer");
+        for name in ["A", "Ar", "Art"] {
+            state.document.layers[0].name = name.to_string();
+        }
+        state.commit_layer_property_edit();
+        assert_eq!(state.document.layers[0].name, "Art");
+
+        state.history.undo(&mut state.document);
+        assert_eq!(state.document.layers[0].name, "Layer 1");
+    }
+
+    #[test]
+    fn a_transaction_that_changed_nothing_records_no_step() {
+        let mut state = AppState::new(16, 16);
+        let id = state.document.layers[0].id;
+        state.mark_saved();
+        let generation_before = state.history.generation();
+
+        state.begin_layer_property_edit(id, "Layer Opacity");
+        state.commit_layer_property_edit();
+
+        assert_eq!(state.history.generation(), generation_before);
+        assert!(
+            !state.is_dirty(),
+            "clicking a slider without moving it is not an edit"
+        );
+    }
+
+    #[test]
+    fn switching_layers_commits_the_previous_transaction() {
+        let mut state = AppState::new(16, 16);
+        let first = state.document.layers[0].id;
+        let second = state.add_layer_undoable(None);
+        state.mark_saved();
+
+        state.begin_layer_property_edit(first, "Layer Opacity");
+        if let Some(layer) = state.document.get_layer_mut(first) {
+            layer.opacity = 0.25;
+        }
+        state.begin_layer_property_edit(second, "Layer Opacity");
+        assert_eq!(
+            state.history.undo_entries().last().map(|entry| entry.label),
+            Some("Layer Opacity")
+        );
+        state.commit_layer_property_edit();
+        assert_eq!(
+            state.document.get_layer(first).map(|layer| layer.opacity),
+            Some(0.25)
+        );
+    }
+
+    #[test]
+    fn adjustment_slider_session_is_one_undo_step() {
+        let mut state = AppState::new(16, 16);
+        let id = state.add_adjustment_layer_undoable(
+            aurelia_core::layer::AdjustmentType::BrightnessContrast {
+                brightness: 0.0,
+                contrast: 0.0,
+            },
+            None,
+        );
+        state.mark_saved();
+
+        state.begin_layer_property_edit(id, "Adjustment Layer");
+        if let Some(adjustment) = state
+            .document
+            .get_layer_mut(id)
+            .and_then(|layer| layer.adjustment.as_mut())
+        {
+            adjustment.adjustment_type = aurelia_core::layer::AdjustmentType::BrightnessContrast {
+                brightness: 40.0,
+                contrast: 10.0,
+            };
+        }
+        state.commit_layer_property_edit();
+
+        let configured = |state: &AppState| {
+            state
+                .document
+                .get_layer(id)
+                .and_then(|layer| layer.adjustment.as_ref())
+                .and_then(|adjustment| match adjustment.adjustment_type {
+                    aurelia_core::layer::AdjustmentType::BrightnessContrast {
+                        brightness, ..
+                    } => Some(brightness),
+                    _ => None,
+                })
+        };
+        assert_eq!(configured(&state), Some(40.0));
+        state.history.undo(&mut state.document);
+        assert_eq!(
+            configured(&state),
+            Some(0.0),
+            "undo restores the previous values"
+        );
     }
 }
