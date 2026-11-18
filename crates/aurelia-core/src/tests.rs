@@ -5821,3 +5821,71 @@ mod canvas_lifecycle {
         }
     }
 }
+
+#[cfg(test)]
+mod resample_alpha_tests {
+    use crate::document::Document;
+    use crate::layer::{LayerBuffer, PixelFormat};
+
+    fn eight_bit(pixels: [[u8; 4]; 2]) -> Document {
+        let mut doc = Document::new(2, 1);
+        doc.is_transparent = true;
+        doc.layers[0].set_pixels(pixels.concat());
+        doc
+    }
+
+    /// A transparent neighbour carries its own colour (the usual case after an erase or a PNG
+    /// import). Straight-alpha interpolation averages that colour in and produces a saturated
+    /// fringe; premultiplied interpolation must keep the edge red and stop at the coverage.
+    #[test]
+    fn transparent_saturated_edge_does_not_bleed_colour() {
+        let mut doc = eight_bit([[255, 0, 0, 255], [0, 0, 255, 0]]);
+        doc.scale_canvas(3, 1, true);
+        let pixels = doc.layers[0].as_srgb8_exact();
+        assert_eq!(
+            &pixels[4..8],
+            &[255, 0, 0, 128],
+            "the half-covered edge stays red with 50% coverage, not purple"
+        );
+    }
+
+    /// Asymmetric coverage: an opaque red next to a half-transparent blue. The result must be
+    /// weighted by coverage (170/85 at 192 alpha), not an equal average (128/128).
+    #[test]
+    fn partially_transparent_pixels_interpolate_premultiplied() {
+        let mut doc = eight_bit([[255, 0, 0, 255], [0, 0, 255, 128]]);
+        doc.scale_canvas(3, 1, true);
+        let pixels = doc.layers[0].as_srgb8_exact();
+        assert_eq!(
+            &pixels[4..8],
+            &[170, 0, 85, 192],
+            "colour is weighted by the neighbouring coverage"
+        );
+        assert_ne!(&pixels[4..8], &[128, 0, 128, 192], "straight-alpha average");
+    }
+
+    /// The same invariant on the native 16-bit path, where there is no lattice to hide behind.
+    #[test]
+    fn sixteen_bit_transparent_edge_does_not_bleed_colour() {
+        let mut doc = Document::new_with_format(2, 1, PixelFormat::Srgb16);
+        doc.is_transparent = true;
+        *doc.layers[0].buffer_mut() = LayerBuffer::Srgb16(vec![65535, 0, 0, 65535, 0, 0, 65535, 0]);
+        doc.scale_canvas(3, 1, true);
+        match doc.layers[0].buffer() {
+            LayerBuffer::Srgb16(channels) => {
+                assert_eq!(&channels[4..8], &[65535, 0, 0, 32768]);
+            }
+            LayerBuffer::Srgb8(_) => panic!("16-bit scaling must keep 16-bit storage"),
+        }
+    }
+
+    /// Opaque content keeps the historical arithmetic exactly (the baseline digest test pins the
+    /// whole-image case; this pins a single sample).
+    #[test]
+    fn opaque_samples_keep_the_historical_arithmetic() {
+        let mut doc = eight_bit([[10, 20, 30, 255], [200, 100, 50, 255]]);
+        doc.scale_canvas(3, 1, true);
+        let pixels = doc.layers[0].as_srgb8_exact();
+        assert_eq!(&pixels[4..8], &[105, 60, 40, 255]);
+    }
+}

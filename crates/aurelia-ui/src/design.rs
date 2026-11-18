@@ -125,12 +125,12 @@ pub fn gloss(painter: &Painter, rect: Rect, rounding: Rounding, base: Color32, s
     painter.hline(
         egui::Rangef::new(rect.left() + inset, rect.right() - inset),
         rect.top() + 0.5,
-        Stroke::new(1.0, INNER_GLOW),
+        Stroke::new(1.0_f32, INNER_GLOW),
     );
     painter.hline(
         egui::Rangef::new(rect.left() + inset, rect.right() - inset),
         rect.bottom() - 0.5,
-        Stroke::new(1.0, Color32::from_black_alpha(70)),
+        Stroke::new(1.0_f32, Color32::from_black_alpha(70)),
     );
 }
 
@@ -150,14 +150,14 @@ pub fn spaced(text: &str) -> String {
 pub fn panel_frame(fill: Color32) -> egui::Frame {
     egui::Frame::none()
         .fill(fill)
-        .stroke(Stroke::new(1.0, HAIRLINE))
+        .stroke(Stroke::new(1.0_f32, HAIRLINE))
         .inner_margin(PANEL_PAD)
 }
 
 pub fn bar_frame(fill: Color32) -> egui::Frame {
     egui::Frame::none()
         .fill(fill)
-        .stroke(Stroke::new(1.0, HAIRLINE))
+        .stroke(Stroke::new(1.0_f32, HAIRLINE))
         .inner_margin(egui::Margin::symmetric(PANEL_PAD, 5.0))
 }
 
@@ -194,7 +194,7 @@ pub fn chip(ui: &mut Ui, text: RichText, accent: Color32) -> Response {
             20,
         ))
         .stroke(Stroke::new(
-            1.0,
+            1.0_f32,
             Color32::from_rgba_unmultiplied(accent.r(), accent.g(), accent.b(), 110),
         ))
         .rounding(Rounding::same(6.0))
@@ -258,7 +258,7 @@ pub fn gloss_button(
             rect,
             rounding,
             Stroke::new(
-                1.0,
+                1.0_f32,
                 Color32::from_rgba_unmultiplied(
                     accent.r(),
                     accent.g(),
@@ -268,7 +268,7 @@ pub fn gloss_button(
             ),
         );
     } else {
-        painter.rect_stroke(rect, rounding, Stroke::new(1.0, HAIRLINE));
+        painter.rect_stroke(rect, rounding, Stroke::new(1.0_f32, HAIRLINE));
     }
 
     let text_color = if active {
@@ -343,9 +343,13 @@ pub fn slider_row(
 /// Equal-width button, used for the tool shelf, presets and canvas ops grids.
 pub fn grid_button(ui: &mut Ui, text: &str, active: bool, accent: Color32, width: f32) -> bool {
     let (fill, stroke, colour) = if active {
-        (accent.linear_multiply(0.30), Stroke::new(1.0, accent), TEXT)
+        (
+            accent.linear_multiply(0.30),
+            Stroke::new(1.0_f32, accent),
+            TEXT,
+        )
     } else {
-        (INK_RAISED, Stroke::new(1.0, HAIRLINE), TEXT_DIM)
+        (INK_RAISED, Stroke::new(1.0_f32, HAIRLINE), TEXT_DIM)
     };
     ui.add(
         egui::Button::new(RichText::new(text).size(11.5).color(colour))

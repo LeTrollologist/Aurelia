@@ -85,7 +85,7 @@ fn render_tool_button(
             painter.rect_stroke(
                 rect,
                 rounding,
-                Stroke::new(1.0, accent_c32.linear_multiply(0.90)),
+                Stroke::new(1.0_f32, accent_c32.linear_multiply(0.90)),
             );
             // Slim accent bar on the leading edge marks the active tool.
             let bar = egui::Rect::from_min_size(
@@ -98,7 +98,7 @@ fn render_tool_button(
                 rect,
                 rounding,
                 Stroke::new(
-                    1.0,
+                    1.0_f32,
                     Color32::from_rgba_unmultiplied(
                         accent_c32.r(),
                         accent_c32.g(),
@@ -108,7 +108,7 @@ fn render_tool_button(
                 ),
             );
         } else {
-            painter.rect_stroke(rect, rounding, Stroke::new(1.0, design::HAIRLINE));
+            painter.rect_stroke(rect, rounding, Stroke::new(1.0_f32, design::HAIRLINE));
         }
 
         // Vector icon, vertically centred in the row.
@@ -272,7 +272,7 @@ fn title_button(ui: &mut egui::Ui, kind: TitleButtonKind, maximized: bool) -> bo
     response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
     if response.has_focus() {
         ui.painter()
-            .rect_stroke(rect.shrink(1.0), 0.0, Stroke::new(1.0, design::GOLD));
+            .rect_stroke(rect.shrink(1.0), 0.0, Stroke::new(1.0_f32, design::GOLD));
     }
     let hovered = response.hovered();
     let close = matches!(kind, TitleButtonKind::Close);
@@ -293,7 +293,7 @@ fn title_button(ui: &mut egui::Ui, kind: TitleButtonKind, maximized: bool) -> bo
     } else {
         design::TEXT
     };
-    let stroke = Stroke::new(1.3, colour);
+    let stroke = Stroke::new(1.3_f32, colour);
     let centre = rect.center();
     match kind {
         TitleButtonKind::Minimize => {
@@ -348,7 +348,7 @@ fn render_title_bar(ui: &mut egui::Ui, state: &mut AppState) {
     ui.painter().rect_filled(bar, 0.0, design::INK_PANEL_TOP);
     ui.painter().line_segment(
         [bar.left_bottom(), bar.right_bottom()],
-        Stroke::new(1.0, design::HAIRLINE),
+        Stroke::new(1.0_f32, design::HAIRLINE),
     );
     ui.set_min_height(TITLE_BAR_HEIGHT);
     ui.horizontal(|ui| {
@@ -2351,7 +2351,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                     rect.expand(2.0),
                                     egui::Rounding::same(10.0),
                                     egui::Stroke::new(
-                                        1.0,
+                                        1.0_f32,
                                         Color32::from_rgba_unmultiplied(
                                             accent_c32.r(),
                                             accent_c32.g(),
@@ -2379,7 +2379,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 rect,
                                 rr,
                                 egui::Stroke::new(
-                                    if active { 2.0 } else { 1.0 },
+                                    if active { 2.0 } else { 1.0_f32 },
                                     if active { accent_c32 } else { design::HAIRLINE },
                                 ),
                             );
@@ -2467,7 +2467,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             painter.rect_stroke(
                                 rect,
                                 rr,
-                                Stroke::new(if hover > 0.5 { 1.5 } else { 1.0 }, ring),
+                                Stroke::new(if hover > 0.5 { 1.5 } else { 1.0_f32 }, ring),
                             );
                             if resp.clicked() {
                                 if state.color_slot_is_secondary {
@@ -2618,9 +2618,9 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 design::mix(design::INK_PANEL_TOP, kind_tint, 0.05)
                             };
                             let stroke = if is_active {
-                                egui::Stroke::new(1.0, kind_tint.linear_multiply(0.80))
+                                egui::Stroke::new(1.0_f32, kind_tint.linear_multiply(0.80))
                             } else {
-                                egui::Stroke::new(1.0, design::HAIRLINE)
+                                egui::Stroke::new(1.0_f32, design::HAIRLINE)
                             };
 
                             egui::Frame::none()
@@ -2899,7 +2899,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                         .and_then(|pid| group_options.iter().find(|(gid, _)| *gid == pid).map(|(_, n)| n.as_str()))
                                                         .unwrap_or("Root");
 
-                                                    egui::ComboBox::from_id_source(format!("group_sel_{}", layer_id))
+                                                    egui::ComboBox::from_id_source(format!( "group_sel_{}_{}", layer_id, if is_adj { "adj" } else { "layer" } ))
                                                         .selected_text(current_name)
                                                         .show_ui(ui, |ui| {
                                                             if ui.selectable_label(current_parent_id.is_none(), "Root (No Folder)").clicked() {
@@ -2956,7 +2956,7 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                                         .and_then(|pid| group_options.iter().find(|(gid, _)| *gid == pid).map(|(_, n)| n.as_str()))
                                                         .unwrap_or("Root");
 
-                                                    egui::ComboBox::from_id_source(format!("group_sel_{}", layer_id))
+                                                    egui::ComboBox::from_id_source(format!( "group_sel_{}_{}", layer_id, if is_adj { "adj" } else { "layer" } ))
                                                         .selected_text(current_name)
                                                         .show_ui(ui, |ui| {
                                                             if ui.selectable_label(current_parent_id.is_none(), "Root (No Folder)").clicked() {
@@ -6961,7 +6961,7 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
                 let p = state.canvas_to_ui(glam::Vec2::new(guide.position, 0.0), win_w, win_h);
                 painter.line_segment(
                     [egui::pos2(p.x, clip.top()), egui::pos2(p.x, clip.bottom())],
-                    Stroke::new(1.0, guide_color),
+                    Stroke::new(1.0_f32, guide_color),
                 );
                 painter.text(
                     egui::pos2(p.x + 3.0, clip.top() + 2.0),
@@ -6975,7 +6975,7 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
                 let p = state.canvas_to_ui(glam::Vec2::new(0.0, guide.position), win_w, win_h);
                 painter.line_segment(
                     [egui::pos2(clip.left(), p.y), egui::pos2(clip.right(), p.y)],
-                    Stroke::new(1.0, guide_color),
+                    Stroke::new(1.0_f32, guide_color),
                 );
                 painter.text(
                     egui::pos2(clip.left() + 3.0, p.y + 2.0),
@@ -7002,7 +7002,8 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
             let normal = egui::vec2(-dir.y, dir.x);
             let half = 9.0;
             let body_fill = Color32::from_rgba_unmultiplied(32, 41, 54, 225);
-            let body_stroke = Stroke::new(1.0, Color32::from_rgba_unmultiplied(236, 208, 128, 220));
+            let body_stroke =
+                Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(236, 208, 128, 220));
             let corners = vec![
                 origin + normal * half,
                 end + normal * half,
@@ -7027,7 +7028,7 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
                 let extent = if major { half } else { half * 0.45 };
                 ruler_painter.line_segment(
                     [p + normal * extent, p - normal * extent],
-                    Stroke::new(1.0, tick_color),
+                    Stroke::new(1.0_f32, tick_color),
                 );
                 if major {
                     ruler_painter.text(
@@ -7053,8 +7054,8 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
                 egui::FontId::proportional(10.0),
                 Color32::from_rgb(255, 224, 150),
             );
-            ruler_painter.circle_stroke(end, 5.0, Stroke::new(1.5, handle_color));
-            ruler_painter.circle_stroke(origin, 3.0, Stroke::new(1.0, handle_color));
+            ruler_painter.circle_stroke(end, 5.0, Stroke::new(1.5_f32, handle_color));
+            ruler_painter.circle_stroke(origin, 3.0, Stroke::new(1.0_f32, handle_color));
         }
     }
 
@@ -7064,7 +7065,7 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
         let snap_color = Color32::from_rgba_unmultiplied(255, 210, 90, 240);
         let p = state.canvas_to_ui(point, win_w, win_h);
         let centre = egui::pos2(p.x, p.y);
-        painter.circle_stroke(centre, 5.0, Stroke::new(1.4, snap_color));
+        painter.circle_stroke(centre, 5.0, Stroke::new(1.4_f32, snap_color));
         painter.circle_filled(centre, 1.8, snap_color);
         if let Some(ruler) = state.straight_ruler {
             let dir = glam::Vec2::new(ruler.angle_rad.cos(), ruler.angle_rad.sin());
@@ -7072,7 +7073,7 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
             let b = state.canvas_to_ui(point + dir * 14.0, win_w, win_h);
             painter.line_segment(
                 [egui::pos2(a.x, a.y), egui::pos2(b.x, b.y)],
-                Stroke::new(1.2, snap_color),
+                Stroke::new(1.2_f32, snap_color),
             );
         }
     }
@@ -7084,13 +7085,13 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
                 let p = state.canvas_to_ui(glam::Vec2::new(marker.position, 0.0), win_w, win_h);
                 painter.line_segment(
                     [egui::pos2(p.x, clip.top()), egui::pos2(p.x, clip.bottom())],
-                    Stroke::new(1.0, snap_color),
+                    Stroke::new(1.0_f32, snap_color),
                 );
             } else {
                 let p = state.canvas_to_ui(glam::Vec2::new(0.0, marker.position), win_w, win_h);
                 painter.line_segment(
                     [egui::pos2(clip.left(), p.y), egui::pos2(clip.right(), p.y)],
-                    Stroke::new(1.0, snap_color),
+                    Stroke::new(1.0_f32, snap_color),
                 );
             }
         }
@@ -7101,20 +7102,20 @@ fn paint_guides(ctx: &egui::Context, state: &AppState) {
         let origin = egui::pos2(origin_v.x, origin_v.y);
         if viewport.contains(origin) {
             let handle = Color32::from_rgb(246, 196, 90);
-            painter.circle_stroke(origin, 4.0, Stroke::new(1.5, handle));
+            painter.circle_stroke(origin, 4.0, Stroke::new(1.5_f32, handle));
             painter.line_segment(
                 [
                     egui::pos2(origin.x - 7.0, origin.y),
                     egui::pos2(origin.x + 7.0, origin.y),
                 ],
-                Stroke::new(1.0, handle),
+                Stroke::new(1.0_f32, handle),
             );
             painter.line_segment(
                 [
                     egui::pos2(origin.x, origin.y - 7.0),
                     egui::pos2(origin.x, origin.y + 7.0),
                 ],
-                Stroke::new(1.0, handle),
+                Stroke::new(1.0_f32, handle),
             );
         }
     }

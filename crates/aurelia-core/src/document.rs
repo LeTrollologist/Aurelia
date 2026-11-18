@@ -1480,13 +1480,56 @@ fn resample_channels<C: Channel>(
                 let p10 = pixel(x1, y0);
                 let p01 = pixel(x0, y1);
                 let p11 = pixel(x1, y1);
+                let weights = [
+                    (1.0 - fx) * (1.0 - fy),
+                    fx * (1.0 - fy),
+                    (1.0 - fx) * fy,
+                    fx * fy,
+                ];
                 let mut result = [C::ZERO; 4];
-                for channel in 0..4 {
-                    let top = p00[channel].to_scaled_f32() * (1.0 - fx)
-                        + p10[channel].to_scaled_f32() * fx;
-                    let bottom = p01[channel].to_scaled_f32() * (1.0 - fx)
-                        + p11[channel].to_scaled_f32() * fx;
-                    result[channel] = C::from_scaled_f32(top * (1.0 - fy) + bottom * fy);
+                // Uniform alpha keeps the original arithmetic byte-for-byte. Mixed alpha is
+                // interpolated premultiplied, like the free-transform sampler: averaging colour
+                // and coverage independently lets a transparent neighbour's colour bleed into
+                // the edge (#47).
+                if p00[3] == p10[3] && p00[3] == p01[3] && p00[3] == p11[3] {
+                    // Same expression order as the pre-premultiplied code: opaque digests must
+                    // not move because of a floating-point reassociation.
+                    for channel in 0..4 {
+                        let top = p00[channel].to_scaled_f32() * (1.0 - fx)
+                            + p10[channel].to_scaled_f32() * fx;
+                        let bottom = p01[channel].to_scaled_f32() * (1.0 - fx)
+                            + p11[channel].to_scaled_f32() * fx;
+                        result[channel] = C::from_scaled_f32(top * (1.0 - fy) + bottom * fy);
+                    }
+                } else {
+                    let premultiply = |pixel: [C; 4]| -> [f32; 3] {
+                        let alpha = pixel[3].to_scaled_f32();
+                        [
+                            pixel[0].to_scaled_f32() * alpha,
+                            pixel[1].to_scaled_f32() * alpha,
+                            pixel[2].to_scaled_f32() * alpha,
+                        ]
+                    };
+                    let q00 = premultiply(p00);
+                    let q10 = premultiply(p10);
+                    let q01 = premultiply(p01);
+                    let q11 = premultiply(p11);
+                    let alpha_exact = p00[3].to_scaled_f32() * weights[0]
+                        + p10[3].to_scaled_f32() * weights[1]
+                        + p01[3].to_scaled_f32() * weights[2]
+                        + p11[3].to_scaled_f32() * weights[3];
+                    result[3] = C::from_scaled_f32(alpha_exact);
+                    if result[3] != C::ZERO {
+                        for channel in 0..3 {
+                            let premultiplied = q00[channel] * weights[0]
+                                + q10[channel] * weights[1]
+                                + q01[channel] * weights[2]
+                                + q11[channel] * weights[3];
+                            // Unpremultiply by the exact coverage, not the rounded channel, so a
+                            // half-covered edge does not lose a unit of colour.
+                            result[channel] = C::from_scaled_f32(premultiplied / alpha_exact);
+                        }
+                    }
                 }
                 result
             } else {
