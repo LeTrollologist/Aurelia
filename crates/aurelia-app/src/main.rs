@@ -1,4 +1,5 @@
 mod high_depth;
+mod system_fonts;
 
 use aurelia_core::brush::{BrushPoint, ToolType};
 use aurelia_core::history::LayerPixelsDeltaCommand;
@@ -3733,6 +3734,18 @@ unsafe extern "system" fn window_proc_impl(
                             app.state.load_custom_font(&path.to_string_lossy());
                         }
                     }
+                    PendingFileAction::LoadSystemFont(index) => {
+                        // Resolve the family to its installed file and load it through the same
+                        // path as a manually chosen font.
+                        if let Some(font) = app.state.system_fonts.get(index) {
+                            let path = font.path.to_string_lossy().to_string();
+                            let family = font.family.clone();
+                            if app.state.load_custom_font(&path) {
+                                app.state.text.font_name = family.clone();
+                                app.state.set_status(format!("Font: {family}"));
+                            }
+                        }
+                    }
                 }
             }
             // A Recent Projects entry is opened here, after the egui frame and independently of
@@ -4213,6 +4226,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app_state.right_panel_w *= dpi_scale;
     app_state.header_h *= dpi_scale;
     app_state.footer_h *= dpi_scale;
+    // Installed fonts: registry enumeration only, so startup does not parse font files.
+    app_state.system_fonts = system_fonts::installed()
+        .into_iter()
+        .map(|font| aurelia_ui::SystemFontEntry {
+            family: font.family,
+            path: font.path,
+        })
+        .collect();
     let egui_ctx = egui::Context::default();
     egui_ctx.set_pixels_per_point(dpi_scale);
     configure_aurelia_style(&egui_ctx, app_state.theme_accent_color());

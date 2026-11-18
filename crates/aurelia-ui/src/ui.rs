@@ -1639,6 +1639,30 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 state.pending_file_action = Some(PendingFileAction::LoadCustomFont);
                             }
 
+                            if !state.system_fonts.is_empty() {
+                                ui.add_space(3.0);
+                                ui.label(RichText::new("INSTALLED FONTS:").size(9.0).color(Color32::from_rgb(172, 161, 130)));
+                                let mut chosen: Option<usize> = None;
+                                egui::ComboBox::from_id_source("system_font_family")
+                                    .selected_text(state.text.font_name.clone())
+                                    .width(190.0)
+                                    .show_ui(ui, |ui| {
+                                        for (index, font) in state.system_fonts.iter().enumerate() {
+                                            if ui
+                                                .selectable_label(false, &font.family)
+                                                .on_hover_text(font.path.display().to_string())
+                                                .clicked()
+                                            {
+                                                chosen = Some(index);
+                                            }
+                                        }
+                                    });
+                                if let Some(index) = chosen {
+                                    state.pending_file_action =
+                                        Some(PendingFileAction::LoadSystemFont(index));
+                                }
+                            }
+
                             ui.add_space(3.0);
                             if ui.add(egui::Slider::new(&mut state.text.font_size, 6.0..=160.0).text("Font Size")).changed() {
                                 state.sync_active_text_layer();
@@ -5348,18 +5372,56 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
 
                                     ui.separator();
 
-                                    // Custom font button
-                                    if ui
-                                        .button("📂 Font")
-                                        .on_hover_text(format!(
-                                            "Current: {}\nClick to load custom TTF/OTF",
-                                            state.text.font_name
-                                        ))
-                                        .clicked()
-                                    {
-                                        state.pending_file_action =
-                                            Some(PendingFileAction::LoadCustomFont);
-                                    }
+                                    // Font menu: every installed family plus the manual file
+                                    // picker. This lives on the floating toolbar because the
+                                    // tool-properties panel is not scrollable.
+                                    let font_label = format!("🔤 {}", state.text.font_name);
+                                    ui.menu_button(font_label, |ui| {
+                                        if ui.button("📂 Load Font File (.ttf / .otf)…").clicked()
+                                        {
+                                            state.pending_file_action =
+                                                Some(PendingFileAction::LoadCustomFont);
+                                            ui.close_menu();
+                                        }
+                                        if !state.system_fonts.is_empty() {
+                                            ui.separator();
+                                            ui.label(RichText::new("INSTALLED FONTS").size(9.0));
+                                            egui::ScrollArea::vertical().max_height(320.0).show(
+                                                ui,
+                                                |ui| {
+                                                    let mut chosen: Option<usize> = None;
+                                                    for (index, font) in
+                                                        state.system_fonts.iter().enumerate()
+                                                    {
+                                                        let selected = state
+                                                            .text
+                                                            .font_name
+                                                            .eq_ignore_ascii_case(&font.family);
+                                                        if ui
+                                                            .selectable_label(
+                                                                selected,
+                                                                &font.family,
+                                                            )
+                                                            .on_hover_text(
+                                                                font.path.display().to_string(),
+                                                            )
+                                                            .clicked()
+                                                        {
+                                                            chosen = Some(index);
+                                                        }
+                                                    }
+                                                    if let Some(index) = chosen {
+                                                        state.pending_file_action = Some(
+                                                            PendingFileAction::LoadSystemFont(
+                                                                index,
+                                                            ),
+                                                        );
+                                                        ui.close_menu();
+                                                    }
+                                                },
+                                            );
+                                        }
+                                    });
 
                                     ui.separator();
 

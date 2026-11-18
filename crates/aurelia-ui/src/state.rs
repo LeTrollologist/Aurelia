@@ -325,6 +325,13 @@ pub enum PendingEditAction {
     CopyMerged,
 }
 
+/// One installed font the host discovered, ready for the text tool's font list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SystemFontEntry {
+    pub family: String,
+    pub path: PathBuf,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PendingFileAction {
     SaveProject,
@@ -339,6 +346,8 @@ pub enum PendingFileAction {
     ImportPresets,
     ExportPresets,
     LoadCustomFont,
+    /// Load the installed font at this index of [`AppState::system_fonts`].
+    LoadSystemFont(usize),
     NewCanvas(NewCanvasSpec),
 }
 
@@ -667,6 +676,9 @@ pub struct AppState {
     pub is_space_panning: bool,
     pub pan_drag_start: Option<Vec2>,
     pub pending_file_action: Option<PendingFileAction>,
+    /// Installed fonts the host discovered at startup, sorted by family name. The text tool
+    /// lists these; the host resolves the path when one is chosen.
+    pub system_fonts: Vec<SystemFontEntry>,
     /// Project or PSD a menu asked to open. The host loads it after the frame, so the unsaved
     /// changes prompt and the load never run inside the egui frame.
     pub pending_open_path: Option<PathBuf>,
@@ -997,6 +1009,7 @@ impl AppState {
             pan_drag_start: None,
             pending_file_action: None,
             pending_open_path: None,
+            system_fonts: Vec::new(),
             pending_edit_action: None,
             document_path: None,
             saved_generation: 0,
