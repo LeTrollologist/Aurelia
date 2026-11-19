@@ -38,6 +38,7 @@ fn styles() -> LayerStyles {
             color: Color::WHITE,
             opacity: 0.4,
         }),
+        ..LayerStyles::default()
     }
 }
 

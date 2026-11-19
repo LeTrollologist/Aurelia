@@ -27,11 +27,22 @@ pub struct LayerStyles {
     pub drop_shadow: Option<DropShadowStyle>,
     #[serde(default)]
     pub outer_glow: Option<OuterGlowStyle>,
+    #[serde(default)]
+    pub inner_shadow: Option<InnerShadowStyle>,
+    #[serde(default)]
+    pub inner_glow: Option<InnerGlowStyle>,
+    #[serde(default)]
+    pub bevel: Option<BevelStyle>,
 }
 
 impl LayerStyles {
     pub fn is_empty(&self) -> bool {
-        self.stroke.is_none() && self.drop_shadow.is_none() && self.outer_glow.is_none()
+        self.stroke.is_none()
+            && self.drop_shadow.is_none()
+            && self.outer_glow.is_none()
+            && self.inner_shadow.is_none()
+            && self.inner_glow.is_none()
+            && self.bevel.is_none()
     }
 
     /// Scales pixel lengths with a canvas resize. Offsets scale per axis; widths, blurs and
@@ -59,6 +70,26 @@ impl LayerStyles {
                 color: glow.color,
                 opacity: glow.opacity,
             }),
+            inner_shadow: self.inner_shadow.as_ref().map(|shadow| InnerShadowStyle {
+                offset_x: shadow.offset_x * scale_x,
+                offset_y: shadow.offset_y * scale_y,
+                blur: (shadow.blur * uniform).max(0.0),
+                color: shadow.color,
+                opacity: shadow.opacity,
+            }),
+            inner_glow: self.inner_glow.as_ref().map(|glow| InnerGlowStyle {
+                radius: (glow.radius * uniform).max(0.0),
+                color: glow.color,
+                opacity: glow.opacity,
+            }),
+            bevel: self.bevel.as_ref().map(|bevel| BevelStyle {
+                size: (bevel.size * uniform).max(0.0),
+                angle_deg: bevel.angle_deg,
+                depth: bevel.depth,
+                highlight: bevel.highlight,
+                shadow: bevel.shadow,
+                opacity: bevel.opacity,
+            }),
         }
     }
 
@@ -74,6 +105,17 @@ impl LayerStyles {
                 .outer_glow
                 .as_ref()
                 .is_some_and(|s| s.radius > 0.0 && s.opacity > 0.0)
+            || self.inner_shadow.as_ref().is_some_and(|s| {
+                s.opacity > 0.0 && (s.blur > 0.0 || s.offset_x != 0.0 || s.offset_y != 0.0)
+            })
+            || self
+                .inner_glow
+                .as_ref()
+                .is_some_and(|s| s.radius > 0.0 && s.opacity > 0.0)
+            || self
+                .bevel
+                .as_ref()
+                .is_some_and(|s| s.size > 0.0 && s.opacity > 0.0 && s.depth > 0.0)
     }
 }
 
@@ -99,6 +141,41 @@ pub struct DropShadowStyle {
 pub struct OuterGlowStyle {
     pub radius: f32,
     pub color: Color,
+    pub opacity: f32,
+}
+
+/// Shadow cast inward from the layer's silhouette; clipped by the layer's own alpha.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InnerShadowStyle {
+    pub offset_x: f32,
+    pub offset_y: f32,
+    /// Blur radius in pixels; 0 is a hard inner shadow.
+    pub blur: f32,
+    pub color: Color,
+    pub opacity: f32,
+}
+
+/// Glow that hugs the inside of the layer's silhouette; clipped by the layer's own alpha.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InnerGlowStyle {
+    pub radius: f32,
+    pub color: Color,
+    pub opacity: f32,
+}
+
+/// Bevel/emboss lit from `angle_deg` (degrees, screen space with y down, pointing toward the
+/// light). The edge normal comes from the gradient of a blurred alpha silhouette, which is
+/// deterministic and works for holes, islands and partly transparent edges.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BevelStyle {
+    /// Bevel width in pixels; the blur radius of the silhouette used for the normal field.
+    pub size: f32,
+    /// Direction toward the light in degrees (225 = upper-left, 45 = lower-right).
+    pub angle_deg: f32,
+    /// Strength of the highlight/shadow, 0..=1.
+    pub depth: f32,
+    pub highlight: Color,
+    pub shadow: Color,
     pub opacity: f32,
 }
 
@@ -130,6 +207,42 @@ impl Default for OuterGlowStyle {
             radius: 8.0,
             color: Color::BRAND_GOLD,
             opacity: 0.8,
+        }
+    }
+}
+
+impl Default for InnerShadowStyle {
+    fn default() -> Self {
+        Self {
+            offset_x: 4.0,
+            offset_y: 4.0,
+            blur: 8.0,
+            color: Color::BLACK,
+            opacity: 0.6,
+        }
+    }
+}
+
+impl Default for InnerGlowStyle {
+    fn default() -> Self {
+        Self {
+            radius: 8.0,
+            color: Color::WHITE,
+            opacity: 0.6,
+        }
+    }
+}
+
+impl Default for BevelStyle {
+    fn default() -> Self {
+        Self {
+            size: 6.0,
+            // Pointing toward the upper-left of the screen.
+            angle_deg: 225.0,
+            depth: 0.6,
+            highlight: Color::WHITE,
+            shadow: Color::BLACK,
+            opacity: 0.7,
         }
     }
 }
@@ -255,6 +368,22 @@ fn effect_support(styles: &LayerStyles) -> u32 {
         {
             let offset = shadow.offset_x.abs().max(shadow.offset_y.abs()).ceil() as u32;
             support = support.max(offset + blur_support(shadow.blur));
+        }
+    }
+    // Inner effects blur the *inverse* silhouette, which is 1 over the whole empty area. The
+    // bounded rectangle must therefore include the same margin as an outer effect, or the blur
+    // window would see a zero boundary that the full canvas does not have.
+    if let Some(shadow) = &styles.inner_shadow {
+        if shadow.opacity > 0.0
+            && (shadow.blur > 0.0 || shadow.offset_x != 0.0 || shadow.offset_y != 0.0)
+        {
+            let offset = shadow.offset_x.abs().max(shadow.offset_y.abs()).ceil() as u32;
+            support = support.max(offset + blur_support(shadow.blur));
+        }
+    }
+    if let Some(glow) = &styles.inner_glow {
+        if glow.radius > 0.0 && glow.opacity > 0.0 {
+            support = support.max(blur_support(glow.radius));
         }
     }
     support
@@ -429,6 +558,129 @@ fn render_rect<C: Channel>(
         }
     }
 
+    // Inner effects paint *on top of* the layer and are clipped by its own alpha, in the same
+    // fixed order Photoshop applies them: inner shadow, inner glow, bevel.
+    if let Some(inner) = &styles.inner_shadow {
+        if inner.opacity > 0.0
+            && (inner.blur > 0.0 || inner.offset_x != 0.0 || inner.offset_y != 0.0)
+        {
+            // Inverse coverage, shifted opposite the light and blurred, then clipped by the
+            // layer alpha. Multiplying by `alpha` keeps fractional coverage intact instead of
+            // turning the silhouette into a binary mask.
+            let mut mask = vec![0.0_f32; n];
+            let dx = inner.offset_x.round() as i32;
+            let dy = inner.offset_y.round() as i32;
+            for ly in 0..sh as i32 {
+                for lx in 0..sw as i32 {
+                    let sx = lx - dx;
+                    let sy = ly - dy;
+                    if sx < 0 || sy < 0 || sx >= sw as i32 || sy >= sh as i32 {
+                        continue;
+                    }
+                    mask[(ly as usize) * sw + lx as usize] =
+                        1.0 - alpha[(sy as usize) * sw + sx as usize].clamp(0.0, 1.0);
+                }
+            }
+            if inner.blur > 0.0 {
+                blur(&mut mask, sw as u32, sh as u32, inner.blur);
+            }
+            let color = inner.color.to_rgba8();
+            let opacity = inner.opacity.clamp(0.0, 1.0);
+            for index in 0..n {
+                let coverage = mask[index].clamp(0.0, 1.0) * alpha[index].clamp(0.0, 1.0);
+                mix_inside(
+                    &mut canvas[index],
+                    [
+                        color[0] as f32 / 255.0,
+                        color[1] as f32 / 255.0,
+                        color[2] as f32 / 255.0,
+                    ],
+                    coverage * opacity,
+                );
+            }
+        }
+    }
+
+    if let Some(glow) = &styles.inner_glow {
+        if glow.opacity > 0.0 && glow.radius > 0.0 {
+            let mut mask: Vec<f32> = alpha
+                .iter()
+                .map(|value| 1.0 - value.clamp(0.0, 1.0))
+                .collect();
+            blur(&mut mask, sw as u32, sh as u32, glow.radius);
+            let color = glow.color.to_rgba8();
+            let opacity = glow.opacity.clamp(0.0, 1.0);
+            for index in 0..n {
+                let coverage = mask[index].clamp(0.0, 1.0) * alpha[index].clamp(0.0, 1.0);
+                mix_inside(
+                    &mut canvas[index],
+                    [
+                        color[0] as f32 / 255.0,
+                        color[1] as f32 / 255.0,
+                        color[2] as f32 / 255.0,
+                    ],
+                    coverage * opacity,
+                );
+            }
+        }
+    }
+
+    if let Some(bevel) = &styles.bevel {
+        if bevel.size > 0.0 && bevel.opacity > 0.0 && bevel.depth > 0.0 {
+            // Deterministic normal field: gradient of the blurred silhouette. Central
+            // differences with clamped borders; the normal points outward (away from the
+            // covered area). Holes and islands produce their own local normals.
+            let mut soft = alpha.clone();
+            blur(&mut soft, sw as u32, sh as u32, bevel.size);
+            let angle = bevel.angle_deg.to_radians();
+            let light_x = angle.cos();
+            let light_y = angle.sin();
+            let highlight = bevel.highlight.to_rgba8();
+            let shadow = bevel.shadow.to_rgba8();
+            let depth = bevel.depth.clamp(0.0, 1.0);
+            let opacity = bevel.opacity.clamp(0.0, 1.0);
+            let edge_scale = bevel.size * 2.0 + 1.0;
+            for ly in 0..sh {
+                for lx in 0..sw {
+                    let index = ly * sw + lx;
+                    let inside = alpha[index].clamp(0.0, 1.0);
+                    if inside <= 0.0 {
+                        continue;
+                    }
+                    let left = soft[ly * sw + lx.saturating_sub(1)];
+                    let right = soft[ly * sw + (lx + 1).min(sw - 1)];
+                    let up = soft[ly.saturating_sub(1) * sw + lx];
+                    let down = soft[(ly + 1).min(sh - 1) * sw + lx];
+                    let gx = right - left;
+                    let gy = down - up;
+                    let length = (gx * gx + gy * gy).sqrt();
+                    if length < 1e-6 {
+                        continue;
+                    }
+                    // Outward normal is the negative gradient.
+                    let nx = -gx / length;
+                    let ny = -gy / length;
+                    let lambert = nx * light_x + ny * light_y;
+                    let edge = (length * edge_scale).clamp(0.0, 1.0);
+                    let tint = (lambert.abs() * edge * depth * opacity * inside).clamp(0.0, 1.0);
+                    if tint <= 0.0 {
+                        continue;
+                    }
+                    let color = if lambert >= 0.0 { highlight } else { shadow };
+                    mix_inside(
+                        &mut canvas[index],
+                        [
+                            color[0] as f32 / 255.0,
+                            color[1] as f32 / 255.0,
+                            color[2] as f32 / 255.0,
+                        ],
+                        tint,
+                    );
+                }
+            }
+        }
+    }
+
     for ly in 0..sh {
         let gy = y0 as usize + ly;
         for lx in 0..sw {
@@ -443,6 +695,21 @@ fn render_rect<C: Channel>(
         }
     }
     out
+}
+
+/// Mixes an inner-effect colour into an existing pixel without changing its alpha.
+///
+/// Inner effects live inside the layer: they tint the pixels the layer already covers, so the
+/// silhouette (including fractional alpha) must survive the effect untouched.
+fn mix_inside(dst: &mut [f32; 4], color: [f32; 3], amount: f32) {
+    let t = amount.clamp(0.0, 1.0);
+    if t <= 0.0 {
+        return;
+    }
+    let inv = 1.0 - t;
+    dst[0] = dst[0] * inv + color[0] * t;
+    dst[1] = dst[1] * inv + color[1] * t;
+    dst[2] = dst[2] * inv + color[2] * t;
 }
 
 /// Straight-alpha source-over into a straight-alpha destination.
@@ -838,6 +1105,7 @@ mod bounded_equivalence {
                 color: Color::WHITE,
                 opacity: 0.4,
             }),
+            ..LayerStyles::default()
         }
     }
 
@@ -900,11 +1168,7 @@ mod bounded_equivalence {
             layer.styles = styles();
             assert_equivalent(&layer);
 
-            layer.styles = LayerStyles {
-                stroke: None,
-                drop_shadow: None,
-                outer_glow: None,
-            };
+            layer.styles = LayerStyles::default();
             assert_equivalent(&layer);
         }
     }
@@ -997,6 +1261,26 @@ mod bounded_randomized {
                     color: Color::WHITE,
                     opacity: rng.unit(),
                 }),
+                inner_shadow: (rng.next().is_multiple_of(2)).then(|| InnerShadowStyle {
+                    offset_x: (rng.unit() - 0.5) * 20.0,
+                    offset_y: (rng.unit() - 0.5) * 20.0,
+                    blur: rng.unit() * 12.0,
+                    color: Color::BLACK,
+                    opacity: rng.unit(),
+                }),
+                inner_glow: (rng.next().is_multiple_of(2)).then(|| InnerGlowStyle {
+                    radius: rng.unit() * 12.0,
+                    color: Color::WHITE,
+                    opacity: rng.unit(),
+                }),
+                bevel: (rng.next().is_multiple_of(2)).then(|| BevelStyle {
+                    size: rng.unit() * 10.0 + 0.5,
+                    angle_deg: rng.unit() * 360.0,
+                    depth: rng.unit(),
+                    highlight: Color::WHITE,
+                    shadow: Color::BLACK,
+                    opacity: rng.unit(),
+                }),
             };
             layer.styles = styles;
 
@@ -1015,5 +1299,263 @@ mod bounded_randomized {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod inner_effects_and_bevel {
+    use super::*;
+
+    fn layer(width: u32, height: u32) -> Vec<u8> {
+        vec![0u8; (width as usize) * (height as usize) * 4]
+    }
+
+    fn put(pixels: &mut [u8], width: u32, x: u32, y: u32, rgba: [u8; 4]) {
+        let at = ((y as usize) * width as usize + x as usize) * 4;
+        pixels[at..at + 4].copy_from_slice(&rgba);
+    }
+
+    fn get(pixels: &[u8], width: u32, x: u32, y: u32) -> [u8; 4] {
+        let at = ((y as usize) * width as usize + x as usize) * 4;
+        [pixels[at], pixels[at + 1], pixels[at + 2], pixels[at + 3]]
+    }
+
+    fn luminance(pixel: [u8; 4]) -> u32 {
+        pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32
+    }
+
+    #[test]
+    fn inner_shadow_preserves_alpha_and_fractional_coverage() {
+        // Two opaque white pixels, each with a different alpha, on an otherwise transparent
+        // 8x4 strip. A hard inner shadow shifted by (1, 0) darkens each pixel by its own
+        // coverage: full for alpha 255, about half for alpha 128.
+        let width = 8;
+        let height = 4;
+        let mut source = layer(width, height);
+        put(&mut source, width, 2, 1, [255, 255, 255, 255]);
+        put(&mut source, width, 5, 1, [255, 255, 255, 128]);
+        // Give each a transparent neighbour to its left so the shifted inverse mask is 1.
+        let styles = LayerStyles {
+            inner_shadow: Some(InnerShadowStyle {
+                offset_x: 1.0,
+                offset_y: 0.0,
+                blur: 0.0,
+                color: Color::BLACK,
+                opacity: 1.0,
+            }),
+            ..LayerStyles::default()
+        };
+        let out = render(&source, width, height, &styles);
+        // Alpha is never changed by an inner effect.
+        for index in 0..width as usize * height as usize {
+            assert_eq!(
+                out[index * 4 + 3],
+                source[index * 4 + 3],
+                "alpha at {index}"
+            );
+        }
+        let opaque = get(&out, width, 2, 1);
+        let half = get(&out, width, 5, 1);
+        assert_eq!(opaque, [0, 0, 0, 255], "full coverage goes fully black");
+        assert_eq!(half[3], 128, "partial alpha is preserved");
+        assert!(
+            half[0] > 0 && half[0] < 255,
+            "a half-covered pixel takes a fractional shadow, got {half:?}"
+        );
+        // Transparent pixels stay transparent and colourless.
+        assert_eq!(get(&out, width, 0, 0), [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn inner_shadow_reaches_a_hole_but_not_outside_the_shape() {
+        // 3x3 opaque block with a transparent centre; a hard shadow shifted left casts from the
+        // hole. The pixel right of the hole darkens, the far corner does not.
+        let width = 3;
+        let height = 3;
+        let mut source = layer(width, height);
+        for y in 0..3 {
+            for x in 0..3 {
+                put(&mut source, width, x, y, [255, 255, 255, 255]);
+            }
+        }
+        put(&mut source, width, 1, 1, [0, 0, 0, 0]);
+        let styles = LayerStyles {
+            inner_shadow: Some(InnerShadowStyle {
+                offset_x: 1.0,
+                offset_y: 0.0,
+                blur: 0.0,
+                color: Color::BLACK,
+                opacity: 1.0,
+            }),
+            ..LayerStyles::default()
+        };
+        let out = render(&source, width, height, &styles);
+        assert_eq!(
+            get(&out, width, 2, 1),
+            [0, 0, 0, 255],
+            "shadow at the hole edge"
+        );
+        assert_eq!(
+            get(&out, width, 0, 0),
+            [255, 255, 255, 255],
+            "far corner untouched"
+        );
+        assert_eq!(
+            get(&out, width, 1, 1),
+            [0, 0, 0, 0],
+            "the hole stays transparent"
+        );
+    }
+
+    #[test]
+    fn inner_glow_stays_inside_and_keeps_alpha() {
+        // An opaque block inset in a transparent canvas, so the inverse silhouette exists inside
+        // the styled rectangle and the glow can hug the block's edge.
+        let width = 15;
+        let height = 15;
+        let mut source = layer(width, height);
+        for y in 3..12 {
+            for x in 3..12 {
+                put(&mut source, width, x, y, [100, 100, 100, 255]);
+            }
+        }
+        let styles = LayerStyles {
+            inner_glow: Some(InnerGlowStyle {
+                radius: 2.0,
+                color: Color::WHITE,
+                opacity: 1.0,
+            }),
+            ..LayerStyles::default()
+        };
+        let out = render(&source, width, height, &styles);
+        for index in 0..width as usize * height as usize {
+            assert_eq!(
+                out[index * 4 + 3],
+                source[index * 4 + 3],
+                "alpha at {index}"
+            );
+        }
+        assert!(
+            luminance(get(&out, width, 3, 3)) > luminance(get(&out, width, 7, 7)),
+            "the glow hugs the edge, the centre stays unchanged"
+        );
+        assert_eq!(get(&out, width, 7, 7), [100, 100, 100, 255]);
+        assert_eq!(get(&out, width, 0, 0), [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn bevel_lights_the_upper_left_and_shades_the_lower_right() {
+        let width = 11;
+        let height = 11;
+        let mut source = layer(width, height);
+        for y in 0..11 {
+            for x in 0..11 {
+                put(&mut source, width, x, y, [128, 128, 128, 255]);
+            }
+        }
+        let styles = LayerStyles {
+            bevel: Some(BevelStyle {
+                size: 3.0,
+                angle_deg: 225.0, // light from the upper-left
+                depth: 1.0,
+                highlight: Color::WHITE,
+                shadow: Color::BLACK,
+                opacity: 1.0,
+            }),
+            ..LayerStyles::default()
+        };
+        let out = render(&source, width, height, &styles);
+        let top_left = get(&out, width, 1, 1);
+        let bottom_right = get(&out, width, 9, 9);
+        let centre = get(&out, width, 5, 5);
+        assert!(
+            luminance(top_left) > luminance(centre),
+            "upper-left edge should be lit: {top_left:?} vs {centre:?}"
+        );
+        assert!(
+            luminance(bottom_right) < luminance(centre),
+            "lower-right edge should be shaded: {bottom_right:?} vs {centre:?}"
+        );
+        for index in 0..width as usize * height as usize {
+            assert_eq!(out[index * 4 + 3], 255, "bevel must not change alpha");
+        }
+    }
+
+    #[test]
+    fn bevel_is_deterministic_on_one_pixel_details() {
+        let width = 6;
+        let height = 6;
+        let mut source = layer(width, height);
+        for x in 0..6 {
+            put(&mut source, width, x, 3, [200, 120, 40, 255]);
+        }
+        let styles = LayerStyles {
+            bevel: Some(BevelStyle {
+                size: 1.0,
+                angle_deg: 45.0,
+                depth: 0.8,
+                highlight: Color::WHITE,
+                shadow: Color::BLACK,
+                opacity: 0.9,
+            }),
+            ..LayerStyles::default()
+        };
+        let first = render(&source, width, height, &styles);
+        let second = render(&source, width, height, &styles);
+        assert_eq!(first, second, "bevel output must be deterministic");
+        for index in 0..width as usize * height as usize {
+            assert_eq!(first[index * 4 + 3], source[index * 4 + 3]);
+        }
+    }
+
+    #[test]
+    fn inner_effects_work_on_sixteen_bit_layers() {
+        let width = 11;
+        let height = 11;
+        let mut source = vec![0u16; width as usize * height as usize * 4];
+        for y in 3..8 {
+            for x in 3..8 {
+                let at = ((y as usize) * width as usize + x as usize) * 4;
+                source[at] = 32768;
+                source[at + 1] = 32768;
+                source[at + 2] = 32768;
+                source[at + 3] = 65535;
+            }
+        }
+        let styles = LayerStyles {
+            bevel: Some(BevelStyle {
+                size: 2.0,
+                angle_deg: 225.0,
+                depth: 1.0,
+                highlight: Color::WHITE,
+                shadow: Color::BLACK,
+                opacity: 1.0,
+            }),
+            inner_glow: Some(InnerGlowStyle {
+                radius: 2.0,
+                color: Color::WHITE,
+                opacity: 0.5,
+            }),
+            ..LayerStyles::default()
+        };
+        let out = render(&source, width, height, &styles);
+        for index in 0..width as usize * height as usize {
+            assert_eq!(
+                out[index * 4 + 3],
+                source[index * 4 + 3],
+                "alpha at {index}"
+            );
+        }
+        let at = |x: u32, y: u32| -> u16 { out[((y as usize) * width as usize + x as usize) * 4] };
+        assert!(
+            at(3, 3) > at(5, 5),
+            "the lit corner is brighter at 16-bit: {} vs {}",
+            at(3, 3),
+            at(5, 5)
+        );
+        assert!(
+            at(3, 3) > 32768 || at(8, 8) < 32768,
+            "the effect is evaluated, not skipped"
+        );
     }
 }

@@ -16,9 +16,9 @@ pub mod ui;
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub use dialogs::{
-    export_image_dialog, export_png_dialog, export_preset_dialog, import_preset_dialog,
-    open_brush_dialog, open_font_dialog, open_icc_dialog, open_image_dialog, open_project_dialog,
-    save_project_dialog,
+    export_image_dialog, export_png_dialog, export_preset_dialog, export_style_presets_dialog,
+    import_preset_dialog, import_style_presets_dialog, open_brush_dialog, open_font_dialog,
+    open_icc_dialog, open_image_dialog, open_project_dialog, save_project_dialog,
 };
 pub use shell::{is_shell_registered, register_shell_associations, unregister_shell_associations};
 pub use state::{AppState, PendingFileAction, SystemFontEntry, WindowAction};

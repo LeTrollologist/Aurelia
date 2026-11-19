@@ -3127,6 +3127,74 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 }
                             }
 
+                            // Inner shadow
+                            let mut inner_shadow_on = styles.inner_shadow.is_some();
+                            if ui.checkbox(&mut inner_shadow_on, "Inner Shadow").changed() {
+                                styles.inner_shadow = inner_shadow_on.then(aurelia_core::layer_style::InnerShadowStyle::default);
+                                changed = true;
+                                finished = true;
+                            }
+                            if let Some(inner) = &mut styles.inner_shadow {
+                                changed |= ui.add(egui::Slider::new(&mut inner.offset_x, -64.0..=64.0).text("Offset X")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut inner.offset_y, -64.0..=64.0).text("Offset Y")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut inner.blur, 0.0..=60.0).text("Blur")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut inner.opacity, 0.0..=1.0).text("Opacity")).changed();
+                                let rgba = inner.color.to_rgba8();
+                                let mut rgb = [rgba[0], rgba[1], rgba[2]];
+                                if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                    inner.color = Color::from_rgba8(rgb[0], rgb[1], rgb[2], rgba[3]);
+                                    changed = true;
+                                    finished = true;
+                                }
+                            }
+
+                            // Inner glow
+                            let mut inner_glow_on = styles.inner_glow.is_some();
+                            if ui.checkbox(&mut inner_glow_on, "Inner Glow").changed() {
+                                styles.inner_glow = inner_glow_on.then(aurelia_core::layer_style::InnerGlowStyle::default);
+                                changed = true;
+                                finished = true;
+                            }
+                            if let Some(glow) = &mut styles.inner_glow {
+                                changed |= ui.add(egui::Slider::new(&mut glow.radius, 0.5..=60.0).text("Radius")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut glow.opacity, 0.0..=1.0).text("Opacity")).changed();
+                                let rgba = glow.color.to_rgba8();
+                                let mut rgb = [rgba[0], rgba[1], rgba[2]];
+                                if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                    glow.color = Color::from_rgba8(rgb[0], rgb[1], rgb[2], rgba[3]);
+                                    changed = true;
+                                    finished = true;
+                                }
+                            }
+
+                            // Bevel / emboss
+                            let mut bevel_on = styles.bevel.is_some();
+                            if ui.checkbox(&mut bevel_on, "Bevel / Emboss").changed() {
+                                styles.bevel = bevel_on.then(aurelia_core::layer_style::BevelStyle::default);
+                                changed = true;
+                                finished = true;
+                            }
+                            if let Some(bevel) = &mut styles.bevel {
+                                changed |= ui.add(egui::Slider::new(&mut bevel.size, 0.5..=60.0).text("Size")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut bevel.angle_deg, 0.0..=360.0).text("Light angle")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut bevel.depth, 0.0..=1.0).text("Depth")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut bevel.opacity, 0.0..=1.0).text("Opacity")).changed();
+                                let highlight = bevel.highlight.to_rgba8();
+                                let mut rgb = [highlight[0], highlight[1], highlight[2]];
+                                if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                    bevel.highlight = Color::from_rgba8(rgb[0], rgb[1], rgb[2], highlight[3]);
+                                    changed = true;
+                                    finished = true;
+                                }
+                                let shadow = bevel.shadow.to_rgba8();
+                                let mut rgb = [shadow[0], shadow[1], shadow[2]];
+                                if ui.color_edit_button_srgb(&mut rgb).changed() {
+                                    bevel.shadow = Color::from_rgba8(rgb[0], rgb[1], rgb[2], shadow[3]);
+                                    changed = true;
+                                    finished = true;
+                                }
+                            }
+
                             if changed {
                                 state.begin_layer_style_edit(active_id);
                                 if let Some(layer) = state.document.get_layer_mut(active_id) {
@@ -3141,6 +3209,69 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                             // change, so it cannot be detected from `changed`).
                             if !ui.input(|i| i.pointer.primary_down()) {
                                 state.finish_layer_style_edit();
+                            }
+
+                            ui.add_space(4.0);
+                            ui.separator();
+                            design::section(ui, "STYLE PRESETS");
+                            let mut apply_index: Option<usize> = None;
+                            let mut delete_index: Option<usize> = None;
+                            ui.horizontal(|ui| {
+                                if !state.style_presets.is_empty() {
+                                    egui::ComboBox::from_id_source("style_preset_combo")
+                                        .selected_text("Apply a style preset")
+                                        .width(180.0)
+                                        .show_ui(ui, |ui| {
+                                            for (index, preset) in state.style_presets.iter().enumerate() {
+                                                if ui.selectable_label(false, &preset.name).clicked() {
+                                                    apply_index = Some(index);
+                                                }
+                                            }
+                                        });
+                                } else {
+                                    ui.label(RichText::new("No style presets yet").size(9.0));
+                                }
+                                if ui.small_button("Import…").clicked() {
+                                    state.pending_file_action = Some(PendingFileAction::ImportStylePresets);
+                                }
+                                if ui.small_button("Export…").clicked() {
+                                    state.pending_file_action = Some(PendingFileAction::ExportStylePresets);
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut state.style_preset_name)
+                                        .desired_width(130.0)
+                                        .hint_text("Preset name"),
+                                );
+                                if ui.small_button("Save style").clicked() {
+                                    state.save_current_style_preset();
+                                }
+                            });
+                            if !state.style_presets.is_empty() {
+                                egui::ScrollArea::vertical().max_height(84.0).show(ui, |ui| {
+                                    for (index, preset) in state.style_presets.iter().enumerate() {
+                                        ui.horizontal(|ui| {
+                                            if ui.small_button("✕").on_hover_text("Delete this preset").clicked() {
+                                                delete_index = Some(index);
+                                            }
+                                            ui.label(RichText::new(&preset.name).size(10.0));
+                                        });
+                                    }
+                                });
+                            }
+                            if let Some(index) = apply_index {
+                                state.apply_style_preset(index);
+                            }
+                            if let Some(index) = delete_index {
+                                state.delete_style_preset(index);
+                            }
+                            if let Some(error) = &state.style_preset_error {
+                                ui.label(
+                                    RichText::new(error)
+                                        .size(9.0)
+                                        .color(Color32::from_rgb(224, 112, 92)),
+                                );
                             }
                         }
                     }

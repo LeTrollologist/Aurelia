@@ -75,3 +75,18 @@ pub fn open_font_dialog() -> Option<PathBuf> {
         .add_filter("Font Files (*.ttf, *.otf)", &["ttf", "otf"])
         .pick_file()
 }
+
+pub fn import_style_presets_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Import Style Presets")
+        .add_filter("Aurelia style presets (*.aurp)", &["aurp"])
+        .pick_file()
+}
+
+pub fn export_style_presets_dialog() -> Option<PathBuf> {
+    rfd::FileDialog::new()
+        .set_title("Export Style Presets")
+        .add_filter("Aurelia style presets (*.aurp)", &["aurp"])
+        .set_file_name("styles.aurp")
+        .save_file()
+}

@@ -29,6 +29,7 @@ fn fixture_document() -> Document {
             color: Color::WHITE,
             opacity: 0.4,
         }),
+        ..LayerStyles::default()
     };
     doc.editor = EditorState {
         guides: vec![

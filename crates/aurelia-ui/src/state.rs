@@ -354,6 +354,8 @@ pub enum PendingFileAction {
     ImportPresets,
     ExportPresets,
     LoadCustomFont,
+    ImportStylePresets,
+    ExportStylePresets,
     /// Load the installed font at this index of [`AppState::system_fonts`].
     LoadSystemFont(usize),
     NewCanvas(NewCanvasSpec),
@@ -816,6 +818,10 @@ pub struct AppState {
     pub active_gradient_preset_idx: Option<usize>,
     /// Last preset import/save error, shown in the shelf instead of silently ignoring it.
     pub preset_error: Option<String>,
+    /// Layer-style presets, loaded from `styles.aurp`; separate from the brush library.
+    pub style_presets: Vec<aurelia_core::style_store::StylePreset>,
+    pub style_preset_error: Option<String>,
+    pub style_preset_name: String,
     pub show_preset_manager: bool,
 
     // ── Frame Animation & Timeline Strip ──
@@ -1116,6 +1122,9 @@ impl AppState {
             gradient_presets: aurelia_core::brush::GradientPreset::default_library(),
             active_gradient_preset_idx: Some(0),
             preset_error: None,
+            style_presets: Vec::new(),
+            style_preset_error: None,
+            style_preset_name: String::new(),
             show_preset_manager: false,
 
             timeline: aurelia_core::animation::AnimationTimeline::new(width, height),
@@ -6188,5 +6197,207 @@ mod property_transaction_tests {
             Some(0.0),
             "undo restores the previous values"
         );
+    }
+}
+
+/// Layer-style preset library (`styles.aurp`), kept separate from the brush/gradient library.
+impl AppState {
+    pub fn style_preset_path() -> PathBuf {
+        // A path override keeps tests and portable installs off the real profile; the normal
+        // location is next to the brush library.
+        if let Some(path) = std::env::var_os("AURELIA_STYLE_PRESETS_PATH") {
+            return PathBuf::from(path);
+        }
+        Self::autosave_dir()
+            .parent()
+            .map(|dir| dir.join("styles.aurp"))
+            .unwrap_or_else(|| std::env::temp_dir().join("aurelia-styles.aurp"))
+    }
+
+    fn style_preset_library(&self) -> aurelia_core::style_store::StylePresetLibrary {
+        aurelia_core::style_store::StylePresetLibrary {
+            presets: self.style_presets.clone(),
+        }
+    }
+
+    /// Loads the library. A missing file is an empty library; a corrupt one is reported and
+    /// leaves the in-memory list untouched rather than silently deleting user presets.
+    pub fn load_style_presets(&mut self) {
+        match aurelia_core::style_store::load_style_library(&Self::style_preset_path()) {
+            Ok(library) => {
+                self.style_presets = library.presets;
+                self.style_preset_error = None;
+            }
+            Err(error) => {
+                self.style_preset_error = Some(error.to_string());
+            }
+        }
+    }
+
+    pub fn save_style_presets(&mut self) -> Result<(), String> {
+        match aurelia_core::style_store::save_style_library(
+            &self.style_preset_library(),
+            &Self::style_preset_path(),
+        ) {
+            Ok(()) => {
+                self.style_preset_error = None;
+                Ok(())
+            }
+            Err(error) => {
+                let message = error.to_string();
+                self.style_preset_error = Some(message.clone());
+                Err(message)
+            }
+        }
+    }
+
+    /// Saves the active layer's style stack under the name in `style_preset_name`. An existing
+    /// preset with the same name is replaced; otherwise the list grows within the store bound.
+    pub fn save_current_style_preset(&mut self) -> bool {
+        let active_id = self.document.active_layer_id;
+        let Some(styles) = self
+            .document
+            .get_layer(active_id)
+            .map(|layer| layer.styles.clone())
+        else {
+            return false;
+        };
+        if styles.is_empty() {
+            self.style_preset_error = Some("This layer has no styles to save".into());
+            return false;
+        }
+        let requested = self.style_preset_name.trim().to_string();
+        let name = if requested.is_empty() {
+            format!("Style {}", self.style_presets.len() + 1)
+        } else {
+            requested
+        };
+        if let Some(existing) = self
+            .style_presets
+            .iter_mut()
+            .find(|preset| preset.name.eq_ignore_ascii_case(&name))
+        {
+            existing.styles = styles;
+        } else {
+            self.style_presets
+                .push(aurelia_core::style_store::StylePreset::new(
+                    name.clone(),
+                    styles,
+                ));
+        }
+        self.style_preset_name.clear();
+        match self.save_style_presets() {
+            Ok(()) => {
+                self.set_status(format!("Saved style preset '{name}'"));
+                true
+            }
+            Err(error) => {
+                self.set_status(format!("Could not save style preset: {error}"));
+                false
+            }
+        }
+    }
+
+    /// Applies a preset to the active layer as one undoable style edit.
+    pub fn apply_style_preset(&mut self, index: usize) -> bool {
+        let Some(preset) = self.style_presets.get(index).cloned() else {
+            return false;
+        };
+        let active_id = self.document.active_layer_id;
+        let stylable = self
+            .document
+            .get_layer(active_id)
+            .is_some_and(|layer| layer.is_raster() || layer.is_text());
+        if !stylable {
+            self.style_preset_error = Some("Select a raster or text layer to apply a style".into());
+            return false;
+        }
+        self.begin_layer_style_edit(active_id);
+        if let Some(layer) = self.document.get_layer_mut(active_id) {
+            layer.styles = preset.styles;
+        }
+        self.finish_layer_style_edit();
+        self.mark_canvas_dirty();
+        self.set_status(format!("Applied style preset '{}'", preset.name));
+        true
+    }
+
+    pub fn delete_style_preset(&mut self, index: usize) -> bool {
+        if index >= self.style_presets.len() {
+            return false;
+        }
+        let removed = self.style_presets.remove(index);
+        let _ = self.save_style_presets();
+        self.set_status(format!("Deleted style preset '{}'", removed.name));
+        true
+    }
+
+    pub fn import_style_presets(&mut self, path: &Path) -> Result<(), String> {
+        let library = aurelia_core::style_store::load_style_library(path)
+            .map_err(|error| error.to_string())?;
+        self.style_presets = library.presets;
+        self.save_style_presets()?;
+        self.set_status(format!(
+            "Imported {} style preset(s)",
+            self.style_presets.len()
+        ));
+        Ok(())
+    }
+
+    pub fn export_style_presets(&mut self, path: &Path) -> Result<(), String> {
+        aurelia_core::style_store::save_style_library(&self.style_preset_library(), path)
+            .map_err(|error| error.to_string())?;
+        self.set_status("Exported style presets");
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod style_preset_tests {
+    use super::AppState;
+    use aurelia_core::layer_style::InnerGlowStyle;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn style_presets_save_load_apply_and_undo() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("aurelia-style-presets-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).expect("temp dir");
+        let path = directory.join("styles.aurp");
+        std::env::set_var("AURELIA_STYLE_PRESETS_PATH", &path);
+
+        let mut state = AppState::new(32, 32);
+        let id = state.document.layers[0].id;
+        if let Some(layer) = state.document.get_layer_mut(id) {
+            layer.styles.inner_glow = Some(InnerGlowStyle {
+                radius: 3.0,
+                color: aurelia_core::color::Color::WHITE,
+                opacity: 0.5,
+            });
+        }
+        state.style_preset_name = "Halo".into();
+        assert!(state.save_current_style_preset());
+        assert_eq!(state.style_presets.len(), 1);
+        assert!(path.exists(), "the library is written to the override path");
+
+        let mut loaded = AppState::new(16, 16);
+        loaded.load_style_presets();
+        assert_eq!(loaded.style_presets.len(), 1, "the library reloads");
+        loaded.mark_saved();
+
+        assert!(loaded.apply_style_preset(0));
+        assert!(loaded.document.layers[0].styles.inner_glow.is_some());
+        assert!(loaded.is_dirty(), "applying a preset is an undoable edit");
+        loaded.history.undo(&mut loaded.document);
+        assert!(loaded.document.layers[0].styles.is_empty());
+
+        assert!(loaded.delete_style_preset(0));
+        assert!(loaded.style_presets.is_empty());
+
+        std::env::remove_var("AURELIA_STYLE_PRESETS_PATH");
+        let _ = std::fs::remove_dir_all(&directory);
     }
 }

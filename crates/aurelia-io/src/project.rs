@@ -457,7 +457,10 @@ fn write_layer_styles<W: Write>(doc: &Document, writer: &mut W) -> Result<(), Pr
         return Ok(());
     }
     let mut payload = Vec::new();
-    payload.push(1u8); // styles payload version
+    // Version 2 adds inner shadow, inner glow and bevel. Version 1 payloads still parse (see
+    // `parse_layer_styles`); new builds always write 2, and an older reader that rejects the
+    // version ignores the whole optional section instead of guessing at an unknown layout.
+    payload.push(2u8); // styles payload version
     payload.extend_from_slice(&(styled.len() as u32).to_le_bytes());
     for layer in styled {
         payload.extend_from_slice(&layer.id.to_le_bytes());
@@ -471,6 +474,15 @@ fn write_layer_styles<W: Write>(doc: &Document, writer: &mut W) -> Result<(), Pr
         }
         if styles.outer_glow.is_some() {
             flags |= 4;
+        }
+        if styles.inner_shadow.is_some() {
+            flags |= 8;
+        }
+        if styles.inner_glow.is_some() {
+            flags |= 16;
+        }
+        if styles.bevel.is_some() {
+            flags |= 32;
         }
         payload.push(flags);
         if let Some(stroke) = &styles.stroke {
@@ -489,6 +501,26 @@ fn write_layer_styles<W: Write>(doc: &Document, writer: &mut W) -> Result<(), Pr
             payload.extend_from_slice(&glow.radius.to_le_bytes());
             payload.extend_from_slice(&glow.opacity.to_le_bytes());
             payload.extend_from_slice(&glow.color.to_rgba8());
+        }
+        if let Some(inner) = &styles.inner_shadow {
+            payload.extend_from_slice(&inner.offset_x.to_le_bytes());
+            payload.extend_from_slice(&inner.offset_y.to_le_bytes());
+            payload.extend_from_slice(&inner.blur.to_le_bytes());
+            payload.extend_from_slice(&inner.opacity.to_le_bytes());
+            payload.extend_from_slice(&inner.color.to_rgba8());
+        }
+        if let Some(glow) = &styles.inner_glow {
+            payload.extend_from_slice(&glow.radius.to_le_bytes());
+            payload.extend_from_slice(&glow.opacity.to_le_bytes());
+            payload.extend_from_slice(&glow.color.to_rgba8());
+        }
+        if let Some(bevel) = &styles.bevel {
+            payload.extend_from_slice(&bevel.size.to_le_bytes());
+            payload.extend_from_slice(&bevel.angle_deg.to_le_bytes());
+            payload.extend_from_slice(&bevel.depth.to_le_bytes());
+            payload.extend_from_slice(&bevel.opacity.to_le_bytes());
+            payload.extend_from_slice(&bevel.highlight.to_rgba8());
+            payload.extend_from_slice(&bevel.shadow.to_rgba8());
         }
     }
     if payload.len() > STYLE_MAX_BYTES as usize {
@@ -555,7 +587,10 @@ fn parse_layer_styles(
     payload: &[u8],
 ) -> Option<Vec<(u64, aurelia_core::layer_style::LayerStyles)>> {
     use aurelia_core::color::Color;
-    use aurelia_core::layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
+    use aurelia_core::layer_style::{
+        BevelStyle, DropShadowStyle, InnerGlowStyle, InnerShadowStyle, LayerStyles, OuterGlowStyle,
+        StrokeStyle,
+    };
 
     struct Cursor<'a> {
         data: &'a [u8],
@@ -591,7 +626,9 @@ fn parse_layer_styles(
         at: 0,
     };
     let version = cursor.u8()?;
-    if version != 1 {
+    // Version 1 has stroke/shadow/outer glow; version 2 appends the inner effects and bevel.
+    // Anything else is an unknown layout: ignore the section rather than misreading it.
+    if version != 1 && version != 2 {
         return None;
     }
     let count = cursor.u32()? as usize;
@@ -639,6 +676,48 @@ fn parse_layer_styles(
                 color,
                 opacity,
             });
+        }
+        if version >= 2 {
+            if flags & 8 != 0 {
+                let offset_x = cursor.f32()?;
+                let offset_y = cursor.f32()?;
+                let blur = cursor.f32()?.max(0.0);
+                let opacity = cursor.f32()?.clamp(0.0, 1.0);
+                let color = cursor.color()?;
+                styles.inner_shadow = Some(InnerShadowStyle {
+                    offset_x,
+                    offset_y,
+                    blur,
+                    color,
+                    opacity,
+                });
+            }
+            if flags & 16 != 0 {
+                let radius = cursor.f32()?.max(0.0);
+                let opacity = cursor.f32()?.clamp(0.0, 1.0);
+                let color = cursor.color()?;
+                styles.inner_glow = Some(InnerGlowStyle {
+                    radius,
+                    color,
+                    opacity,
+                });
+            }
+            if flags & 32 != 0 {
+                let size = cursor.f32()?.max(0.0);
+                let angle_deg = cursor.f32()?;
+                let depth = cursor.f32()?.clamp(0.0, 1.0);
+                let opacity = cursor.f32()?.clamp(0.0, 1.0);
+                let highlight = cursor.color()?;
+                let shadow = cursor.color()?;
+                styles.bevel = Some(BevelStyle {
+                    size,
+                    angle_deg,
+                    depth,
+                    highlight,
+                    shadow,
+                    opacity,
+                });
+            }
         }
         out.push((id, styles));
     }
@@ -1566,5 +1645,44 @@ mod tests {
         let mut bytes = DecodeBudget::new(0).expect("budget");
         assert!(bytes.reserve(0, MAX_PROJECT_DECODED_BYTES).is_ok());
         assert!(bytes.reserve(0, 1).is_err());
+    }
+}
+
+#[cfg(test)]
+mod asty_compatibility_tests {
+    use super::parse_layer_styles;
+
+    fn v1_payload() -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.push(1u8); // version 1: stroke, drop shadow, outer glow only
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        payload.extend_from_slice(&7u64.to_le_bytes());
+        payload.push(1u8); // stroke flag
+        payload.extend_from_slice(&2.5f32.to_le_bytes()); // width
+        payload.extend_from_slice(&0.75f32.to_le_bytes()); // opacity
+        payload.extend_from_slice(&[10, 20, 30, 255]); // colour
+        payload
+    }
+
+    #[test]
+    fn version_one_styles_still_parse_and_default_the_new_effects() {
+        let parsed = parse_layer_styles(&v1_payload()).expect("v1 payload must parse");
+        assert_eq!(parsed.len(), 1);
+        let (id, styles) = &parsed[0];
+        assert_eq!(*id, 7);
+        assert!(styles.stroke.is_some());
+        assert!(styles.inner_shadow.is_none());
+        assert!(styles.inner_glow.is_none());
+        assert!(styles.bevel.is_none());
+    }
+
+    #[test]
+    fn an_unknown_style_version_is_ignored() {
+        let mut payload = v1_payload();
+        payload[0] = 3;
+        assert!(
+            parse_layer_styles(&payload).is_none(),
+            "an unknown ASTY version must be ignored, not misread"
+        );
     }
 }

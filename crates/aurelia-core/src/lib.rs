@@ -16,6 +16,7 @@ pub mod pixel;
 pub mod preset_store;
 pub mod rasterizer;
 pub mod selection;
+pub mod style_store;
 pub mod symmetry;
 pub mod transform;
 

@@ -76,3 +76,41 @@ fn damaged_optional_section_is_ignored_not_fatal() {
     let _ = std::fs::remove_file(&path);
     assert!(loaded.get_layer(id).expect("layer").styles.is_empty());
 }
+
+#[test]
+fn inner_effects_and_bevel_round_trip() {
+    use aurelia_core::layer_style::{BevelStyle, InnerGlowStyle, InnerShadowStyle};
+
+    let mut doc = Document::new(24, 24);
+    let id = doc.active_layer_id;
+    let layer = doc.get_layer_mut(id).expect("layer");
+    layer.styles.inner_shadow = Some(InnerShadowStyle {
+        offset_x: 3.0,
+        offset_y: -2.0,
+        blur: 5.0,
+        color: Color::from_hex("#203040").expect("colour"),
+        opacity: 0.6,
+    });
+    layer.styles.inner_glow = Some(InnerGlowStyle {
+        radius: 4.0,
+        color: Color::from_hex("#ffeeaa").expect("colour"),
+        opacity: 0.35,
+    });
+    layer.styles.bevel = Some(BevelStyle {
+        size: 6.5,
+        angle_deg: 225.0,
+        depth: 0.7,
+        highlight: Color::WHITE,
+        shadow: Color::BLACK,
+        opacity: 0.55,
+    });
+
+    let path = temp_path("inner");
+    save_project_file(&doc, &path).expect("save");
+    let loaded = load_project_file(&path).expect("load");
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(
+        loaded.get_layer(id).expect("layer").styles,
+        doc.get_layer(id).expect("source").styles
+    );
+}

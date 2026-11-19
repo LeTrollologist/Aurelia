@@ -99,25 +99,36 @@ least one layer has styles:
 magic           4 bytes   "ASTY"
 payload_len     u32 LE    bytes after this field (1 .. 1 MiB)
 payload:
-  version       u8        1
+  version       u8        1 or 2 (new files write 2)
   count         u32 LE    layers with styles
   each entry:
     layer_id    u64 LE
-    flags       u8        bit0 stroke, bit1 drop shadow, bit2 outer glow
+    flags       u8        bit0 stroke, bit1 drop shadow, bit2 outer glow,
+                          bit3 inner shadow, bit4 inner glow, bit5 bevel
     stroke:     width f32, opacity f32, r/g/b/a u8   (if bit0)
     shadow:     offset x/y f32, blur f32, opacity f32, r/g/b/a u8 (if bit1)
     glow:       radius f32, opacity f32, r/g/b/a u8   (if bit2)
+    inner shadow: offset x/y f32, blur f32, opacity f32, r/g/b/a u8 (if bit3, v2)
+    inner glow:   radius f32, opacity f32, r/g/b/a u8               (if bit4, v2)
+    bevel:        size f32, angle_deg f32, depth f32, opacity f32,
+                  highlight r/g/b/a u8, shadow r/g/b/a u8           (if bit5, v2)
 ```
 
 Semantics:
 
+- Version 2 appends inner shadow, inner glow and bevel. Version 1 payloads still load, with the
+  new effects `None`; new builds always write 2. An unknown version is ignored (the document loads
+  without styles), so the section never blocks a load.
+- **Loss on resave:** a build older than v2 ignores the section entirely; if that build saves the
+  project, the v2-only styles are dropped. This is the same forward-compatibility rule as any
+  unknown trailing section, and the v3.18 release notes state it.
 - Optional and additive: a file without the section loads with empty styles, and a file saved by
   an older build simply ends earlier. The container version is unchanged.
 - The section is ignored when it is absent, truncated, longer than 1 MiB, has an unknown version,
   a count above 100 000 or larger than the payload can hold (9 bytes per entry), or non-finite
   floats. A damaged optional section never fails the load.
-- Opacity is clamped to `0..=1` and width/radius/blur to `>= 0` on read; unknown flag bits are
-  skipped by their field layout only through known versions, so a future bit requires a version
+- Opacity and bevel depth are clamped to `0..=1`, width/radius/blur/size to `>= 0`, and the bevel
+  angle is kept as authored, on read. Flags beyond the version's field layout require a version
   bump.
 - Styles never change layer pixels or the layer record; they are a composite-time property.
 

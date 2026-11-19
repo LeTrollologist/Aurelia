@@ -5553,7 +5553,10 @@ mod layer_style_composite {
 
 mod deferred_style_semantics {
     use crate::color::Color;
-    use crate::layer_style::{DropShadowStyle, LayerStyles, OuterGlowStyle, StrokeStyle};
+    use crate::layer_style::{
+        BevelStyle, DropShadowStyle, InnerGlowStyle, InnerShadowStyle, LayerStyles, OuterGlowStyle,
+        StrokeStyle,
+    };
     use crate::Document;
 
     fn glow_style(radius: f32) -> LayerStyles {
@@ -5625,6 +5628,26 @@ mod deferred_style_semantics {
                 color: Color::WHITE,
                 opacity: 0.4,
             }),
+            inner_shadow: Some(InnerShadowStyle {
+                offset_x: 2.0,
+                offset_y: -1.0,
+                blur: 3.0,
+                color: Color::BLACK,
+                opacity: 0.5,
+            }),
+            inner_glow: Some(InnerGlowStyle {
+                radius: 3.0,
+                color: Color::WHITE,
+                opacity: 0.4,
+            }),
+            bevel: Some(BevelStyle {
+                size: 2.0,
+                angle_deg: 225.0,
+                depth: 0.5,
+                highlight: Color::WHITE,
+                shadow: Color::BLACK,
+                opacity: 0.5,
+            }),
         };
 
         doc.scale_canvas_with_styles(20, 20, true, true);
@@ -5636,6 +5659,14 @@ mod deferred_style_semantics {
             (6.0, 4.0, 8.0)
         );
         assert_eq!(styles.outer_glow.as_ref().unwrap().radius, 8.0);
+        let inner = styles.inner_shadow.as_ref().unwrap();
+        assert_eq!(
+            (inner.offset_x, inner.offset_y, inner.blur),
+            (4.0, -2.0, 6.0)
+        );
+        assert_eq!(styles.inner_glow.as_ref().unwrap().radius, 6.0);
+        let bevel = styles.bevel.as_ref().unwrap();
+        assert_eq!((bevel.size, bevel.angle_deg), (4.0, 225.0));
 
         let mut unscaled = Document::new(10, 10);
         let id = unscaled.active_layer_id;

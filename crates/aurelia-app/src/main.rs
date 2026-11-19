@@ -3742,6 +3742,20 @@ unsafe extern "system" fn window_proc_impl(
                             }
                         }
                     }
+                    PendingFileAction::ImportStylePresets => {
+                        if let Some(path) = aurelia_ui::import_style_presets_dialog() {
+                            if let Err(error) = app.state.import_style_presets(&path) {
+                                app.state.style_preset_error = Some(error);
+                            }
+                        }
+                    }
+                    PendingFileAction::ExportStylePresets => {
+                        if let Some(path) = aurelia_ui::export_style_presets_dialog() {
+                            if let Err(error) = app.state.export_style_presets(&path) {
+                                app.state.style_preset_error = Some(error);
+                            }
+                        }
+                    }
                     PendingFileAction::LoadCustomFont => {
                         if let Some(path) = aurelia_ui::open_font_dialog() {
                             app.state.load_custom_font(&path.to_string_lossy());
@@ -4191,6 +4205,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     app_state.load_preferences();
+    app_state.load_style_presets();
 
     // Offer crash-recovery snapshots left behind by a previous session. This scans the whole
     // autosave directory, not just the current document: a fresh launch has no document path,
@@ -4236,6 +4251,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(doc) => {
                         app_state = AppState::from_document(doc);
                         app_state.load_preferences();
+                        app_state.load_style_presets();
                         app_state.mark_dirty();
                         app_state
                             .set_status("Recovered autosave snapshot - use Save As to keep it");
