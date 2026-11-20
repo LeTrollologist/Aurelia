@@ -457,10 +457,11 @@ fn write_layer_styles<W: Write>(doc: &Document, writer: &mut W) -> Result<(), Pr
         return Ok(());
     }
     let mut payload = Vec::new();
-    // Version 2 adds inner shadow, inner glow and bevel. Version 1 payloads still parse (see
-    // `parse_layer_styles`); new builds always write 2, and an older reader that rejects the
-    // version ignores the whole optional section instead of guessing at an unknown layout.
-    payload.push(2u8); // styles payload version
+    // Version 3 appends soften/contour/gloss to the bevel entry; version 2 added the inner
+    // effects; version 1 has the three original effects. All three versions parse, and new
+    // builds always write 3; an older reader that rejects the version ignores the whole
+    // optional section instead of guessing at an unknown layout.
+    payload.push(3u8); // styles payload version
     payload.extend_from_slice(&(styled.len() as u32).to_le_bytes());
     for layer in styled {
         payload.extend_from_slice(&layer.id.to_le_bytes());
@@ -521,6 +522,9 @@ fn write_layer_styles<W: Write>(doc: &Document, writer: &mut W) -> Result<(), Pr
             payload.extend_from_slice(&bevel.opacity.to_le_bytes());
             payload.extend_from_slice(&bevel.highlight.to_rgba8());
             payload.extend_from_slice(&bevel.shadow.to_rgba8());
+            payload.extend_from_slice(&bevel.soften.to_le_bytes());
+            payload.extend_from_slice(&bevel.contour.to_le_bytes());
+            payload.extend_from_slice(&bevel.gloss.to_le_bytes());
         }
     }
     if payload.len() > STYLE_MAX_BYTES as usize {
@@ -626,9 +630,10 @@ fn parse_layer_styles(
         at: 0,
     };
     let version = cursor.u8()?;
-    // Version 1 has stroke/shadow/outer glow; version 2 appends the inner effects and bevel.
-    // Anything else is an unknown layout: ignore the section rather than misreading it.
-    if version != 1 && version != 2 {
+    // Version 1 has stroke/shadow/outer glow; version 2 appends the inner effects and bevel;
+    // version 3 appends the bevel's soften/contour/gloss. Anything else is an unknown layout:
+    // ignore the section rather than misreading it.
+    if version != 1 && version != 2 && version != 3 {
         return None;
     }
     let count = cursor.u32()? as usize;
@@ -709,10 +714,22 @@ fn parse_layer_styles(
                 let opacity = cursor.f32()?.clamp(0.0, 1.0);
                 let highlight = cursor.color()?;
                 let shadow = cursor.color()?;
+                let (soften, contour, gloss) = if version >= 3 {
+                    (
+                        cursor.f32()?.clamp(0.0, 1.0),
+                        cursor.f32()?.clamp(-1.0, 1.0),
+                        cursor.f32()?.clamp(0.0, 1.0),
+                    )
+                } else {
+                    (0.0, 0.0, 0.0)
+                };
                 styles.bevel = Some(BevelStyle {
                     size,
                     angle_deg,
                     depth,
+                    soften,
+                    contour,
+                    gloss,
                     highlight,
                     shadow,
                     opacity,
@@ -1679,10 +1696,60 @@ mod asty_compatibility_tests {
     #[test]
     fn an_unknown_style_version_is_ignored() {
         let mut payload = v1_payload();
-        payload[0] = 3;
+        payload[0] = 4;
         assert!(
             parse_layer_styles(&payload).is_none(),
             "an unknown ASTY version must be ignored, not misread"
         );
+    }
+}
+
+#[cfg(test)]
+mod asty_v3_tests {
+    use super::parse_layer_styles;
+
+    fn bevel_payload(version: u8, extras: Option<[f32; 3]>) -> Vec<u8> {
+        let mut payload = Vec::new();
+        payload.push(version);
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        payload.extend_from_slice(&11u64.to_le_bytes());
+        payload.push(32u8); // bevel flag
+        payload.extend_from_slice(&4.0f32.to_le_bytes()); // size
+        payload.extend_from_slice(&225.0f32.to_le_bytes()); // angle
+        payload.extend_from_slice(&0.5f32.to_le_bytes()); // depth
+        payload.extend_from_slice(&0.8f32.to_le_bytes()); // opacity
+        payload.extend_from_slice(&[255, 255, 255, 255]); // highlight
+        payload.extend_from_slice(&[0, 0, 0, 255]); // shadow
+        if let Some([soften, contour, gloss]) = extras {
+            payload.extend_from_slice(&soften.to_le_bytes());
+            payload.extend_from_slice(&contour.to_le_bytes());
+            payload.extend_from_slice(&gloss.to_le_bytes());
+        }
+        payload
+    }
+
+    #[test]
+    fn version_two_bevels_default_the_new_controls() {
+        let parsed = parse_layer_styles(&bevel_payload(2, None)).expect("v2 bevel must parse");
+        let bevel = parsed[0].1.bevel.as_ref().expect("bevel");
+        assert_eq!((bevel.soften, bevel.contour, bevel.gloss), (0.0, 0.0, 0.0));
+        assert_eq!(bevel.size, 4.0);
+    }
+
+    #[test]
+    fn version_three_round_trips_the_bevel_controls_and_clamps_them() {
+        let parsed =
+            parse_layer_styles(&bevel_payload(3, Some([2.5, -4.0, 9.0]))).expect("v3 bevel");
+        let bevel = parsed[0].1.bevel.as_ref().expect("bevel");
+        assert_eq!(bevel.soften, 1.0, "soften clamps to 0..=1");
+        assert_eq!(bevel.contour, -1.0, "contour clamps to -1..=1");
+        assert_eq!(bevel.gloss, 1.0, "gloss clamps to 0..=1");
+    }
+
+    #[test]
+    fn a_truncated_version_three_bevel_is_ignored() {
+        let mut payload = bevel_payload(3, Some([0.5, 0.5, 0.5]));
+        payload.truncate(payload.len() - 4);
+        assert!(parse_layer_styles(&payload).is_none());
     }
 }

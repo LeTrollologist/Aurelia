@@ -86,6 +86,9 @@ impl LayerStyles {
                 size: (bevel.size * uniform).max(0.0),
                 angle_deg: bevel.angle_deg,
                 depth: bevel.depth,
+                soften: bevel.soften,
+                contour: bevel.contour,
+                gloss: bevel.gloss,
                 highlight: bevel.highlight,
                 shadow: bevel.shadow,
                 opacity: bevel.opacity,
@@ -174,6 +177,15 @@ pub struct BevelStyle {
     pub angle_deg: f32,
     /// Strength of the highlight/shadow, 0..=1.
     pub depth: f32,
+    /// Widens the normal field beyond `size` (0 = crisp, 1 = three times the radius).
+    #[serde(default)]
+    pub soften: f32,
+    /// Shapes the rim falloff, -1..=1: positive is a tighter rim, negative a broader one.
+    #[serde(default)]
+    pub contour: f32,
+    /// Sharpens the lit side, 0..=1: higher values concentrate the highlight.
+    #[serde(default)]
+    pub gloss: f32,
     pub highlight: Color,
     pub shadow: Color,
     pub opacity: f32,
@@ -240,6 +252,9 @@ impl Default for BevelStyle {
             // Pointing toward the upper-left of the screen.
             angle_deg: 225.0,
             depth: 0.6,
+            soften: 0.0,
+            contour: 0.0,
+            gloss: 0.0,
             highlight: Color::WHITE,
             shadow: Color::BLACK,
             opacity: 0.7,
@@ -630,8 +645,9 @@ fn render_rect<C: Channel>(
             // Deterministic normal field: gradient of the blurred silhouette. Central
             // differences with clamped borders; the normal points outward (away from the
             // covered area). Holes and islands produce their own local normals.
+            let field_radius = (bevel.size * (1.0 + bevel.soften.clamp(0.0, 1.0) * 2.0)).max(0.5);
             let mut soft = alpha.clone();
-            blur(&mut soft, sw as u32, sh as u32, bevel.size);
+            blur(&mut soft, sw as u32, sh as u32, field_radius);
             let angle = bevel.angle_deg.to_radians();
             let light_x = angle.cos();
             let light_y = angle.sin();
@@ -639,7 +655,11 @@ fn render_rect<C: Channel>(
             let shadow = bevel.shadow.to_rgba8();
             let depth = bevel.depth.clamp(0.0, 1.0);
             let opacity = bevel.opacity.clamp(0.0, 1.0);
-            let edge_scale = bevel.size * 2.0 + 1.0;
+            let edge_scale = field_radius * 2.0 + 1.0;
+            // Contour reshapes the rim ramp: positive tightens it, negative broadens it.
+            let edge_exponent = 2f32.powf(bevel.contour.clamp(-1.0, 1.0));
+            // Gloss concentrates the lit side into a sharper specular.
+            let gloss_exponent = 1.0 + bevel.gloss.clamp(0.0, 1.0) * 3.0;
             for ly in 0..sh {
                 for lx in 0..sw {
                     let index = ly * sw + lx;
@@ -661,8 +681,13 @@ fn render_rect<C: Channel>(
                     let nx = -gx / length;
                     let ny = -gy / length;
                     let lambert = nx * light_x + ny * light_y;
-                    let edge = (length * edge_scale).clamp(0.0, 1.0);
-                    let tint = (lambert.abs() * edge * depth * opacity * inside).clamp(0.0, 1.0);
+                    let edge = (length * edge_scale).clamp(0.0, 1.0).powf(edge_exponent);
+                    let strength = if lambert >= 0.0 {
+                        lambert.clamp(0.0, 1.0).powf(gloss_exponent)
+                    } else {
+                        (-lambert).clamp(0.0, 1.0)
+                    };
+                    let tint = (strength * edge * depth * opacity * inside).clamp(0.0, 1.0);
                     if tint <= 0.0 {
                         continue;
                     }
@@ -1277,6 +1302,9 @@ mod bounded_randomized {
                     size: rng.unit() * 10.0 + 0.5,
                     angle_deg: rng.unit() * 360.0,
                     depth: rng.unit(),
+                    soften: 0.0,
+                    contour: 0.0,
+                    gloss: 0.0,
                     highlight: Color::WHITE,
                     shadow: Color::BLACK,
                     opacity: rng.unit(),
@@ -1457,7 +1485,10 @@ mod inner_effects_and_bevel {
             bevel: Some(BevelStyle {
                 size: 3.0,
                 angle_deg: 225.0, // light from the upper-left
-                depth: 1.0,
+                depth: 0.6,
+                soften: 0.0,
+                contour: 0.0,
+                gloss: 0.0,
                 highlight: Color::WHITE,
                 shadow: Color::BLACK,
                 opacity: 1.0,
@@ -1494,6 +1525,9 @@ mod inner_effects_and_bevel {
                 size: 1.0,
                 angle_deg: 45.0,
                 depth: 0.8,
+                soften: 0.0,
+                contour: 0.0,
+                gloss: 0.0,
                 highlight: Color::WHITE,
                 shadow: Color::BLACK,
                 opacity: 0.9,
@@ -1526,7 +1560,10 @@ mod inner_effects_and_bevel {
             bevel: Some(BevelStyle {
                 size: 2.0,
                 angle_deg: 225.0,
-                depth: 1.0,
+                depth: 0.6,
+                soften: 0.0,
+                contour: 0.0,
+                gloss: 0.0,
                 highlight: Color::WHITE,
                 shadow: Color::BLACK,
                 opacity: 1.0,
@@ -1556,6 +1593,117 @@ mod inner_effects_and_bevel {
         assert!(
             at(3, 3) > 32768 || at(8, 8) < 32768,
             "the effect is evaluated, not skipped"
+        );
+    }
+}
+
+#[cfg(test)]
+mod bevel_controls {
+    use super::*;
+
+    fn block(width: u32) -> Vec<u8> {
+        let mut source = vec![0u8; (width as usize) * (width as usize) * 4];
+        let inset = width / 4;
+        for y in inset..(width - inset) {
+            for x in inset..(width - inset) {
+                let at = ((y as usize) * width as usize + x as usize) * 4;
+                source[at..at + 4].copy_from_slice(&[40, 40, 40, 255]);
+            }
+        }
+        source
+    }
+
+    fn bevel(size: f32) -> LayerStyles {
+        LayerStyles {
+            bevel: Some(BevelStyle {
+                size,
+                angle_deg: 225.0,
+                depth: 0.6,
+                soften: 0.0,
+                contour: 0.0,
+                gloss: 0.0,
+                highlight: Color::WHITE,
+                shadow: Color::BLACK,
+                opacity: 1.0,
+            }),
+            ..LayerStyles::default()
+        }
+    }
+
+    fn at(pixels: &[u8], width: u32, x: u32, y: u32) -> [u8; 4] {
+        let index = ((y as usize) * width as usize + x as usize) * 4;
+        [
+            pixels[index],
+            pixels[index + 1],
+            pixels[index + 2],
+            pixels[index + 3],
+        ]
+    }
+
+    fn luminance(pixel: [u8; 4]) -> u32 {
+        pixel[0] as u32 + pixel[1] as u32 + pixel[2] as u32
+    }
+
+    #[test]
+    fn soften_widens_the_lit_field() {
+        let width = 21;
+        let source = block(width);
+        let hard = render(&source, width, width, &bevel(2.0));
+        let mut soft_style = bevel(2.0);
+        if let Some(bevel) = &mut soft_style.bevel {
+            bevel.soften = 1.0;
+        }
+        let soft = render(&source, width, width, &soft_style);
+        // Two pixels inside the top-left corner is outside a crisp field but inside a softened
+        // one, so it is only lit by the softened bevel.
+        let inset = width / 4;
+        let hard_pixel = at(&hard, width, inset + 4, inset + 4);
+        let soft_pixel = at(&soft, width, inset + 4, inset + 4);
+        assert!(
+            luminance(soft_pixel) > luminance(hard_pixel),
+            "soften should light a wider band: {hard_pixel:?} vs {soft_pixel:?}"
+        );
+        assert_eq!(soft_pixel[3], 255, "soften must not change alpha");
+    }
+
+    #[test]
+    fn contour_and_gloss_change_the_rim_deterministically() {
+        let width = 21;
+        let source = block(width);
+        let base = render(&source, width, width, &bevel(3.0));
+
+        let mut contoured_style = bevel(3.0);
+        if let Some(bevel) = &mut contoured_style.bevel {
+            bevel.contour = 1.0;
+            bevel.gloss = 1.0;
+        }
+        let contoured = render(&source, width, width, &contoured_style);
+        assert_ne!(base, contoured, "contour/gloss must change the output");
+        assert_eq!(
+            contoured,
+            render(&source, width, width, &contoured_style),
+            "the controls must be deterministic"
+        );
+        for index in 0..(width as usize) * (width as usize) {
+            assert_eq!(
+                contoured[index * 4 + 3],
+                source[index * 4 + 3],
+                "alpha at {index}"
+            );
+        }
+        // Negative contour broadens the rim, so the lit band grows relative to the tight rim.
+        let mut broad_style = bevel(3.0);
+        if let Some(bevel) = &mut broad_style.bevel {
+            bevel.contour = -1.0;
+        }
+        let broad = render(&source, width, width, &broad_style);
+        let inset = width / 4;
+        let lit = |pixels: &[u8]| luminance(at(pixels, width, inset, inset));
+        assert!(
+            lit(&broad) >= lit(&base),
+            "a broad contour must not darken the corner: {} vs {}",
+            lit(&broad),
+            lit(&base)
         );
     }
 }

@@ -3178,6 +3178,9 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 changed |= ui.add(egui::Slider::new(&mut bevel.size, 0.5..=60.0).text("Size")).changed();
                                 changed |= ui.add(egui::Slider::new(&mut bevel.angle_deg, 0.0..=360.0).text("Light angle")).changed();
                                 changed |= ui.add(egui::Slider::new(&mut bevel.depth, 0.0..=1.0).text("Depth")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut bevel.soften, 0.0..=1.0).text("Soften")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut bevel.contour, -1.0..=1.0).text("Contour")).changed();
+                                changed |= ui.add(egui::Slider::new(&mut bevel.gloss, 0.0..=1.0).text("Gloss")).changed();
                                 changed |= ui.add(egui::Slider::new(&mut bevel.opacity, 0.0..=1.0).text("Opacity")).changed();
                                 let highlight = bevel.highlight.to_rgba8();
                                 let mut rgb = [highlight[0], highlight[1], highlight[2]];
@@ -3249,16 +3252,70 @@ pub fn render_ui(ctx: &egui::Context, state: &mut AppState) {
                                 }
                             });
                             if !state.style_presets.is_empty() {
-                                egui::ScrollArea::vertical().max_height(84.0).show(ui, |ui| {
-                                    for (index, preset) in state.style_presets.iter().enumerate() {
+                                let mut select_index: Option<usize> = None;
+                                let mut move_request: Option<(usize, isize)> = None;
+                                let rows: Vec<(usize, String)> = state
+                                    .style_presets
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(index, preset)| (index, preset.name.clone()))
+                                    .collect();
+                                egui::ScrollArea::vertical().max_height(96.0).show(ui, |ui| {
+                                    for (index, name) in rows {
                                         ui.horizontal(|ui| {
                                             if ui.small_button("✕").on_hover_text("Delete this preset").clicked() {
                                                 delete_index = Some(index);
                                             }
-                                            ui.label(RichText::new(&preset.name).size(10.0));
+                                            if ui.small_button("↑").on_hover_text("Move up").clicked() {
+                                                move_request = Some((index, -1));
+                                            }
+                                            if ui.small_button("↓").on_hover_text("Move down").clicked() {
+                                                move_request = Some((index, 1));
+                                            }
+                                            let selected = state.style_preset_index == Some(index);
+                                            if ui
+                                                .selectable_label(selected, RichText::new(&name).size(10.0))
+                                                .on_hover_text("Select to rename")
+                                                .clicked()
+                                            {
+                                                select_index = Some(index);
+                                            }
                                         });
                                     }
                                 });
+                                if let Some(index) = select_index {
+                                    state.style_preset_index = Some(index);
+                                    state.style_preset_rename = state
+                                        .style_presets
+                                        .get(index)
+                                        .map(|preset| preset.name.clone())
+                                        .unwrap_or_default();
+                                }
+                                if let Some((index, delta)) = move_request {
+                                    if let Some(new_index) = state.move_style_preset(index, delta) {
+                                        state.style_preset_index = Some(new_index);
+                                        state.style_preset_rename = state
+                                            .style_presets
+                                            .get(new_index)
+                                            .map(|preset| preset.name.clone())
+                                            .unwrap_or_default();
+                                    }
+                                }
+                                if let Some(index) = state.style_preset_index {
+                                    if index < state.style_presets.len() {
+                                        ui.horizontal(|ui| {
+                                            ui.add(
+                                                egui::TextEdit::singleline(&mut state.style_preset_rename)
+                                                    .desired_width(130.0)
+                                                    .hint_text("New name"),
+                                            );
+                                            if ui.small_button("Rename").clicked() {
+                                                let name = state.style_preset_rename.clone();
+                                                state.rename_style_preset(index, &name);
+                                            }
+                                        });
+                                    }
+                                }
                             }
                             if let Some(index) = apply_index {
                                 state.apply_style_preset(index);

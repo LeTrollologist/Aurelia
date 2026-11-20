@@ -22,6 +22,10 @@ pub struct SelectionEdit {
     pub after: Option<SelectionMask>,
 }
 
+#[cfg(test)]
+/// Serialises tests that set the process-global style-library path override.
+pub(crate) static STYLE_LIBRARY_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// One in-progress coalesced property edit (rename, opacity drag, adjustment sliders), so a
 /// whole gesture becomes a single undo step.
 #[derive(Debug, Clone)]
@@ -822,6 +826,9 @@ pub struct AppState {
     pub style_presets: Vec<aurelia_core::style_store::StylePreset>,
     pub style_preset_error: Option<String>,
     pub style_preset_name: String,
+    /// Selected preset row for rename/move, and the name being edited.
+    pub style_preset_index: Option<usize>,
+    pub style_preset_rename: String,
     pub show_preset_manager: bool,
 
     // ── Frame Animation & Timeline Strip ──
@@ -1125,6 +1132,8 @@ impl AppState {
             style_presets: Vec::new(),
             style_preset_error: None,
             style_preset_name: String::new(),
+            style_preset_index: None,
+            style_preset_rename: String::new(),
             show_preset_manager: false,
 
             timeline: aurelia_core::animation::AnimationTimeline::new(width, height),
@@ -6354,15 +6363,14 @@ impl AppState {
 
 #[cfg(test)]
 mod style_preset_tests {
-    use super::AppState;
+    use super::{AppState, STYLE_LIBRARY_ENV_LOCK};
     use aurelia_core::layer_style::InnerGlowStyle;
-    use std::sync::Mutex;
-
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn style_presets_save_load_apply_and_undo() {
-        let _guard = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let _guard = STYLE_LIBRARY_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let directory =
             std::env::temp_dir().join(format!("aurelia-style-presets-{}", std::process::id()));
         std::fs::create_dir_all(&directory).expect("temp dir");
@@ -6396,6 +6404,140 @@ mod style_preset_tests {
 
         assert!(loaded.delete_style_preset(0));
         assert!(loaded.style_presets.is_empty());
+
+        std::env::remove_var("AURELIA_STYLE_PRESETS_PATH");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+}
+
+/// Rename and reorder operations for the style preset library. Order is the stored order.
+impl AppState {
+    /// Renames a preset. Empty, oversized and duplicate names are rejected with an error; the
+    /// library is saved only after a valid rename.
+    pub fn rename_style_preset(&mut self, index: usize, name: &str) -> bool {
+        let name = name.trim();
+        if index >= self.style_presets.len() {
+            return false;
+        }
+        if name.is_empty() {
+            self.style_preset_error = Some("A preset name cannot be empty".into());
+            return false;
+        }
+        if name.len() > aurelia_core::style_store::MAX_STYLE_PRESET_NAME_BYTES {
+            self.style_preset_error = Some(format!(
+                "Preset names are limited to {} bytes",
+                aurelia_core::style_store::MAX_STYLE_PRESET_NAME_BYTES
+            ));
+            return false;
+        }
+        if self
+            .style_presets
+            .iter()
+            .enumerate()
+            .any(|(other, preset)| other != index && preset.name.eq_ignore_ascii_case(name))
+        {
+            self.style_preset_error = Some(format!("A preset named '{name}' already exists"));
+            return false;
+        }
+        let old = self.style_presets[index].name.clone();
+        self.style_presets[index].name = name.to_string();
+        match self.save_style_presets() {
+            Ok(()) => {
+                self.style_preset_error = None;
+                self.style_preset_rename = name.to_string();
+                self.set_status(format!("Renamed style preset '{old}' to '{name}'"));
+                true
+            }
+            Err(error) => {
+                self.style_preset_error = Some(error);
+                false
+            }
+        }
+    }
+
+    /// Moves a preset one position earlier/later. Returns the new index so the UI can keep the
+    /// selection on the moved row.
+    pub fn move_style_preset(&mut self, index: usize, delta: isize) -> Option<usize> {
+        if index >= self.style_presets.len() {
+            return None;
+        }
+        let target = index as isize + delta;
+        if target < 0 || target >= self.style_presets.len() as isize {
+            return None;
+        }
+        let target = target as usize;
+        self.style_presets.swap(index, target);
+        if let Err(error) = self.save_style_presets() {
+            self.style_preset_error = Some(error);
+            return None;
+        }
+        self.set_status(format!("Moved style preset to position {}", target + 1));
+        Some(target)
+    }
+}
+
+#[cfg(test)]
+mod style_preset_rename_tests {
+    use super::{AppState, STYLE_LIBRARY_ENV_LOCK};
+    use aurelia_core::layer_style::InnerGlowStyle;
+    use aurelia_core::style_store::StylePreset;
+
+    fn glow(radius: f32) -> aurelia_core::layer_style::LayerStyles {
+        let mut styles = aurelia_core::layer_style::LayerStyles::default();
+        styles.inner_glow = Some(InnerGlowStyle {
+            radius,
+            color: aurelia_core::color::Color::WHITE,
+            opacity: 0.5,
+        });
+        styles
+    }
+
+    #[test]
+    fn rename_and_reorder_persist_in_the_library() {
+        let _guard = STYLE_LIBRARY_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("aurelia-style-rename-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).expect("temp dir");
+        std::env::set_var("AURELIA_STYLE_PRESETS_PATH", directory.join("styles.aurp"));
+
+        let mut state = AppState::new(8, 8);
+        state.style_presets = vec![
+            StylePreset::new("One", glow(2.0)),
+            StylePreset::new("Two", glow(4.0)),
+        ];
+        state.save_style_presets().expect("seed library");
+
+        assert!(state.rename_style_preset(0, "First"));
+        assert!(
+            !state.rename_style_preset(1, "first"),
+            "a case-insensitive duplicate must be rejected"
+        );
+        assert!(
+            !state.rename_style_preset(0, "   "),
+            "an empty name must be rejected"
+        );
+        assert_eq!(state.move_style_preset(0, 1), Some(1), "moved down");
+        assert_eq!(
+            state.move_style_preset(0, -1),
+            None,
+            "cannot move above the top"
+        );
+        assert_eq!(
+            state.move_style_preset(1, 1),
+            None,
+            "cannot move past the end"
+        );
+
+        let mut loaded = AppState::new(8, 8);
+        loaded.load_style_presets();
+        let names: Vec<String> = loaded
+            .style_presets
+            .iter()
+            .map(|preset| preset.name.clone())
+            .collect();
+        assert_eq!(names, vec!["Two".to_string(), "First".to_string()]);
 
         std::env::remove_var("AURELIA_STYLE_PRESETS_PATH");
         let _ = std::fs::remove_dir_all(&directory);

@@ -89,12 +89,20 @@ entry: u32 name_len | UTF-8 name | u32 json_len | JSON(LayerStyles)
   rather than reinterpreted.
 - Storage path: `%LOCALAPPDATA%\Aurelia\styles.aurp` (an `AURELIA_STYLE_PRESETS_PATH` override
   exists for portable installs and tests).
-- Panel: save the active stack under a name, apply any preset as one undoable style edit, delete,
-  and import/export the library through the host file dialogs.
+- Panel: save the active stack under a name, apply any preset as one undoable style edit, select,
+  rename, move up/down, delete, and import/export the library through the host file dialogs.
+
+## Bevel controls
+
+- `soften` (0..=1) widens the normal field to three times the size at 1, so the lit band spreads
+  inward.
+- `contour` (-1..=1) reshapes the rim falloff: positive tightens the rim, negative broadens it.
+- `gloss` (0..=1) raises the lit side to a power (up to 4), concentrating the highlight.
+
+All three are deterministic and clamped on read, carry through ASTY v3, and preserve alpha.
 
 ## Deferred
 
-- Rename and reorder in the preset panel (delete + save under a new name covers the workflow).
 - Style presets inside brush preset categories (the two libraries stay separate by design).
 
 ## Non-goals
